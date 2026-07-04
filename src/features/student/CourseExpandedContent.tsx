@@ -1,0 +1,96 @@
+import { Box, Stack, Typography } from '@mui/material';
+import { PlayCircle, CheckCircle2 } from 'lucide-react';
+import { Course, Topic } from './types';
+
+interface Props {
+  course: Course;
+  dbProgress: Record<string, boolean>;
+  getText: (field: any) => string;
+  getCourseTopics: (course: Course) => Topic[];
+  onNavigate: (path: string) => void;
+  theme: any;
+}
+
+const DROPDOWN_WIDTH = { xs: '90vw', sm: '85vw', md: '900px', lg: '1040px' }; 
+const DROPDOWN_MAX_HEIGHT = { xs: '220px', md: '365px' };                   
+
+export function CourseExpandedContent({ course, dbProgress, getText, getCourseTopics, onNavigate, theme }: Props) {
+  const lastSession = (() => {
+    try { return JSON.parse(localStorage.getItem('mooc_last_session') || 'null'); }
+    catch { return null; }
+  })();
+
+  const topics = getCourseTopics(course);
+
+  return (
+    <Box
+      sx={{
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        zIndex: 50,
+        marginTop: '10px',
+        width: DROPDOWN_WIDTH,
+        maxWidth: '95vw',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <Box sx={{ bgcolor: 'background.paper', borderRadius: { xs: 2, md: 1 }, border: '1px solid', borderColor: 'primary.main' + '4D', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
+        <Box
+          sx={{
+            p: { xs: 1.5, md: 2 },
+            display: 'flex',
+            flexDirection: 'row',
+            gap: { xs: 3, md: 5 },
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            maxWidth: '100%',
+            '&::-webkit-scrollbar': { height: '8px' },
+            '&::-webkit-scrollbar-thumb': { bgcolor: 'primary.main', borderRadius: '4px' },
+          }}
+        >
+          {topics.map(topic => (
+            <Box
+              key={getText(topic.title)}
+              sx={{
+                flexShrink: 0,
+                width: { xs: 260, md: 320 },
+                borderRight: '1px solid',
+                borderColor: 'divider',
+                pr: { xs: 3, md: 5 },
+                '&:last-of-type': { borderRight: 'none', pr: 0 },
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'primary.main', mb: 1, display: 'block', fontSize: { xs: '1rem', md: '1.15rem' } }}>
+                {getText(topic.title)}
+              </Typography>
+              <Stack spacing={0.5} sx={{ maxHeight: DROPDOWN_MAX_HEIGHT, overflowY: 'auto', pr: 1 }}>
+                {topic.lessons?.map(lesson => {
+                  const isLastActive = lastSession?.courseId === course.id && lastSession?.lessonId === lesson.id && !dbProgress[`${course.id}_${lesson.id}`];
+                  return (
+                    <Box
+                      key={lesson.id}
+                      onClick={() => onNavigate(`/courses/${course.id}/${lesson.id}`)}
+                      sx={{ p: 1, borderRadius: '8px', cursor: 'pointer', bgcolor: 'action.hover', '&:hover': { bgcolor: 'action.selected' }, minWidth: 0 }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: { xs: '0.85rem', md: '0.9rem' } }}>
+                          {getText(lesson.title)}
+                        </Typography>
+                        {dbProgress[`${course.id}_${lesson.id}`] ? (
+                          <CheckCircle2 size={18} color={theme.palette.success.main} />
+                        ) : (
+                          <PlayCircle size={18} color={isLastActive ? '#ff9800' : theme.palette.primary.main} />
+                        )}
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    </Box>
+  );
+}
