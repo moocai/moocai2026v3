@@ -6,12 +6,13 @@ import {
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { BookOpen, ChevronDown, ChevronRight, Code2, CheckCircle2, X, ChevronLeft } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronRight, Code2, CheckCircle2,ChevronLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
+import { courseService } from '../../services/courseService';
 
 
 type I18nField = { ca: string; es: string; en: string };
@@ -46,6 +47,16 @@ export default function CourseLessons() {
   const defaultLessonId = course?.content?.[0]?.id ?? null;
   const activeId = activeLessonId ?? defaultLessonId;
 
+  const [theoryMap, setTheoryMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!course || !activeId) return;
+    if (theoryMap[activeId] !== undefined) return;
+    courseService.getTopicBySlug(course.id, activeId)
+      .then(data => setTheoryMap(prev => ({ ...prev, [activeId]: data.theory_md || '' })))
+      .catch(() => setTheoryMap(prev => ({ ...prev, [activeId]: '' })));
+  }, [course, activeId]);
+
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -73,6 +84,16 @@ export default function CourseLessons() {
     );
   };
 
+  const getLessonProgress = (lesson: any): number => {
+    const completable = lesson.subTopics?.filter((s: any) => s.type === 'coding' || s.type === 'test') || [];
+    if (completable.length === 0) return 0;
+    const done = completable.filter((s: any) => {
+      const key = `${courseId}_${s.problemSlug || s.slug || lesson.id}`;
+      return !!progress[key];
+    });
+    return Math.round((done.length / completable.length) * 100);
+  };
+
   const lang = (i18n.language?.split('-')[0] as keyof I18nField) || 'ca';
   const getText = (field: I18nField | string | undefined): string => {
     if (!field) return '';
@@ -88,6 +109,110 @@ export default function CourseLessons() {
 
   if (!course) return <Typography>{t('lesson.course_not_found')}</Typography>;
 
+  const renderSidebarTabs = () => (
+    <>
+      <Box sx={{borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
+        <Tabs value={contentTab} onChange={(_, v) => setContentTab(v)} sx={{ minHeight: 0, '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 0, py: 1, fontWeight: 800, fontSize: { xs: '0.75rem', md: '1rem' }, textTransform: 'none', color: 'white', ml: { xs: 0, md: 1 }, px: { xs: 1, md: 2 } }, '& .Mui-selected': { color: 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' } }}>
+          <Tab label={t('lesson.tab_statement', 'Temari')} />
+        </Tabs>
+      </Box>
+      {contentTab === 0 && course.content?.map((lesson, index) => (
+        <motion.div
+          key={lesson.id}
+          initial={{ opacity: 0, x: -30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: index * 0.2, type: 'spring', stiffness: 80, damping: 5 }}
+        >
+        <Accordion disableGutters elevation={0} sx={{
+          '&:before': { display: 'none' },
+          borderColor: 'divider',
+          bgcolor: 'transparent',
+        }}>
+          <AccordionSummary expandIcon={<ChevronDown size={30} />} onClick={() => setActiveLessonId(lesson.id)} sx={{
+            px: 2, minHeight: 48,
+            '& .MuiAccordionSummary-content': { my: 0 },
+            '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.5) },
+            ...(lesson.id === activeId ? { bgcolor: alpha('#8400ff', 0.3) } : {})
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
+              <Typography sx={{ fontSize: { xs: '0.85rem', md: '1rem' }, fontWeight: 600, lineHeight: 1.3, flex: 1, letterSpacing: '0.15em', color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#fff') : undefined}}>
+                {getText(lesson.title)}
+              </Typography>
+              <Typography sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.secondary', flexShrink: 0 }}>
+                {getLessonProgress(lesson)}%
+              </Typography>
+            </Box>
+          </AccordionSummary>
+          <AccordionDetails sx={{ px: 2, pb: 2, pt: 1 }}>
+            {theoryMap[lesson.id] && (
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Button
+                  onClick={() => {
+                    setActiveLessonId(lesson.id);
+                    const el = document.getElementById(`theory-${lesson.id}`);
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  disableRipple sx={{ justifyContent: 'flex-start', fontWeight: 600, fontSize: { xs: '0.9rem', md: '1.05rem' }, color: lesson.id === activeId ? '#ffffff' : 'text.secondary', bgcolor: lesson.id === activeId ? alpha('#8400ff', 0.1) : 'transparent', textTransform: 'none', minWidth: 0, borderRadius: 1, '&:hover': { color: '#ffffff', bgcolor: alpha('#8400ff', 0.4) }, flex: 1 }}>
+                  📖 Teoria
+                </Button>
+              </Box>
+            )}
+            <Stack spacing={0.5}>
+              {lesson.subTopics?.filter((s: any) => s.type !== 'coding' && s.type !== 'test').map((sub, i) => {
+                const subKey = `${courseId}_${sub.problemSlug || lesson.id}`;
+                const isSubDone = !!progress[subKey];
+                return (
+                  <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Button
+                      onClick={() => {
+                        setActiveLessonId(lesson.id);
+                        const el = document.getElementById(`sub-${lesson.id}-${i}`);
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      disableRipple sx={{justifyContent: 'flex-start', fontWeight: 600, fontSize: { xs: '0.9rem', md: '1.05rem' }, color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#ffffff') : 'text.secondary', textTransform: 'none', minWidth: 0, borderRadius: 1, '&:hover': { color: '#ffffff', bgcolor: alpha('#8400ff', 0.4) }, flex: 1}}>
+                      {getText(sub.subtitle)}
+                    </Button>
+                    {isSubDone && <CheckCircle2 size={14} color={theme.palette.success.main} />}
+                  </Box>
+                );
+              })}
+              {lesson.subTopics?.filter((s: any) => s.type === 'coding').map((sub: any) => {
+                const subKey = `${courseId}_${sub.problemSlug || sub.slug}`;
+                const isDone = !!progress[subKey];
+                return (
+                  <Button
+                    key={sub.problemSlug || sub.slug}
+                    component={RouterLink}
+                    to={`/courses/${courseId}/${sub.problemSlug || sub.slug || lesson.id}`}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start', fontSize: { xs: '0.9rem', md: '1.05rem' }, fontWeight: 600, textTransform: 'none', color: isDone ? 'success.main' : 'text.secondary', borderRadius: 1, '&:hover': { bgcolor: alpha('#8400ff', 0.1) } }}
+                  >
+                    {isDone ? '✅' : '💻'} {getText(sub.subtitle)}
+                  </Button>
+                );
+              })}
+              {lesson.subTopics?.filter((s: any) => s.type === 'test').map((sub: any) => {
+                const subKey = `${courseId}_${sub.problemSlug || sub.slug}`;
+                const isDone = !!progress[subKey];
+                return (
+                  <Button
+                    key={sub.problemSlug || sub.slug}
+                    component={RouterLink}
+                    to={`/courses/${courseId}/exam/${sub.problemSlug || sub.slug || lesson.id}`}
+                    size="small"
+                    sx={{ justifyContent: 'flex-start', fontSize: { xs: '0.9rem', md: '1.05rem' }, fontWeight: 600, textTransform: 'none', color: isDone ? 'success.main' : 'text.secondary', borderRadius: 1, '&:hover': { bgcolor: alpha('#8400ff', 0.1) } }}
+                  >
+                    {isDone ? '✅' : '📝'} {getText(sub.subtitle)}
+                  </Button>
+                );
+              })}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+        </motion.div>
+      )      )}
+    </>
+  );
 
   return (
     <Box sx={{ position: 'fixed', top: 64, left: 0, right: 0, bottom: 0, bgcolor: 'background.default', overflow: 'hidden' }}>
@@ -103,7 +228,8 @@ export default function CourseLessons() {
           borderColor: 'divider',
           display: { xs: 'none', md: 'block' },
           bgcolor: 'background.paper',
-          pt: 4,
+          mt:2,
+          pt:1,
           overflowY: 'auto',
           overflowX: 'hidden',
           maxHeight: 'calc(100vh - 64px)',
@@ -111,131 +237,7 @@ export default function CourseLessons() {
           '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
           '&::-webkit-scrollbar-thumb': { bgcolor: 'divider', borderRadius: 3 },
         }}>
-          <Box sx={{borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'background.paper' }}>
-            <Tabs value={contentTab} onChange={(_, v) => setContentTab(v)} sx={{ minHeight: 0, '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 0, py: 1, fontWeight: 800, fontSize: '1rem', textTransform: 'none', color: 'white', ml: 1 }, '& .Mui-selected': { color: 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' } }}>
-              <Tab label={t('lesson.tab_statement', 'Temari')} />
-              <Tab label={t('lesson.tab_other_solutions', 'Laboratoris')} />
-              <Tab label={t('lesson.tab_tests', 'Tests')} />
-            </Tabs>
-          </Box>
-          {/* Temari: acordions del syllabus */}
-          {contentTab === 0 && course.content?.map((lesson, index) => (
-            <motion.div
-              key={lesson.id}
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.2, type: 'spring', stiffness: 80, damping: 5 }}
-            >
-            <Accordion disableGutters elevation={0} sx={{
-              '&:before': { display: 'none' },
-              borderColor: 'divider',
-              bgcolor: 'transparent',
-            }}>
-              <AccordionSummary expandIcon={<ChevronDown size={30} />} onClick={() => setActiveLessonId(lesson.id)} sx={{
-                px: 2, minHeight: 48,
-                '& .MuiAccordionSummary-content': { my: 0 },
-                '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.5) },
-                ...(lesson.id === activeId ? { bgcolor: alpha('#8400ff', 0.3) } : {})
-              }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <Typography sx={{ fontSize: '1rem', fontWeight: 600, lineHeight: 1.3, flex: 1, letterSpacing: '0.15em', color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#fff') : undefined}}>
-                    {getText(lesson.title)}
-                  </Typography>
-                </Box>
-              </AccordionSummary>
-              <AccordionDetails sx={{ px: 2, pb: 2, pt: 1 }}>
-                <Stack spacing={0.5}>
-                  {lesson.subTopics?.filter((s: any) => s.type !== 'test').map((sub, i) => {
-                    const subKey = `${courseId}_${sub.problemSlug || lesson.id}`;
-                    const isSubDone = !!progress[subKey];
-                    return (
-                      <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Button
-                          onClick={() => {
-                            setActiveLessonId(lesson.id);
-                            const el = document.getElementById(`sub-${lesson.id}-${i}`);
-                            if (el) el.scrollIntoView({ behavior: 'smooth' });
-                          }}
-                          disableRipple sx={{justifyContent: 'flEx-start', fontSize: '1rem', color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#ffffff') : 'text.secondary', textTransform: 'none', minWidth: 0, borderRadius: 1, '&:hover': { color: '#ffffff', bgcolor: alpha('#8400ff', 0.4) }, flex: 1}}>
-                          {getText(sub.subtitle)}
-                        </Button>
-                        {isSubDone && <CheckCircle2 size={14} color={theme.palette.success.main} />}
-                      </Box>
-                    );
-                  })}
-                </Stack>
-              </AccordionDetails>
-            </Accordion>
-            </motion.div>
-          ))}
-
-          {/* Laboratoris: només coding */}
-          {contentTab === 1 && (
-            <Stack spacing={2} sx={{ px: 2, py: 2 }}>
-              {course.content?.map((temari) => {
-                const codingSubs = temari.subTopics?.filter((s: any) => s.type === 'coding');
-                if (!codingSubs?.length) return null;
-                return (
-                  <Box key={temari.id}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.8rem', color: '#8400ff', mb: 1 }}>
-                      {getText(temari.title)}
-                    </Typography>
-                    <Stack spacing={0.5}>
-                      {codingSubs.map((sub: any) => {
-                        const subKey = `${courseId}_${sub.problemSlug || sub.slug}`;
-                        const isDone = !!progress[subKey];
-                        return (
-                          <Button
-                            key={sub.problemSlug || sub.slug}
-                            component={RouterLink}
-                            to={`/courses/${courseId}/${sub.problemSlug || sub.slug || temari.id}`}
-                            size="small"
-                            sx={{ justifyContent: 'flex-start', fontSize: '0.75rem', fontWeight: 600, textTransform: 'none', color: isDone ? 'success.main' : 'text.secondary', borderRadius: 1, '&:hover': { bgcolor: alpha('#8400ff', 0.1) } }}
-                          >
-                            {isDone ? '✅' : '💻'} {getText(sub.subtitle)}
-                          </Button>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
-
-          {/* Tests: problemes tipus test */}
-          {contentTab === 2 && (
-            <Stack spacing={2} sx={{ px: 2, py: 2 }}>
-              {course.content?.map((temari) => {
-                const testSubs = temari.subTopics?.filter((s: any) => s.type === 'test');
-                if (!testSubs?.length) return null;
-                return (
-                  <Box key={temari.id}>
-                    <Typography sx={{ fontWeight: 700, fontSize: '0.8rem', color: '#8400ff', mb: 1 }}>
-                      {getText(temari.title)}
-                    </Typography>
-                    <Stack spacing={0.5}>
-                      {testSubs.map((sub: any) => {
-                        const subKey = `${courseId}_${sub.problemSlug || sub.slug}`;
-                        const isDone = !!progress[subKey];
-                        return (
-                          <Button
-                            key={sub.problemSlug || sub.slug}
-                            component={RouterLink}
-                            to={`/courses/${courseId}/exam/${sub.problemSlug || sub.slug || temari.id}`}
-                            size="small"
-                            sx={{ justifyContent: 'flex-start', fontSize: '0.75rem', fontWeight: 600, textTransform: 'none', color: isDone ? 'success.main' : 'text.secondary', borderRadius: 1, '&:hover': { bgcolor: alpha('#8400ff', 0.1) } }}
-                          >
-                            {isDone ? '✅' : '📝'} {getText(sub.subtitle)}
-                          </Button>
-                        );
-                      })}
-                    </Stack>
-                  </Box>
-                );
-              })}
-            </Stack>
-          )}
+          {renderSidebarTabs()}
         </Box>
 
         {/* CENTRAL COLUMN - Reading Content */}
@@ -256,7 +258,7 @@ export default function CourseLessons() {
               size="small"
               startIcon={<BookOpen size={16}/>}
               sx={{fontWeight: 700, borderRadius: 2, textTransform: 'none'}}>
-              {t('lesson.syllabus')}
+              {t('lesson.tab_statement', 'Temari')}
             </Button>
           </Box>
 
@@ -265,64 +267,10 @@ export default function CourseLessons() {
             open={mobileSyllabusOpen}
             onClose={() => setMobileSyllabusOpen(false)}
             anchor="left"
-            slotProps={{ paper: { sx: { width: 280, pt: 4, bgcolor: 'background.paper' } } }}
+            slotProps={{ paper: { sx: { width: 280, bgcolor: 'background.paper', top: 80, height: 'calc(100vh - 64px)' } } }}
           >
             <Box component="aside">
-            <Box sx={{ px: 2, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <BookOpen size={30} color={theme.palette.primary.main} />
-                <Typography sx={{ fontSize: '1rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.3em', color: 'text.secondary', flex: 1 }}>
-                  {t('lesson.syllabus')}
-                </Typography>
-                <Box component="button" onClick={() => setMobileSyllabusOpen(false)} sx={{ border: 'none', bgcolor: 'transparent', cursor: 'pointer', display: 'flex', p: 0.5, borderRadius: 1, color:'red'}}>
-                  <X size={24} />
-                </Box>
-              </Box>
-            </Box>
-            {course.content?.map((lesson, index) => (
-              <Accordion key={lesson.id} disableGutters elevation={0} sx={{
-                '&:before': { display: 'none' },
-                borderBottom: '1px solid',
-                borderColor: 'divider',
-                bgcolor: 'transparent',
-              }}>
-              <AccordionSummary expandIcon={<ChevronDown size={30} />} onClick={() => { setActiveLessonId(lesson.id); requestAnimationFrame(() => { document.getElementById(`lesson-${lesson.id}`)?.scrollIntoView({ behavior: 'smooth' }); }); }} sx={{
-                  px: 2, minHeight: 28,
-                  '& .MuiAccordionSummary-content': { my: 0 },
-                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.5) },
-                  ...(lesson.id === activeId ? { bgcolor: alpha('#8400ff', 0.1) } : {})
-                }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: 'text.disabled', fontVariantNumeric: 'tabular-nums' }}>
-                      {String(index + 1).padStart(2, '0')}
-                    </Typography>
-                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 600, lineHeight: 3, flex: 1, color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#fff') : undefined }}>
-                      {getText(lesson.title)}
-                    </Typography>
-                    {isLessonCompleted(lesson) && (
-                      <CheckCircle2 size={16} color={theme.palette.success.main} />
-                    )}
-                  </Box>
-                </AccordionSummary>
-                <AccordionDetails sx={{ px: 2, pb: 2, pt: 1 }}>
-                  <Stack spacing={0.5}>
-                    {lesson.subTopics?.map((sub, i) => (
-                      <Button
-                        key={i}
-                        onClick={() => {
-                          setActiveLessonId(lesson.id);
-                          setMobileSyllabusOpen(false);
-                          const el = document.getElementById(`sub-${lesson.id}-${i}`);
-                          if (el) el.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        disableRipple sx={{ justifyContent: 'flex-start', fontSize: '1rem', color: lesson.id === activeId ? (mode === 'light' ? '#000' : '#8400ff') : 'text.secondary', textTransform: 'none', minWidth: 0, borderRadius: 1, '&:hover': { color: '#8400ff', bgcolor: alpha('#8400ff', 0.06) } }}>
-                        {getText(sub.subtitle)}
-                      </Button>
-                    ))}
-                  </Stack>
-                </AccordionDetails>
-              </Accordion>
-            ))}
+              {renderSidebarTabs()}
             </Box>
           </Drawer>
 
@@ -378,32 +326,19 @@ export default function CourseLessons() {
                     </Typography>
                   </Box>
 
-                  {/* Sub-topics */}
-                  {lesson.subTopics?.filter((s: any) => s.type !== 'test').map((sub, i) => (
-                    <Box key={i} id={`sub-${lesson.id}-${i}`} sx={{ mb: 5, scrollMarginTop: '60px' }}>
+                  {/* Theory */}
+                  {theoryMap[lesson.id] && (
+                    <Box id={`theory-${lesson.id}`} sx={{ mb: 5 }}>
                       <Typography variant="h5" sx={{ fontWeight: 700, fontSize: '1.15rem', mb: 1.5, color: '#149eca' }}>
-                        {getText(sub.subtitle)}
+                        Teoria
                       </Typography>
                       <Box sx={{ '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 1.8, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: 'divider', px: 2, py: 1, textAlign: 'left', color: 'text.secondary' }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{getText(sub.text)}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{theoryMap[lesson.id]}</ReactMarkdown>
                       </Box>
-                      {sub.exampleCode && (
-                        <Box sx={{ bgcolor: '#1a1d23', border: '1px solid', borderColor: '#30363d', borderRadius: 2, overflow: 'hidden' }}>
-                          <Box sx={{ px: 2.5, py: 1.25, bgcolor: '#23272f', borderBottom: '1px solid #30363d', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                            <Code2 size={14} color="#8b949e" />
-                            <Typography sx={{ fontSize: '0.65rem', color: '#8b949e', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.10em' }}>
-                              Example
-                            </Typography>
-                          </Box>
-                          <Box sx={{ p: 3, overflow: 'auto' }}>
-                            <Typography sx={{ fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.9rem', color: '#7ee787', whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
-                              {`"${sub.exampleCode}"`}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      )}
                     </Box>
-                  ))}
+                  )}
+
+
                 </Box>
               </motion.div>
             ))}

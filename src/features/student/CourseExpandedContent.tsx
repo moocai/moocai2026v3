@@ -1,3 +1,4 @@
+import { useRef, useEffect, useState } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { PlayCircle, CheckCircle2 } from 'lucide-react';
 import { Course, Topic } from './types';
@@ -11,10 +12,31 @@ interface Props {
   theme: any;
 }
 
-const DROPDOWN_WIDTH = { xs: '90vw', sm: '85vw', md: '900px', lg: '1040px' }; 
-const DROPDOWN_MAX_HEIGHT = { xs: '220px', md: '365px' };                   
+const DROPDOWN_MAX_HEIGHT = { xs: '220px', md: '365px' };
 
 export function CourseExpandedContent({ course, dbProgress, getText, getCourseTopics, onNavigate, theme }: Props) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [top, setTop] = useState<number>(0);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const update = () => {
+      const parent = ref.current?.parentElement;
+      if (parent) {
+        const rect = parent.getBoundingClientRect();
+        setTop(rect.bottom + 10);
+        setReady(true);
+      }
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
   const lastSession = (() => {
     try { return JSON.parse(localStorage.getItem('mooc_last_session') || 'null'); }
     catch { return null; }
@@ -23,15 +45,16 @@ export function CourseExpandedContent({ course, dbProgress, getText, getCourseTo
   const topics = getCourseTopics(course);
 
   return (
-    <Box
+    <Box ref={ref}
       sx={{
-        position: 'absolute',
-        top: '100%',
+        position: 'fixed',
+        top,
         left: 0,
+        right: 0,
         zIndex: 50,
-        marginTop: '10px',
-        width: DROPDOWN_WIDTH,
-        maxWidth: '95vw',
+        width: '100vw',
+        px: { xs: 2, md: 8 },
+        visibility: ready ? 'visible' : 'hidden',
       }}
       onClick={(e) => e.stopPropagation()}
     >
@@ -61,11 +84,17 @@ export function CourseExpandedContent({ course, dbProgress, getText, getCourseTo
                 '&:last-of-type': { borderRight: 'none', pr: 0 },
               }}
             >
-              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'primary.main', mb: 1, display: 'block', fontSize: { xs: '1rem', md: '1.15rem' } }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 900, color: 'primary.main', mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: { xs: '1rem', md: '1.15rem' } }}>
                 {getText(topic.title)}
+                <Typography component="span" sx={{ fontSize: '1rem', fontWeight: 700, color: 'text.secondary', ml: 1, flexShrink: 0 }}>
+                  {topic.lessons?.length ? Math.round((topic.lessons.filter((l: any) => dbProgress[`${course.id}_${l.id}`]).length / topic.lessons.length) * 100) : 0}%
+                </Typography>
               </Typography>
               <Stack spacing={0.5} sx={{ maxHeight: DROPDOWN_MAX_HEIGHT, overflowY: 'auto', pr: 1 }}>
-                {topic.lessons?.map(lesson => {
+                {[...(topic.lessons || [])].sort((a, b) => {
+                  const order = (t: any) => t?.type === 'test' ? 2 : t?.type === 'coding' ? 1 : 0;
+                  return order(a) - order(b);
+                }).map(lesson => {
                   const isLastActive = lastSession?.courseId === course.id && lastSession?.lessonId === lesson.id && !dbProgress[`${course.id}_${lesson.id}`];
                   return (
                     <Box
@@ -75,7 +104,7 @@ export function CourseExpandedContent({ course, dbProgress, getText, getCourseTo
                     >
                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, fontSize: { xs: '0.85rem', md: '0.9rem' } }}>
-                          {getText(lesson.title)}
+                          {lesson.type === 'coding' ? '💻 ' : lesson.type === 'test' ? '📝 ' : ''}{getText(lesson.title)}
                         </Typography>
                         {dbProgress[`${course.id}_${lesson.id}`] ? (
                           <CheckCircle2 size={18} color={theme.palette.success.main} />

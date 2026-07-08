@@ -5,7 +5,7 @@ export default {
     start: "Home",
     login_students: "Student Access",
     incorrect_pin: "Incorrect PIN",
-    access: "Login",
+    access: "Log in / Sign in",
     enroll_login_required: "You must log in to enroll in the course"
   },
     dashboard: {
@@ -26,7 +26,7 @@ export default {
     register_btn: "Register Student",
     reset_course_confirm: "Are you sure you want to reset the progress of this course?",
     reset_course_tooltip: "Reset course",
-    progress_detail: "Progress Detail",
+    progress_detail: "Global progress",
     click_to_login: "Click to log in",
     role_student: "Student",
     role_teacher: "Teacher",

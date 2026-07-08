@@ -5,7 +5,7 @@ export default {
     start: "Inici",
     login_students: "Accés Alumnes",
     incorrect_pin: "Contrassenya incorrecte",
-    access: "Accedir",
+    access: "Inicia sessió",
     enroll_login_required: "Has d'iniciar sessió per inscriure't al curs"
   },
     dashboard: {
@@ -26,7 +26,7 @@ export default {
     register_btn: "Registrar Alumne",
     reset_course_confirm: "Estàs segur que vols reiniciar el progrés d'aquest curs?",
     reset_course_tooltip: "Reiniciar curs",
-    progress_detail: "Detall del Progrés",
+    progress_detail: "Progrés Global",
     click_to_login: "Fes clic per fer el login",
     role_student: "Alumne",
     role_teacher: "Professor",

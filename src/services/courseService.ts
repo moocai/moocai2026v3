@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { Course } from '../types';
+import i18n from '../i18n';
+import { getLocalizedText } from '../utils/formatters';
 
 /* ------------------------------------------------------------------ */
 /* Configuració d'URL (Blindada)                                     */
@@ -24,14 +26,21 @@ apiClient.interceptors.request.use((config) => {
 /* ------------------------------------------------------------------ */
 /* Servei                                                            */
 /* ------------------------------------------------------------------ */
+
+const fullCourseCache = new Map<string, any>();
+let allCoursesCache: Course[] | null = null;
+
 export const courseService = {
   
-  async getAllCourses(): Promise<Course[]> {
+  async getAllCourses(forceRefresh = false): Promise<Course[]> {
+    if (!forceRefresh && allCoursesCache) {
+      return allCoursesCache;
+    }
     const { data } = await apiClient.get('/public/courses/');
     // Comprovació per assegurar que rebem un array
     const list = Array.isArray(data) ? data : (data.results || []);
     
-    return list.map((c: any) => ({
+    const courses = list.map((c: any) => ({
       id: c.slug,
       slug: c.slug,
       title: c.name,
@@ -41,6 +50,8 @@ export const courseService = {
       duration: '',
       instructor: '',
     }));
+    allCoursesCache = courses;
+    return courses;
   },
 
   async getCourseBySlug(slug: string): Promise<any> {
@@ -53,42 +64,47 @@ export const courseService = {
     return Array.isArray(data) ? data : (data.results || []);
   },
 
+  async getTopicBySlug(courseSlug: string, topicSlug: string): Promise<any> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/`);
+    const lang = i18n.language?.split('-')[0] || 'en';
+    if (data.theory_md) {
+      data.theory_md = getLocalizedText(data.theory_md, lang as any);
+    }
+    return data;
+  },
+
   async getTopicProblems(courseSlug: string, topicSlug: string): Promise<any[]> {
     const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/`);
     return Array.isArray(data) ? data : (data.results || []);
   },
 
-  async submitChallenge(courseSlug: string, challengeSlug: string, code: string): Promise<any> {
-    const file = new File([code], 'submission.csv', { type: 'text/csv' });
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const { data } = await apiClient.post(
-      `/courses/${courseSlug}/challenges/${challengeSlug}/submissions/`,
-      formData
+  async submitChallenge(courseSlug: string, topicSlug: string, problemSlug: string, data: { code?: string; answers?: string[] }): Promise<any> {
+    const { data: response } = await apiClient.post(
+      `/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`,
+      data
     );
+    return response;
+  },
+
+  async getChallenge(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/`);
     return data;
   },
 
-  async getChallenge(courseSlug: string, challengeSlug: string): Promise<any> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/challenges/${challengeSlug}/`);
-    return data;
-  },
-
-  async getChallengeSubmissions(courseSlug: string, challengeSlug: string): Promise<any[]> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/challenges/${challengeSlug}/submissions/`);
+  async getChallengeSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`);
     return Array.isArray(data) ? data : (data.results || []);
   },
 
-  async getChallengeGrades(courseSlug: string, challengeSlug: string): Promise<any[]> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/challenges/${challengeSlug}/submissions/grades/`);
+  async getChallengeGrades(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/grades/`);
     return Array.isArray(data) ? data : (data.results || []);
   },
 
-  async getPeerSubmissions(courseId: string, lessonId: string): Promise<any[]> {
+  async getPeerSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     try {
       const { data } = await apiClient.get(
-        `/courses/${courseId}/topics/${lessonId}/problems/${lessonId}/submissions/peers/`
+        `/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/peers/`
       );
       return Array.isArray(data) ? data : (data.results || []);
     } catch {
@@ -97,11 +113,14 @@ export const courseService = {
   },
 
   /** @deprecated Use submitChallenge instead */
-  async submitSubmission(courseSlug: string, challengeSlug: string, code: string): Promise<any> {
-    return this.submitChallenge(courseSlug, challengeSlug, code);
+  async submitSubmission(courseSlug: string, topicSlug: string, problemSlug: string, data: { code?: string; answers?: string[] }): Promise<any> {
+    return this.submitChallenge(courseSlug, topicSlug, problemSlug, data);
   },
 
-  async getFullCourseDetail(slug: string): Promise<any> {
+  async getFullCourseDetail(slug: string, forceRefresh = false): Promise<any> {
+    if (!forceRefresh && fullCourseCache.has(slug)) {
+      return fullCourseCache.get(slug);
+    }
     try {
       const [courseData, topics] = await Promise.all([
         this.getCourseBySlug(slug),
@@ -129,15 +148,26 @@ export const courseService = {
         })
       );
 
-      return { 
+      const result = { 
         ...courseData, 
         id: courseData.slug, 
         title: courseData.name, 
         content 
       };
+      fullCourseCache.set(slug, result);
+      return result;
     } catch (err) {
       console.error("Error al carregar el detall del curs:", err);
       throw err;
+    }
+  },
+
+  clearCache(slug?: string) {
+    if (slug) {
+      fullCourseCache.delete(slug);
+    } else {
+      fullCourseCache.clear();
+      allCoursesCache = null;
     }
   },
 };

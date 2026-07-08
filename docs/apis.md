@@ -30,7 +30,11 @@ Timeout: 10s
 | GET | `/api/v1/courses/{slug}/` | Obté detalls d'un curs per slug |
 | GET | `/api/v1/courses/{slug}/topics/` | Obté els temes/lliçons d'un curs |
 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | Obté els problemes d'un tema concret |
-| POST | `/api/v1/courses/{slug}/challenges/{challenge}/submissions/` | Envia una solució d'exercici |
+| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | Obté detalls d'un problema concret |
+| POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia una resposta (coding: `{"code":"..."}`, test: `{"answers":["id",...]}`) |
+| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Obté submissions d'un problema |
+| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | Obté notes d'un problema |
+| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | Obté submissions d'altres alumnes |
 
 ---
 
@@ -72,7 +76,11 @@ Definits a `src/services/api.ts`. No fan peticions HTTP; només llegeixen i escr
 | 5 | GET | `/api/v1/courses/{slug}/` | ✅ Sí|
 | 6 | GET | `/api/v1/courses/{slug}/topics/` | ✅ Sí|
 | 7 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | ✅ Sí|
-| 8 | POST | `/api/v1/courses/{slug}/challenges/{challenge}/submissions/` | ❌ No ERROR 401|
+| 8 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | ✅ Sí|
+| 9 | POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | ✅ Sí|
+| 10 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | ❌ No |
+| 11 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | ❌ No |
+| 12 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | ❌ No |
 
 **Estat dels tests:** El projecte no té cap infraestructura de testing ni cap fitxer de test. Tots els endpoints estan sense testejar.
 
@@ -82,6 +90,7 @@ Definits a `src/services/api.ts`. No fan peticions HTTP; només llegeixen i escr
 
 - **Proxy Vite:** La configuració de Vite proxyja `/api` → `https://algorien.com` amb `changeOrigin: true`. En producció, cal configurar el reverse proxy adequadament.
 - **Autenticació:** El token s'obté del login i es guarda a `localStorage` amb clau `token`. L'interceptor d'axios l'afegeix automàticament a totes les peticions.
-- **submitChallenge:** El codi s'envia com a fitxer CSV (`submission.csv`) dins d'un `FormData` amb clau `file`. `Content-Type: multipart/form-data` es gestiona automàticament per axios.
+- **submitChallenge:** El body s'envia com a JSON (`Content-Type: application/json`). Per coding: `{"code":"..."}`, per test: `{"answers":["choice_id",...]}`. Anteriorment s'enviava com a CSV via FormData.
 - **Fallback local:** `getMe()` té fallback a `localStorage` (`currentStudent`). La resta d'endpoints **no tenen fallback** i fallen si l'API no està disponible.
 - **Funció deprecated:** `submitSubmission()` és un wrapper de `submitChallenge()` marcat com a `@deprecated`.
+- **Cursos públics:** Usuaris no autenticats poden enviar submissions. El codi s'executa i es retorna resultat, però no es persisteix (submission_count = 0).

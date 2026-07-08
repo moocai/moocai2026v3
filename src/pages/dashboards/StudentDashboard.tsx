@@ -8,7 +8,6 @@ import {useTranslation} from 'react-i18next';
 import {useNotifications} from '../../contexts/NotificationContext';
 import {Login} from '../../features/student/Login';
 import {Student, Topic, Course} from '../../features/student/types';
-import {StudentProfileCard} from '../../features/student/StudentProfileCard';
 import {ProgressOverview} from '../../features/student/ProgressOverview';
 import {CourseCard} from '../../features/student/CourseCard';
 import {RankingCard} from '../../features/student/RankingCard';
@@ -25,7 +24,7 @@ export default function StudentDashboard() {
   const { addNotification } = useNotifications();
   const { mode } = useThemeMode();
   const [loading, setLoading] = useState(true);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [, setActionLoading] = useState(false);
   const [students, setStudents] = useState<Student[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -54,6 +53,7 @@ export default function StudentDashboard() {
         (item.subTopics || []).map((st: any) => ({
           id: st.problemSlug,
           title: st.subtitle,
+          type: st.type,
         }))
       );
       return [{ title: '', lessons }];
@@ -96,6 +96,7 @@ export default function StudentDashboard() {
                     title: st.subtitle,
                     theoryInstructions: st.text,
                     challenge: st.text,
+                    type: st.type,
                   })),
                 }));
                 return { ...course, topics };
@@ -219,10 +220,6 @@ export default function StudentDashboard() {
     return done * 10;
   };
 
-  const getTotalPoints = useCallback((_studentId: string): number => {
-    return allCourses.reduce((acc, course) => acc + getCoursePoints(course, _studentId), 0);
-  }, [allCourses, getCoursePoints]);
-
   const rankedStudentsByCourse = useMemo(() => {
     const currentCourse = allCourses[rankingTab];
     if (!currentCourse) return [];
@@ -236,10 +233,10 @@ export default function StudentDashboard() {
   );
 
   return (
-    <Box sx={{ position: 'relative', bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#111827' : 'background.default', color: 'text.primary', width: '100%', maxWidth: '100vw', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ position: 'relative', bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#111827' : 'background.default', color: 'text.primary', width: '100%', maxWidth: '100vw', height: '100%', overflow: { xs: 'auto', md: 'hidden' }, display: 'flex', flexDirection: 'column' }}>
         {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
-        <Container maxWidth="xl" sx={{ pt: { xs: 2, md: 6 }, px: { xs: 3, sm: 1.5, md: 8, lg: 8 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          <Box sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Container maxWidth="xl" sx={{ pt: { xs: 2, md: 6 }, px: { xs: 3, sm: 1.5, md: 8, lg: 8 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'hidden' } }}>
+          <Box sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'hidden' } }}>
           {!selectedStudent ? (
                 <Login
                   students={students}
@@ -262,7 +259,6 @@ export default function StudentDashboard() {
                 <Grid container spacing={{ xs: 2, md: 6 }}>
                   <Grid size={{ xs: 12, md: 3 }}>
                     <Stack spacing={2} sx={{ alignItems: 'center' }}>
-                      <StudentProfileCard student={selectedStudent} totalPoints={getTotalPoints(selectedStudent.id)} actionLoading={actionLoading} onLogout={handleLogoutAction} />
                       <Box sx={{ height: { md: '250px' }, width: '100%', display: { xs: 'none', md: 'block' } }} />
                       <ProgressOverview courses={allCourses} getText={getText} getCourseProgress={getCourseProgress} getCoursePoints={getCoursePoints} studentId={selectedStudent.id} />
                     </Stack>

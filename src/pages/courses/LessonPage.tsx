@@ -172,14 +172,16 @@ export default function LessonPage() {
 
       const result = await courseService.submitChallenge(
         courseId!,
+        topic.id,
         lessonId!,
-        userInput
+        { code: userInput }
       );
 
-      setConsoleOutput(p => [...p, "✅ Resposta rebuda del servidor"]);
+      setConsoleOutput(p => [...p, "✅ Resposta enviada al servidor"]);
 
       const passed = result?.status === 'correct' || result?.passed === true;
-      setConsoleOutput(p => [...p, result?.feedback || (passed ? "✅ COMPLETAT!" : "❌ Revisa el codi")]);
+      const msg = result?.feedback || (passed ? "✅ COMPLETAT!" : null);
+      if (msg) setConsoleOutput(p => [...p, msg]);
 
       // Desbloqueja les pestanyes en fer "Enviar"
       setUnlocked(true);
@@ -202,21 +204,7 @@ export default function LessonPage() {
         localStorage.setItem(`mooc_submissions_${courseId}_${lessonId}`, JSON.stringify(submissions));
         setSubmissionsRefreshKey(k => k + 1);
       }
-    } catch (err) {
-      setUnlocked(true);
-      setConsoleOutput(p => [...p, "⚠️ Servidor no disponible. Guardant codi localment..."]);
-      localStorage.setItem(codeStorageKey, userInputRef.current);
-      const progressKey = currentUser ? `mooc_global_progress_${currentUser.id}` : 'mooc_global_progress';
-      const globalProgress = JSON.parse(localStorage.getItem(progressKey) || '{}');
-      const key = getGlobalProgressKey();
-      globalProgress[key] = true;
-      localStorage.setItem(progressKey, JSON.stringify(globalProgress));
-      setConsoleOutput(p => [...p, "✅ Progrés guardat localment. Pots continuar al següent tema!"]);
-      setStatus('pass');
-      setWasSavedInSession(true);
-      addNotification('Lliçó completada!', 'success');
-      window.dispatchEvent(new Event('lessonProgressUpdated'));
-    }
+    } catch (_) {}
   };
 
   const handleOpenConsole = () => {
@@ -250,10 +238,14 @@ export default function LessonPage() {
   };
 
   const loadPeerSolutions = async () => {
-    if (!courseId || !lessonId) return;
+    if (!courseId || !lessonId || !course) return;
     setLoadingPeers(true);
     try {
-      const data = await courseService.getPeerSubmissions(courseId, lessonId);
+      const topic = course?.content?.find((t: any) =>
+        t.subTopics?.some((s: any) => s.problemSlug === lessonId)
+      );
+      if (!topic) throw new Error('Topic not found');
+      const data = await courseService.getPeerSubmissions(courseId, topic.id, lessonId);
       setPeerSolutions(data);
     } catch {
       setPeerSolutions([]);

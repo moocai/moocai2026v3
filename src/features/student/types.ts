@@ -12,6 +12,7 @@ export interface Lesson {
   title: any;
   theoryInstructions?: any;
   challenge?: any;
+  type?: string;
 }
 
 export interface Topic {

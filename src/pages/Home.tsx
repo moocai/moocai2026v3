@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Container, Box, Typography, Grid, CircularProgress, useTheme } from '@mui/material';
@@ -51,14 +52,23 @@ const cardVariants = {
 export default function Home() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [coursesList, setCoursesList] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const saved = localStorage.getItem('currentStudent');
+    if (saved && !location.state?.fromNav) {
+      navigate('/dashboards/student', { replace: true });
+      return;
+    }
     const fetchCourses = async () => {
       try {
         const data = await courseService.getAllCourses();
         setCoursesList(data);
+        // Preload course details for instant navigation
+        data.forEach(course => courseService.getFullCourseDetail(course.slug!));
       } catch (error) {
         console.error("Error carregant cursos des de l'API:", error);
       } finally {

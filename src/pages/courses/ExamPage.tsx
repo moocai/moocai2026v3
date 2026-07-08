@@ -34,15 +34,18 @@ export default function ExamPage() {
     if (!courseId || !challengeSlug || !course) return;
     (async () => {
       try {
-        const problem = course.content?.flatMap((t: any) => t.subTopics || [])
-          .find((s: any) => s.problemSlug === challengeSlug);
+        const topic = course.content?.find((t: any) =>
+          t.subTopics?.some((s: any) => s.problemSlug === challengeSlug)
+        );
+        const problem = topic?.subTopics?.find((s: any) => s.problemSlug === challengeSlug);
         if (problem) {
           setExam(problem);
         } else {
-          const challengeData = await courseService.getChallenge(courseId, challengeSlug).catch(() => null);
+          const challengeData = await courseService.getChallenge(courseId, topic?.id || '', challengeSlug).catch(() => null);
           if (challengeData) setExam(challengeData);
         }
-        const subs = await courseService.getChallengeSubmissions(courseId, challengeSlug).catch(() => []);
+        const topicSlug = topic?.id || '';
+        const subs = await courseService.getChallengeSubmissions(courseId, topicSlug, challengeSlug).catch(() => []);
         setSubmissions(Array.isArray(subs) ? subs : []);
       } catch (e) {
         console.error('Error loading exam:', e);
@@ -57,10 +60,13 @@ export default function ExamPage() {
     setSubmitting(true);
     setResult(null);
     try {
-      const payload = isMultiChoice ? selectedAnswers.join(',') : selectedAnswers[0];
-      const res = await courseService.submitChallenge(courseId, challengeSlug, payload);
+      const topic = course?.content?.find((t: any) =>
+        t.subTopics?.some((s: any) => s.problemSlug === challengeSlug)
+      );
+      const topicSlug = topic?.id || '';
+      const res = await courseService.submitChallenge(courseId, topicSlug, challengeSlug, { answers: selectedAnswers });
       setResult(res);
-      const subs = await courseService.getChallengeSubmissions(courseId, challengeSlug).catch(() => []);
+      const subs = await courseService.getChallengeSubmissions(courseId, topicSlug, challengeSlug).catch(() => []);
       setSubmissions(Array.isArray(subs) ? subs : []);
       const saved = localStorage.getItem('currentStudent');
       const studentId = saved ? JSON.parse(saved).id : 'temp';
