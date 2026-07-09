@@ -36,7 +36,20 @@ export default {
     leaderboard: "CLASIFICACIÓN",
     syllabus: "Temario",
     activities: "Laboratorio",
-    labs: "Laboratorios"
+    labs: "Laboratorios",
+    overall_progress: "Progreso general",
+    code_problems: "Problemas código",
+    test_exercises: "Ejercicios test",
+    view_stats: "Ver Curso Completo",
+    more_stats: "Más estadísticas",
+    coming_soon: "Próximamente",
+    continue_studying: "Continúa estudiando",
+    no_lessons: "Este curso aún no tiene lecciones.",
+    no_attempted_lessons: "Aún no has hecho ningún ejercicio.",
+    view_full_course: "Ver curso completo",
+    no_courses: "No hay cursos disponibles.",
+    no_data: "Sin datos",
+    add_course: "Añadir curso"
   },
   home: {
     featured_title: "Cursos Destacados",

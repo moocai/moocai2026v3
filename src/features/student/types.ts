@@ -13,9 +13,14 @@ export interface Lesson {
   theoryInstructions?: any;
   challenge?: any;
   type?: string;
+  choices?: any[];
+  precode?: string;
+  difficulty?: any;
+  score?: number;
 }
 
 export interface Topic {
+  id?: string;
   title: any;
   lessons: Lesson[];
 }

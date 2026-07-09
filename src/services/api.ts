@@ -14,6 +14,7 @@ export const api = {
     local[`${data.courseId}_${data.lessonId}`] = data.status;
     setProgress(data.studentId, local);
     window.dispatchEvent(new Event('lessonProgressUpdated'));
+    document.dispatchEvent(new Event('lessonProgressUpdated'));
     return { status: 200 };
   },
 

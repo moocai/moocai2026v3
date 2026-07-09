@@ -36,7 +36,20 @@ export default {
     leaderboard: "CLASSIFICACIÓ",
     syllabus: "Temari",
     activities: "Laboratori",
-    labs: "Laboratoris"
+    labs: "Laboratoris",
+    overall_progress: "Progrés general",
+    code_problems: "Problemes codi",
+    test_exercises: "Exercicis test",
+    view_stats: "Veure curs complet",
+    more_stats: "Més estadístiques",
+    coming_soon: "Aviat disponible",
+    continue_studying: "Continua estudiant",
+    no_lessons: "Aquest curs encara no té lliçons.",
+    no_attempted_lessons: "Encara no has fet cap exercici.",
+    view_full_course: "Veure curs sencer",
+    no_courses: "No hi ha cursos disponibles.",
+    no_data: "Sense dades",
+    add_course: "Afegir curs"
   },
   home: {
     featured_title: "Cursos Destacats",

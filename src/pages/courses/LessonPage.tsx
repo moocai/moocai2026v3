@@ -66,13 +66,12 @@ export default function LessonPage() {
   const handleNext = () => {
     if (!course || !currentProblem) return;
     const topics = course.content || [];
-    let topicIdx = -1;
-    for (let i = 0; i < topics.length; i++) {
-      const subs = topics[i].subTopics || [];
-      if (subs.some((s: any) => s.problemSlug === lessonId)) { topicIdx = i; break; }
+    let currentTopicId = '';
+    for (const topic of topics) {
+      const subs = topic.subTopics || [];
+      if (subs.some((s: any) => s.problemSlug === lessonId)) { currentTopicId = topic.id; break; }
     }
-    const nextTopic = topicIdx >= 0 && topicIdx + 1 < topics.length ? topics[topicIdx + 1] : null;
-    navigate(`/courses/${course.id}${nextTopic ? `?lessonId=${nextTopic.id}` : ''}`);
+    navigate(`/courses/${course.id}${currentTopicId ? `?lessonId=${currentTopicId}` : ''}`);
   };
   const codeStorageKey = currentUser ? `code_${currentUser.id}_${courseId}_${lessonId}` : `temp_code_${lessonId}`;
   const getGlobalProgressKey = () => `${courseId}_${lessonId}`;
@@ -151,6 +150,7 @@ export default function LessonPage() {
       setConsoleOutput(p => [...p, "💾 Sincronitzat!"]);
       await api.postProgress({ studentId: currentUser.id, courseId, lessonId, status: globalProgress[key] || false });
       window.dispatchEvent(new Event('lessonProgressUpdated'));
+      document.dispatchEvent(new Event('lessonProgressUpdated'));
       addNotification(t('notifications.progress_saved'), 'success');
     } catch (err) {
       addNotification(t('notifications.progress_error'), 'error');
@@ -186,9 +186,9 @@ export default function LessonPage() {
       // Desbloqueja les pestanyes en fer "Enviar"
       setUnlocked(true);
 
+      await handleSaveProgress(true);
       if (passed) {
         setStatus('pass');
-        await handleSaveProgress(true);
         confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
       } else {
         setStatus('fail');
@@ -265,8 +265,9 @@ export default function LessonPage() {
 
   const userProgressKey = currentUser ? `mooc_global_progress_${currentUser.id}` : 'mooc_global_progress';
   const userProgressData = JSON.parse(localStorage.getItem(userProgressKey) || '{}');
-  const globalProgress = course?.content?.reduce((acc: number, lesson: any) => acc + (userProgressData[`${courseId}_${lesson.id}`] ? 1 : 0), 0) ?? 0;
-  const progressPercent = course?.content?.length ? (globalProgress / course.content.length) * 100 : 0;
+  const allProblems = course?.content?.flatMap((topic: any) => topic.subTopics || []) || [];
+  const globalProgress = allProblems.reduce((acc: number, sub: any) => acc + (userProgressData[`${courseId}_${sub.problemSlug || sub.slug}`] ? 1 : 0), 0);
+  const progressPercent = allProblems.length ? (globalProgress / allProblems.length) * 100 : 0;
 
   // MOBILE LAYOUT - Optimized for xs
  if (isMobile) {

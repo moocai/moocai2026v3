@@ -36,7 +36,20 @@ export default {
     leaderboard: "LEADERBOARD",
     syllabus: "Leasons",
     activities: "Activities",
-    labs: "Labs"
+    labs: "Labs",
+    overall_progress: "Overall Progress",
+    code_problems: "Code Problems",
+    test_exercises: "Test Exercises",
+    view_stats: "View Full Course",
+    more_stats: "More Stats",
+    coming_soon: "Coming Soon",
+    continue_studying: "Continue Studying",
+    no_lessons: "This course has no lessons yet.",
+    no_attempted_lessons: "You haven't attempted any exercises yet.",
+    view_full_course: "View Full Course",
+    no_courses: "No courses available.",
+    no_data: "No data",
+    add_course: "Add Course"
   },
   home: {
     featured_title: "Featured Courses",

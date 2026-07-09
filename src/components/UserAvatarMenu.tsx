@@ -43,8 +43,7 @@ export function UserAvatarMenu({ studentName }: Props) {
     <>
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
         <Avatar
-          onClick={() => navigate('/dashboards/student')}
-          sx={{ bgcolor: 'primary.main', fontWeight: 900, fontSize: '1rem', width: 40, height: 40, cursor: 'pointer', mt:2}}
+          sx={{ bgcolor: 'primary.main', fontWeight: 900, fontSize: '1rem', width: 40, height: 40, cursor: 'default', mt:2}}
         >
           {studentName.charAt(0)}
         </Avatar>

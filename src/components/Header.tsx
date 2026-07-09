@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Close as CloseIcon } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, Avatar} from '@mui/material';
+import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider} from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggleButton } from './ThemeToggleButton';
@@ -118,11 +118,17 @@ export function Header() {
             </Stack>
           </Box>
 
-          {/* DESKTOP NAV (Cursos > Accedir > Language > Theme > Avatar) */}
+          {/* DESKTOP NAV (Cursos > Dashboard > Accedir > Language > Theme > Avatar) */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3 }}>
             <Button onClick={() => scrollToDynamic(1000, 1800)} sx={commonButtonStyle}>
               {t('footer.courses')}
             </Button>
+
+            {isLoggedIn && (
+              <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>
+                {t('dashboard.title')}
+              </Button>
+            )}
 
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
@@ -148,32 +154,36 @@ export function Header() {
         {mobileOpen && (
           <Box component={motion.div} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}  sx={{position: 'fixed', top: '80px',left: 0,right: 0,bottom: 0,width: '100vw',height: 'calc(100vh - 80px)',bgcolor: 'background.default', zIndex: 1300, display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', pt: 4, pb: 6}}>
             <Stack spacing={4} sx={{ width: '85%', alignItems: 'center' }}>
-              
-              {/* 1. Usuari loguejat + Rol */}
-              <Stack spacing={2} sx={{ width: '100%' }}>
-                {isLoggedIn ? (
-                  <>
-                    <Box onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, cursor: 'pointer' }}>
-                      <Avatar sx={{ bgcolor: 'primary.main', fontWeight: 900, width: 48, height: 48, fontSize: '1.2rem' }}>{studentName?.charAt(0) || '?'}</Avatar>
-                      <Typography sx={{ fontWeight: 800, fontSize: '1.2rem' }}>{studentName || t('auth.user')}</Typography>
-                    </Box>
-                    <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', width: '100%', height: '44px' }}>
-                      <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-                      <Button disableRipple onClick={() => { handleRoleChange('student'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                      <Button disableRipple onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-                    </Box>
-                  </>
-                ) : (
-                  <Button fullWidth onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ ...commonButtonStyle, py: 2, fontSize: '1.1rem' }}>{t('auth.access').toUpperCase()}</Button>
+
+              {/* 1. Cursos + Dashboard + nom usuari */}
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%' }}>
+                <Button onClick={() => scrollToDynamic(1000, 700)} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
+                  {t('footer.courses').toUpperCase()}
+                </Button>
+                {isLoggedIn && (
+                  <Button onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                    {t('dashboard.title')}
+                  </Button>
                 )}
-              </Stack>
+                {isLoggedIn && (
+                  <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'text.secondary' }}>
+                    {studentName}
+                  </Typography>
+                )}
+              </Box>
 
               <Divider sx={{ width: '100%', opacity: 0.1 }} />
 
-              {/* 2. Cursos */}
-              <Button fullWidth onClick={() => scrollToDynamic(1000, 700)} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
-                {t('footer.courses').toUpperCase()}
-              </Button>
+              {/* 2. Accedir (no loguejat) o Rol (loguejat) */}
+              {!isLoggedIn ? (
+                <Button fullWidth onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ ...commonButtonStyle, py: 2, fontSize: '1.1rem' }}>{t('auth.access').toUpperCase()}</Button>
+              ) : (
+                <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', width: '100%', height: '44px' }}>
+                  <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
+                  <Button disableRipple onClick={() => { handleRoleChange('student'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
+                  <Button disableRipple onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
+                </Box>
+              )}
 
               <Divider sx={{ width: '100%', opacity: 0.1 }} />
 
