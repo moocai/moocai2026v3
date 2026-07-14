@@ -359,9 +359,9 @@ export default function StudentDashboard() {
                               <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                             )}
                           </Stack>
-                          <MutedLink onClick={() => navigate(`/courses/${currentCourse.slug}`)}>
-                            {t('dashboard.view_stats')} →
-                          </MutedLink>
+                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1 }}>
+                            {t('dashboard.view_stats')}
+                          </Typography>
                         </DashboardCard>
                       </Grid>
 
@@ -388,9 +388,9 @@ export default function StudentDashboard() {
                               <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                             )}
                           </Stack>
-                          <MutedLink onClick={() => navigate(`/courses/${currentCourse.slug}`)}>
-                            {t('dashboard.view_stats')} →
-                          </MutedLink>
+                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1 }}>
+                            {t('dashboard.view_stats')}
+                          </Typography>
                         </DashboardCard>
                       </Grid>
 
@@ -493,16 +493,3 @@ function DashboardCard({ title, children, muted }: { title: string; children: Re
   );
 }
 
-
-
-function MutedLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
-  return (
-    <Typography
-      variant="caption"
-      onClick={onClick}
-      sx={{ color: 'primary.main', fontWeight: 700, cursor: 'pointer', mt: 'auto', pt: 1 }}
-    >
-      {children}
-    </Typography>
-  );
-}

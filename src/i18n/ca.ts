@@ -40,7 +40,7 @@ export default {
     overall_progress: "Progrés general",
     code_problems: "Problemes codi",
     test_exercises: "Exercicis test",
-    view_stats: "Veure curs complet",
+    view_stats: "Veure estadístiques",
     more_stats: "Més estadístiques",
     coming_soon: "Aviat disponible",
     continue_studying: "Continua estudiant",
