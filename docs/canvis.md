@@ -76,3 +76,14 @@
 - **Imports eliminats**: `ProgressOverview`, `CourseCard`, `RankingCard` (substituts per JSX directe al dashboard).
 - **State eliminat**: `expandedCourse`, `rankingTab`.
 - **Imports afegits**: `Tabs`, `Tab`, `IconButton`, `LinearProgress`, `Avatar`, `Button`, `AddIcon`, `MenuBookIcon`, `LaptopMacIcon`, `InfoOutlinedIcon`, `BarChartIcon`, `ArrowForwardIcon`, `RestartAltIcon`.
+
+# 14/07/2026
+
+## i18n (`src/i18n/ca.ts`, `src/i18n/es.ts`, `src/i18n/en.ts`)
+- **8 noves claus** afegides a `lesson`: `tab_course`, `tab_theory`, `tab_exercises`, `tab_tests`, `tab_exams`, `tab_files`, `expand_all`, `collapse_all`.
+- Les 6 tabs del centre (Course / Teoria / Exercicis / Tests / Exàmens / Fitxers) i el botó "Expandeix-ho tot" / "Col·lapsa-ho tot" ara tenen traduccions reals en els 3 idiomes, en lloc de dependre dels fallbacks hardcoded.
+
+## CourseLessons.tsx (`src/pages/courses/CourseLessons.tsx`)
+- **Sidebar col·lapsable**: afegit botó `PanelLeftClose` al costat dret de "Temari" al header del sidebar. En fer clic, la sidebar es redueix a 48px amb una icona per reobrir-la. Transició suau de 0.2s a l'amplada.
+- **State `sidebarOpen`**: nou state boolean (default `true`) que controla l'obertura del sidebar.
+- **Import `PanelLeftClose`**: afegit de `lucide-react`.
