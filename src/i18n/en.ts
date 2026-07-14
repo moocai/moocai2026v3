@@ -204,6 +204,14 @@ export default {
     waiting_execution: "Waiting for execution...",
     run_code: "Run the code...",
     app_file: "App.tsx",
-    system: "SYSTEM"
+    system: "SYSTEM",
+    tab_course: "Course",
+    tab_theory: "Theory",
+    tab_exercises: "Exercises",
+    tab_tests: "Tests",
+    tab_exams: "Exams",
+    tab_files: "Files",
+    expand_all: "Expand all",
+    collapse_all: "Collapse all"
   }
 };

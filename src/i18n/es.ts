@@ -208,6 +208,14 @@ export default {
     waiting_execution: "Esperando ejecución...",
     run_code: "Ejecuta el código...",
     app_file: "App.tsx",
-    system: "SISTEMA"
+    system: "SISTEMA",
+    tab_course: "Curso",
+    tab_theory: "Teoría",
+    tab_exercises: "Ejercicios",
+    tab_tests: "Tests",
+    tab_exams: "Exámenes",
+    tab_files: "Archivos",
+    expand_all: "Expandir todo",
+    collapse_all: "Colapsar todo"
   }
 };
