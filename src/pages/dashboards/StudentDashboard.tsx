@@ -1,6 +1,6 @@
 import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button,} from '@mui/material';
+import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip,} from '@mui/material';
 import Grid from '@mui/material/Grid';
 import AddIcon from '@mui/icons-material/Add';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -43,6 +43,9 @@ export default function StudentDashboard() {
   const [newEmail, setNewEmail] = useState("");
   const [newPin, setNewPin] = useState("");
   const [newRole, setNewRole] = useState<'student' | 'teacher'>('student');
+
+  const isMdUp = useMediaQuery('(min-height:900px)');
+  const lessonsSliceLimit = isMdUp ? 7 : 5;
 
   const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
   const getText = (field: any): string => {
@@ -215,7 +218,7 @@ export default function StudentDashboard() {
     const totalLessons = topics.reduce((acc, topic) => acc + (topic.lessons?.length || 0), 0) || 0;
     if (totalLessons === 0) return 0;
     const studentData = getProgress(studentId);
-    const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter(l => studentData[`${course.id}_${l.id}`]).length || 0), 0) || 0;
+    const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter(l => studentData[`${course.id}_${l.id}`] === true).length || 0), 0) || 0;
     if (done === 0) return 0;
     return Math.max(1, Math.round((done / totalLessons) * 100));
   };
@@ -223,7 +226,7 @@ export default function StudentDashboard() {
   const getCoursePoints = (course: Course, studentId: string): number => {
     const topics = getCourseTopics(course);
     const studentData = getProgress(studentId);
-    const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter(l => studentData[`${course.id}_${l.id}`]).length || 0), 0) || 0;
+    const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter(l => studentData[`${course.id}_${l.id}`] === true).length || 0), 0) || 0;
     return done * 10;
   };
 
@@ -292,13 +295,13 @@ export default function StudentDashboard() {
                     slotProps={{ indicator: { style: { display: 'none' } } }}
                     sx={{ minHeight: 40 }}
                   >
-                    {allCourses.map((course, idx) => (
+                    {allCourses.map((course) => (
                       <Tab
                         key={course.id}
                         label={getText(course.title) || course.slug}
                         sx={{
                           minHeight: 40, textTransform: 'none', fontWeight: 700, borderRadius: 999,
-                          color: courseTabIndex === idx ? 'primary.main' : 'text.secondary',
+                          color: '#00A896 !important',
                         }}
                       />
                     ))}
@@ -324,13 +327,15 @@ export default function StudentDashboard() {
                     {/* --- 5-card summary row --- */}
                     <Grid container spacing={{ xs: 2, xl: 4 }} sx={{ mb: 5, ml: { xl: 2 } }}>
                       {/* Progrés general */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.2 }}>
-                        <DashboardCard title={t('dashboard.overall_progress')}>
-                          <Box sx={{ position: 'relative', display: 'inline-flex', my: { xs: 4, md: 8 }, width: { xs: 110, xl: 160 }, height: { xs: 110, xl: 160 } }}>
-                            <CircularProgress variant="determinate" value={100} thickness={5} size="100%" sx={{ color: 'action.disabledBackground', position: 'absolute' }} />
-                            <CircularProgress variant="determinate" value={currentProgress} thickness={5} size="100%" sx={{ color: 'primary.main' }} />
-                            <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                              <Typography variant="h5" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', xl: '2rem' } }}>{currentProgress}%</Typography>
+                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.2 }} sx={{ height: '100%' }}>
+                        <DashboardCard title={t('dashboard.overall_progress')} compact={!isMdUp}>
+                          <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                            <Box sx={{ position: 'relative', display: 'inline-flex', width: isMdUp ? 190 : 150, height: isMdUp ? 190 : 180 }}>
+                              <CircularProgress variant="determinate" value={100} thickness={5} size="100%" sx={{ color: 'action.disabledBackground', position: 'absolute', ml: isMdUp ? 0 : 1 }} />
+                              <CircularProgress variant="determinate" value={currentProgress} thickness={5} size="100%" sx={{ color: 'primary.main' }} />
+                              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: isMdUp ? 0 : 1 }}>
+                                <Typography variant={isMdUp ? 'h4' : 'h6'} sx={{ fontWeight: 900, fontSize: isMdUp ? '2.5rem' : '1.5rem' }}>{currentProgress}%</Typography>
+                              </Box>
                             </Box>
                           </Box>
                         </DashboardCard>
@@ -338,10 +343,10 @@ export default function StudentDashboard() {
 
                       {/* Topics del curs */}
                       <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.code_problems')}>
+                        <DashboardCard title={t('dashboard.code_problems')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
-                            {flatLessons.filter(isCodeLesson).slice(0, 7).map((lesson: any, i: number) => {
-                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`]);
+                            {flatLessons.filter(isCodeLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
+                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`] === true);
                               return (
                                 <Stack
                                   key={lesson.id || i}
@@ -367,10 +372,10 @@ export default function StudentDashboard() {
 
                       {/* Subtopics del temari */}
                       <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.test_exercises')}>
+                        <DashboardCard title={t('dashboard.test_exercises')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
-                            {flatLessons.filter(isTestLesson).slice(0, 7).map((lesson: any, i: number) => {
-                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`]);
+                            {flatLessons.filter(isTestLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
+                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`] === true);
                               return (
                                 <Stack
                                   key={lesson.id || i}
@@ -396,7 +401,7 @@ export default function StudentDashboard() {
 
                       {/* Leaderboard */}
                       <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.leaderboard')}>
+                        <DashboardCard title={t('dashboard.leaderboard')} compact={!isMdUp}>
                           <Stack spacing={2.5} sx={{ width: '100%', mt: 1, alignItems: 'center' }}>
                             {top3Ranking.map((s) => (
                               <Stack key={s.id} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
@@ -417,7 +422,7 @@ export default function StudentDashboard() {
 
                       {/* Més estadístiques (placeholder) */}
                       <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.more_stats')} muted>
+                        <DashboardCard title={t('dashboard.more_stats')} muted compact={!isMdUp}>
                           <Stack spacing={1} sx={{ flex: 1, py: 4, alignItems: 'center', justifyContent: 'center' }}>
                             <BarChartIcon sx={{ color: 'text.disabled', fontSize: 32 }} />
                             <Typography variant="caption" color="text.disabled">
@@ -436,20 +441,22 @@ export default function StudentDashboard() {
                       <Stack spacing={2}>
                         {(() => {
                           const attemptedLessons = flatLessons.filter((lesson: any) => selectedStudent && dbProgress[`${currentCourse.id}_${lesson.id}`]);
-                          return attemptedLessons.length > 0 ? attemptedLessons.slice(-5).reverse().map((lesson: any, idx: number) => (
+                          return attemptedLessons.length > 0 ? attemptedLessons.slice(-5).reverse().map((lesson: any, idx: number) => {
+                            const isCompleted = dbProgress[`${currentCourse.id}_${lesson.id}`] === true;
+                            return (
                             <Stack key={lesson.id || idx} direction="row" spacing={2} sx={{ alignItems: 'center' }}>
                               {isCodeLesson(lesson) ? <LaptopMacIcon sx={{ color: 'text.secondary' }} /> : <MenuBookIcon sx={{ color: 'text.secondary' }} />}
                               <Typography variant="body2" sx={{ width: { xs: 120, md: 220, xl: 280 } }} noWrap>{getText(lesson.title)}</Typography>
-                              <IconButton size="small" onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}?tab=theory`)}>
-                                <InfoOutlinedIcon fontSize="small" />
-                              </IconButton>
-                              <IconButton size="small" onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}?tab=challenge`)}>
-                                <InfoOutlinedIcon fontSize="small" />
-                              </IconButton>
-                              <LinearProgress variant="determinate" value={100} sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'action.disabledBackground' }} />
-                              <Typography variant="body2" sx={{ width: 44, textAlign: 'right' }} color="text.secondary">100%</Typography>
+                              <Tooltip title={t('dashboard.continue_activity', 'Continuar l\'activitat')} arrow placement="top">
+                                <IconButton size="small" onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}`)}>
+                                  <InfoOutlinedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                              <LinearProgress variant="determinate" value={isCompleted ? 100 : 50} sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'action.disabledBackground' }} />
+                              <Typography variant="body2" sx={{ width: 44, textAlign: 'right' }} color="text.secondary">{isCompleted ? '100%' : '50%'}</Typography>
                             </Stack>
-                          )) : (
+                            );
+                          }) : (
                             <Typography variant="body2" color="text.secondary">
                               {flatLessons.length === 0
                                 ? t('dashboard.no_lessons')
@@ -463,7 +470,7 @@ export default function StudentDashboard() {
                         endIcon={<ArrowForwardIcon fontSize="small" />}
                         sx={{ mt: 2, textTransform: 'none', fontWeight: 700 }}
                       >
-                        {t('dashboard.view_full_course')} {getText(currentCourse.title)}
+                        {t('dashboard.view_full_course')}
                       </Button>
                     </Box>
                   </>
@@ -478,10 +485,10 @@ export default function StudentDashboard() {
   );
 }
 
-function DashboardCard({ title, children, muted }: { title: string; children: React.ReactNode; muted?: boolean }) {
+function DashboardCard({ title, children, muted, compact }: { title: string; children: React.ReactNode; muted?: boolean; compact?: boolean }) {
   return (
     <Box sx={{
-      border: '2px solid', borderColor: '#8400ff', borderRadius: 3, p: 2, minHeight: 390,
+      border: '2px solid', borderColor: '#8400ff', borderRadius: 3, p: 2, minHeight: compact ? 260 : 390, height: '100%',
       display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
       bgcolor: 'background.paper', opacity: muted ? 0.7 : 1,
     }}>

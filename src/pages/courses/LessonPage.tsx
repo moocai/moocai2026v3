@@ -138,6 +138,9 @@ export default function LessonPage() {
           const totalPts = totalDone * 10;
           setConsoleOutput(p => [...p, `🏆 +10 Punts! (Total: ${totalPts})`]);
         }
+      } else if (!globalProgress[key]) {
+        globalProgress[key] = 'attempted';
+        localStorage.setItem(progressKey, JSON.stringify(globalProgress));
       }
       localStorage.setItem('mooc_last_session', JSON.stringify({
         courseId,
@@ -266,7 +269,7 @@ export default function LessonPage() {
   const userProgressKey = currentUser ? `mooc_global_progress_${currentUser.id}` : 'mooc_global_progress';
   const userProgressData = JSON.parse(localStorage.getItem(userProgressKey) || '{}');
   const allProblems = course?.content?.flatMap((topic: any) => topic.subTopics || []) || [];
-  const globalProgress = allProblems.reduce((acc: number, sub: any) => acc + (userProgressData[`${courseId}_${sub.problemSlug || sub.slug}`] ? 1 : 0), 0);
+  const globalProgress = allProblems.reduce((acc: number, sub: any) => acc + (userProgressData[`${courseId}_${sub.problemSlug || sub.slug}`] === true ? 1 : 0), 0);
   const progressPercent = allProblems.length ? (globalProgress / allProblems.length) * 100 : 0;
 
   // MOBILE LAYOUT - Optimized for xs
@@ -294,7 +297,10 @@ export default function LessonPage() {
                   </Box>
                   )}
                 </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1,bgcolor: '#1e1e1e', borderRadius: 1, overflow: 'hidden' }}>
+          <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333', flexShrink: 0 }}>
+            <Typography sx={{ fontSize: 11, color: '#888', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
+          </Box>
           <Box sx={{ flex: 1, p: 1, position: 'relative' }}>
             <textarea 
               value={userInput} 
@@ -305,7 +311,7 @@ export default function LessonPage() {
         </Box>
       </Box>
 
-        <Box sx={{ height: 220, display: 'flex', flexDirection: 'column', width: '100%', bgcolor: '#000', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Box sx={{ height: 230, display: 'flex', flexDirection: 'column', width: '100%', bgcolor: '#000', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
         <Box sx={{ height: 22, px: 1.5, bgcolor: '#111', display: 'flex', alignItems: 'center' }}>
           <Terminal size={10} style={{ opacity: 0.4, marginRight: 4, color: '#fff' }} />
           <Typography sx={{ fontSize: 8, color: '#888', fontWeight: 600 }}>CONSOLE</Typography>
@@ -358,7 +364,7 @@ export default function LessonPage() {
       {/* 3 Columnas Desktop - reduced heights */}
       <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
         {/* COLUMNA 1: Enunciat amb pestanyes (20%) */}
-        <Box sx={{ width: '20%', borderRight: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
+        <Box sx={{ width: '30%', borderRight: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
           <Tabs
             value={activeTab}
             onChange={(_, v) => setActiveTab(v)}
@@ -471,26 +477,28 @@ export default function LessonPage() {
           </Box>
         </Box>
 
-        {/* COLUMNA 2: Editor (57%) - reduced header */}
-        <Box ref={contentRef} sx={{ flex: 1, width: '80%', display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
-          <Box sx={{ height: 40, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography sx={{ fontSize: 11, color: '#888', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
+        {/* COLUMNA 2+3: Editor + Console */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: courseId === 'python-public-test' ? 'column' : 'row', minHeight: 0 }}>
+          {/* COLUMNA 2: Editor */}
+          <Box ref={contentRef} sx={{ [courseId === 'python-public-test' ? 'height' : 'flex']: courseId === 'python-public-test' ? '50%' : 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+            <Box sx={{ height: 40, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography sx={{ fontSize: 11, color: '#888', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
+                <Button onClick={handleOpenConsole} startIcon={<Terminal size={10}/>} sx={{ bgcolor: 'transparent', color: '#888', height: 28, fontSize: 10, fontWeight: 600, px: 1.5, borderRadius: 1, border: '1px solid #444', '&:hover': { bgcolor: '#333', color: '#fff' } }}>Consola</Button>
+                <Button onClick={handleRunTests} startIcon={<Play size={10} fill="#000"/>} sx={{ bgcolor: '#fff', color: '#000', height: 28, fontSize: 10, fontWeight: 700, px: 2, borderRadius: 1 }}>{t('lesson.run')}</Button>
+              </Box>
             </Box>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
-              <Button onClick={handleOpenConsole} startIcon={<Terminal size={10}/>} sx={{ bgcolor: 'transparent', color: '#888', height: 28, fontSize: 10, fontWeight: 600, px: 1.5, borderRadius: 1, border: '1px solid #444', '&:hover': { bgcolor: '#333', color: '#fff' } }}>Consola</Button>
-              <Button onClick={handleRunTests} startIcon={<Play size={10} fill="#000"/>} sx={{ bgcolor: '#fff', color: '#000', height: 28, fontSize: 10, fontWeight: 700, px: 2, borderRadius: 1 }}>{t('lesson.run')}</Button>
-            </Box>
+            <motion.div key={fadeKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ flex: 1, display: 'flex', position: 'relative' }}>
+              <textarea value={userInput} onChange={(e) => { setUserInput(e.target.value); setIsDirty(true); setWasSavedInSession(false); }}
+                style={{ flex: 1, background: 'transparent', color: '#b5e853', fontFamily: "'Fira Code', 'Consolas', monospace", padding: '1rem', border: 'none', outline: 'none', resize: 'none', fontSize: '0.9rem', lineHeight: 1.6, minHeight: 0 }} />
+            </motion.div>
           </Box>
-          <motion.div key={fadeKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ flex: 1, display: 'flex', position: 'relative' }}>
-            <textarea value={userInput} onChange={(e) => { setUserInput(e.target.value); setIsDirty(true); setWasSavedInSession(false); }}
-              style={{ flex: 1, background: 'transparent', color: '#b5e853', fontFamily: "'Fira Code', 'Consolas', monospace", padding: '1rem', border: 'none', outline: 'none', resize: 'none', fontSize: '0.9rem', lineHeight: 1.6, minHeight: 0 }} />
-          </motion.div>
-        </Box>
 
-        {/* COLUMNA 3: Console (40%) */}
-        <Box sx={{ width: '40%', borderLeft: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
+          {/* COLUMNA 3: Console */}
+          <Box sx={{ [courseId === 'python-public-test' ? 'height' : 'width']: courseId === 'python-public-test' ? '50%' : '50%', borderLeft: courseId === 'python-public-test' ? 'none' : '1px solid', borderTop: courseId === 'python-public-test' ? '1px solid' : 'none', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
           <Box sx={{ height: 40, px: 2, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
             <Terminal size={14} style={{opacity: 0.4, marginRight: 6}} />
             <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary' }}>{t('lesson.debug_console')}</Typography>
@@ -512,6 +520,7 @@ export default function LessonPage() {
           </Box>
         </Box>
       </Box>
+    </Box>
 
       {/* Footer Desktop - reduced */}
       <Box sx={{ height: 56, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper' }}>

@@ -1,89 +1,141 @@
-# 09/07/2026
-
-## StudentDashboard.tsx (`src/pages/dashboards/StudentDashboard.tsx`)
-- **`code_problems` card**: ara mostra els **topics** del curs (els temes), filtrant el progrés només per exercicis de codi (`isCodeLesson`).
-- **`test_exercises` card**: ara mostra els **subtopics individuals** (`flatLessons.filter(isTestLesson)`), en lloc de topics buits.
-- **`continue_studying` section**: filtra per mostrar **només exercicis intentats** (`dbProgress[course.id_lesson.id]`). Si no n'hi ha cap, mostra "Encara no has fet cap exercici."
-- **Fix `setActionLoading`**: afegida la coma que faltava a `[, setActionLoading]` (estava `[setActionLoading]`, agafant el valor booleà enlloc del setter).
-- **Tots els textos via i18n**: eliminats tots els `|| 'fallback hardcoded'` de les crides `t()`. Cada text va ara exclusivament per traducció.
-- **TopicBar clickable**: cada barra de topic navega a `CourseLessons` amb `?lessonId={topic.id}` per obrir l'acordió correcte.
-- **Test exercises clickable**: cada subtopic de test navega directament a `ExamPage` via `/courses/{slug}/exam/{lessonId}`.
-- **Rutes corregides**: `navigate('/curs/...')` → `navigate('/courses/...')` per coincidir amb les rutes de `App.tsx`.
-- **`> ` indicator**: afegit `> ` a la dreta del label del TopicBar per indicar que és clickable.
-
-## types.ts (`src/features/student/types.ts`)
-- **Topic.id**: afegit camp `id?: string` a la interfície `Topic`.
-- **Lesson**: afegits camps `choices`, `precode`, `difficulty`, `score`.
-
-## i18n (`src/i18n/ca.ts`, `src/i18n/es.ts`, `src/i18n/en.ts`)
-- **14 noves claus** afegides a `dashboard`: `overall_progress`, `code_problems`, `test_exercises`, `view_stats`, `more_stats`, `coming_soon`, `continue_studying`, `no_lessons`, `no_attempted_lessons`, `view_full_course`, `no_courses`, `no_data`, `add_course`.
-
-## UserAvatarMenu.tsx (`src/components/UserAvatarMenu.tsx`)
-- **Avatar ja no navega al dashboard**: eliminat `onClick={() => navigate('/dashboards/student')}`. L'Avatar ara té `cursor: 'default'`. El menú desplegable (chevron) continua funcionant.
-
-## Header.tsx (`src/components/Header.tsx`)
-- **Botó "Dashboard" al nav desktop**: afegit entre "Cursos" i el toggle d'idioma/tema, visible només si l'usuari està loguejat. Navega a `/dashboards/student`.
-- **Menú mòbil**: reestructurat — eliminada la secció separada d'usuari (avatar + nom + rol a dalt). El nom de l'usuari i un botó "Dashboard" apareixen ara a la mateixa fila que "CURSOS". El toggle de rol s'ha mogut a sota dels cursos.
-- **`Avatar` tret dels imports**: ja no s'usa al Header.
-
-## api.ts (`src/services/api.ts`)
-- **`postProgress`**: ara fa dispatch a `window` i `document` (abans només `window`) per assegurar que tots els listeners rebin l'event `lessonProgressUpdated`.
-
-## LessonPage.tsx (`src/pages/courses/LessonPage.tsx`)
-- **`handleSaveProgress`**: dispatch a `window` + `document` (abans només `window`).
-- **`handleRunTests`**: crida `handleSaveProgress(true)` **sempre** que el servidor respon, tant si `passed` com si no. Abans només guardava en `passed === true`.
-- **`handleNext`**: refactoritzat — ja no navega al *next topic* sinó al *current topic* (per mantenir l'acordió de CourseLessons obert al tema correcte).
-- **`globalProgress` / `progressPercent`**: canviat de comptar per `lesson.id` a aplanar `subTopics` i comptar per `problemSlug || slug`.
+# 16/07/2026
 
 ## StudentDashboard.tsx (`src/pages/dashboards/StudentDashboard.tsx`)
 
-### Progress & Data layer
-- **`getProgress(studentId)`**: nova funció helper que fusiona `mooc_global_progress_{studentId}` + `mooc_shared_all_progress[studentId]`, usada per totes les càrregues de progrés.
-- **`SHARED_PROGRESS_KEY` eliminada**: ja no es necessita com a constant separada; `getProgress()` gestiona la fusió.
-- **`fetchProgress` reescrita**: primer intenta `api.getStudentProgress(studentId)`, si falla usa `getProgress(studentId)`. Eliminada la fusió amb l'storage (ara ho fa `getProgress`).
-- **`getCourseProgress`**: canviat de `useCallback([], [])` a funció normal per eliminar possibles stale closures.
-- **`getCourseProgress`**: afegit `Math.max(1, Math.round(...))` per mostrar almenys 1% si `done > 0` (evita 0% amb pocs exercicis completats).
-- **`getCoursePoints`**: canviat de `SHARED_PROGRESS_KEY` a `getProgress(studentId)`.
-- **Targeta `test_exercises`**: canviada de `dbProgress[key]` a `progressData[key]` (`getProgress(selectedStudent.id)`), mateixa font que la resta.
+### Lògica responsive per alçada de pantalla
+- Afegit `useMediaQuery('(min-height:900px)')` per detectar l'alçada de la pantalla.
+- Variable `lessonsSliceLimit`:
+  - `< 900px` → **5** elements (topics i subtopics).
+  - `≥ 900px` → **7** elements (com abans).
 
-### Helpers
-- **`isTestLesson` / `isCodeLesson`**: filtres per tipus de lliçó (test si `type` en `['test','quiz','exam','multiple_choice']` o té `choices`).
-- **`getFlatLessons`**: aplana tots els topics en una llista plana de lliçons amb `topicTitle`.
+### Cards amb mode compact
+- Afegit prop `compact` al component `DashboardCard`.
+- Quan `compact` és `true` (< 900px), `minHeight` baixa de 390 a **260**.
+- Les 5 cards del resum (Progrés general, Topics del curs, Subtopics del temari, Leaderboard, Més estadístiques) apliquen `compact={!isMdUp}`.
 
-### Layout & Responsive (xl)
-- **Container**: canviat a `maxWidth={false}`, `px: { xs: 3, sm: 1.5, md: 8, lg: 8, xl: 10 }`, `overflow: { xs: 'visible', md: 'auto' }`.
-- **Grid summary cards**: `size={{ xs: 6, sm: 6, md: 2.4, xl: 2.2 }}` (overall progress) i `xl: 2.4` (resta), `spacing={{ xs: 2, xl: 4 }}`, `ml: { xl: 2 }`.
-- **CircularProgress**: `width/height: { xs: 110, xl: 160 }`, `size="100%"`, font `{ xs: '1.5rem', xl: '2rem' }`.
-- **Lesson title ("Continua estudiant")**: `width: { xs: 120, md: 220, xl: 280 }`.
-- **Hover**: text de les lliçons als cards canvia a `#8400ff` al passar el ratolí per sobre.
-- **Text XL**: `fontSize: { xl: '0.85rem' }` a les lliçons dels cards `code_problems` i `test_exercises`.
-- **Stack spacing**: `{ xs: 1.5, xl: 2.5 }` als llistats de lliçons.
+### Centrat del cercle de progrés
+- Wrapper flex afegit al voltant del cercle amb `flex: 1`, `alignItems: 'center'`, `justifyContent: 'center'` per centrar-lo dins la card.
+- `DashboardCard` té `height: '100%'` per estirar-se dins la cel·la del Grid.
+- El `Grid` de Progrés general té `height: '100%'` per assegurar l'estirament.
 
-### UI Components
-- **Course tabs (Tops)**: `Tabs` amb `Tab` per cada curs, botó `RestartAltIcon` (reset), botó `AddIcon` (navega a `/cursos`). Estil `borderRadius: 999`, `border: '2px solid #8400ff'`.
-- **DashboardCard**: component wrapper amb `border: '2px solid'`, `borderColor: '#8400ff'`, `borderRadius: 3`, `minHeight: 390`, títol centrat.
-- **MutedLink**: component per enllaç tipogràfic al final dels cards (`mt: 'auto'` per empènyer-lo al fons).
-- **Leaderboard card**: top 3 amb `Avatar` (inicial del nom), nom i punts (`getCoursePoints`).
-- **"Més estadístiques" card**: placeholder amb `BarChartIcon` + "Aviat disponible".
-- **"Continua estudiant" section**: lliçons intentades (últimes 5), icones codi/test, botons teoria/repte, `LinearProgress` al 100%. Si no n'hi ha, missatge segons si el curs té lliçons o no.
+### Mides del cercle de progrés
+- **`≥ 900px`**: `190 × 190`
+- **`< 900px`**: `150 × 180`
+- Text del percentatge:
+  - `≥ 900px`: variant `h4`, `2.5rem`
+  - `< 900px`: variant `h6`, `1.5rem`
 
-### Events & Cleanup
-- **Listener `lessonProgressUpdated`**: ara neteja correctament al cleanup (`removeEventListener`).
-- **Listener `storage`**: afegit `window.addEventListener('storage', onProgress)` per sincronitzar entre pestanyes.
-- **`handleResetCourse`**: signatura simplificada — ja no rep `MouseEvent`, només `courseId`. Eliminat `stopPropagation`.
+### Ajustaments de posicionament per < 900px
+- `ml: 1` al `CircularProgress` de fons (el gris) quan `< 900px`.
+- `margin: 1` al `Box` del text del percentatge quan `< 900px`.
 
-### Neteja d'imports i state
-- **Imports eliminats**: `ProgressOverview`, `CourseCard`, `RankingCard` (substituts per JSX directe al dashboard).
-- **State eliminat**: `expandedCourse`, `rankingTab`.
-- **Imports afegits**: `Tabs`, `Tab`, `IconButton`, `LinearProgress`, `Avatar`, `Button`, `AddIcon`, `MenuBookIcon`, `LaptopMacIcon`, `InfoOutlinedIcon`, `BarChartIcon`, `ArrowForwardIcon`, `RestartAltIcon`.
+### Auto-save reflectit al dashboard
+- L'auto-save de LessonPage cada 10s ara també marca la lliçó com `'attempted'` a `mooc_global_progress` (si encara no estava marcada com a completada).
+- `getCourseProgress` i `getCoursePoints`: només compten lliçons amb valor `=== true` (completades), no les intentades (`'attempted'`).
+- Status chips de les cards (Topics del curs / Subtopics del temari): només mostren completat si el valor és `=== true`.
+- **"Continua estudiant"**:
+  - Intentades (`'attempted'`): barra al **50%** i text "50%".
+  - Completades (`true`): barra al **100%** i text "100%".
+  - Un sol botó amb icona `InfoOutlinedIcon` enlloc de dos.
+  - Tooltip "Continuar l'activitat" (`placement="top"`) que apareix al fer hover.
+  - Botó navega directament a la lliçó sense paràmetres de tab.
 
-# 14/07/2026
+### Imports
+- Afegit `Tooltip` als imports de `@mui/material`.
 
-## i18n (`src/i18n/ca.ts`, `src/i18n/es.ts`, `src/i18n/en.ts`)
-- **8 noves claus** afegides a `lesson`: `tab_course`, `tab_theory`, `tab_exercises`, `tab_tests`, `tab_exams`, `tab_files`, `expand_all`, `collapse_all`.
-- Les 6 tabs del centre (Course / Teoria / Exercicis / Tests / Exàmens / Fitxers) i el botó "Expandeix-ho tot" / "Col·lapsa-ho tot" ara tenen traduccions reals en els 3 idiomes, en lloc de dependre dels fallbacks hardcoded.
+
+### Color del text dels tabs de curs
+- Color del text dels tabs de nom de curs canviat a blanc (`#fff`) amb `!important` per sobreescriure estils per defecte de MUI.
+
 
 ## CourseLessons.tsx (`src/pages/courses/CourseLessons.tsx`)
-- **Sidebar col·lapsable**: afegit botó `PanelLeftClose` al costat dret de "Temari" al header del sidebar. En fer clic, la sidebar es redueix a 48px amb una icona per reobrir-la. Transició suau de 0.2s a l'amplada.
-- **State `sidebarOpen`**: nou state boolean (default `true`) que controla l'obertura del sidebar.
-- **Import `PanelLeftClose`**: afegit de `lucide-react`.
+
+### Eliminació completa de Sidebar i Right Column
+- **LEFT SIDEBAR eliminada**: s'ha eliminat completament l'accordion syllabus de l'esquerra, incloent `renderSidebarTabs()`, l'estat `sidebarOpen`, el botó de toggle `PanelLeftClose`, i tot el JSX del sidebar.
+- **RIGHT COLUMN eliminada**: s'ha eliminat completament la columna dreta amb anchor links i challenge panel, incloent l'estat `showRightPanel`, el botó de toggle dret, i tot el JSX.
+- **Mobile Drawer eliminat**: s'ha eliminat el `Drawer` mòbil del syllabus, l'estat `mobileSyllabusOpen`, i el botó de toggle mòbil.
+- **Imports netejats**: eliminats `Accordion`, `AccordionSummary`, `AccordionDetails`, `Drawer`, `Stack`, `BookOpen`, `Code2`, `ChevronLeft`, `PanelLeftClose`.
+- **States eliminats**: `mobileSyllabusOpen`, `showRightPanel`, `sidebarOpen`, `contentTab`.
+- **Variables eliminades**: `activeLessonId`, `defaultLessonId`, `activeId`, `isLessonCompleted`.
+- **Imports netejats**: eliminat `useSearchParams` de react-router-dom.
+
+### Centrat de tabs
+- Afegit `justifyContent: 'center'` al `MuiTabs-flexContainer` per centrar les pestanyes tant en mobile com en desktop.
+- Les tabs ara són responsive i sempre estan centrades a la pantalla.
+
+### Reordenació i renom de tabs
+- **Tab "Contingut del curs" eliminada**: s'ha eliminat completament la tab de overview amb cards col·lapsables.
+- **Tabs renumerades**: l'ordre ara és:
+  - TAB 0: Teoria
+  - TAB 1: Programació (abans "Exercicis")
+  - TAB 2: Tests
+  - TAB 3: Fitxers
+- **Tab "Exercicis" renombrada** a "Programació".
+
+### Tab Teoria (TAB 0)
+- Carrega la teoria de **TOTS els topics** automàticament (no només l'actiu).
+- Cada topic es mostra com una **card col·lapsable** amb chevron i títol.
+- En desplegar-se, mostra el contingut de **teoria en Markdown**.
+- Botó "Expandeix-ho tot / Col·lapsa-ho tot".
+
+### Tab Programació (TAB 1)
+- Cards col·lapsables per cada lesson amb chevron.
+- **% de progrés** visible al header de cada lesson.
+- Icones d'estat: `💻` (pendent), `✅` (completat), `⚠️` (guardat localment).
+- Botó "Expandeix-ho tot / Col·lapsa-ho tot".
+
+### Tab Tests (TAB 2)
+- Cards col·lapsables per cada lesson amb chevron.
+- **% de progrés** visible al header de cada lesson.
+- Icones d'estat: `📝` (pendent), `✅` (completat), `⚠️` (guardat localment).
+- Botó "Expandeix-ho tot / Col·lapsa-ho tot".
+
+### Tab Fitxers (TAB 3)
+- Placeholder amb icona `FileText` i missatge "Encara no hi ha fitxers disponibles".
+
+### Indicadors d'estat (auto-save vs completat)
+- Nova funció `renderStatusIcon()` que distingeix 3 estats:
+  - `true` → ✅ (verd, completat/resolt)
+  - `"attempted"` → ⚠️ (groc, guardat localment però no resolt)
+  - absent → icona per defecte (💻 o 📝)
+- `renderStatusChip()` actualitzat:
+  - `true` → CheckCircle2 verd
+  - `"attempted"` → AlertTriangle groc + text "Pendent per enviar"
+  - absent → chip "Pendent"
+- `getLessonProgress()` ara només compta com a "fet" els que tenen `=== true`.
+- Tipus de `progress` canviat de `Record<string, boolean>` a `Record<string, boolean | string>` per admetre `"attempted"`.
+
+### Indicadors de dificultat (TAB 1 Programació + TAB 2 Tests)
+- Nova funció `getDifficultyColor()` que mapeja dificultat a colors:
+  - `easy` → verd (`#22c55e`) + fons clar verd
+  - `medium` → groc (`#f59e0b`) + fons clar groc
+  - `hard` → vermell (`#ef4444`) + fons clar vermell
+  - `very_hard` → vermell fosc (`#dc2626`) + fons clar vermell fosc
+- Nova funció `getDifficultyLabel()` que tradueix la dificultat:
+  - `easy` → "Fàcil"
+  - `medium` → "Mitjà"
+  - `hard` → "Difícil"
+  - `very_hard` → "Molt difícil"
+- Nova funció `renderDifficultyChip()` que renderitza un chip amb color i label de dificultat.
+- Nova funció `renderStatusWithDifficulty()` que combina el chip de dificultat amb el chip d'estat.
+- Els subtopics de TAB 1 (Programació) i TAB 2 (Tests) mostren el chip de dificultat al costat del "Pendent".
+
+### Breadcrumb intel·ligent
+- El breadcrumb "Academy" navega a `/dashboards/student` si l'usuari està loguejat (hi ha `currentStudent` a localStorage), o a `/` si no ho està.
+- Afegit link "Home" al breadcrumb que sempre navega a `/` (pàgina pública).
+
+### Color de text de les tabs
+- Color del text de totes les tabs (Teoria, Programació, Tests, Fitxers) canviat a blanc (`#fff`) tant per defecte com quan estan seleccionades.
+
+
+## LessonPage.tsx (`src/pages/courses/LessonPage.tsx`)
+
+### Layout vertical per a `python-public-test`
+- Les columnes Editor i Console estan en vertical (editor a dalt, consola a sota) només pel curs `python-public-test`. La resta de cursos continua amb layout horitzontal (columnes 2 i 3 side by side).
+- Editor i Console són **50%** d'alçada cadascun en mode vertical.
+- `handleSaveProgress`: quan l'auto-save (`isAutoSaveOnPass = false`), també marca la lliçó com `'attempted'` a `mooc_global_progress` si no estava marcada.
+- `progressPercent`: només compta lliçons amb valor `=== true` (no les intentades).
+
+### Barra d'editor a mobile
+- Afegida la barra de capçalera de l'editor a mobile (abans no es veia): mostra el nom del fitxer.
+- El contenidor de l'editor a mobile té `bgcolor: '#1e1e1e'`, `borderRadius: 1` i `overflow: 'hidden'`.
