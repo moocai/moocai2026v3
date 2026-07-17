@@ -169,17 +169,44 @@
 - Eliminats imports no utilitzats: `LinearProgress`, `Tooltip`, `useMediaQuery`, `TerminalIcon`, `TrendingDownIcon`
 - Normalitzat `type` de lessons a minúscules per filtre `isTestLesson` consistent
 
-## StudentDashboard
+## StudentDashboard.tsx
 
 - `handleStatsClick` simplificat: ja no passa `state` per navigate (RendimentDashboard fetcha les seves pròpies dades)
 - Ambdós "Veure estadístiques" (code + test) utilitzen la mateixa funció `handleStatsClick`
 - Import de `useLocation` eliminat (ja no es necessita)
 
-## Fitxers modificats
+## Més estadístiques
 
-| Fitxer | Canvi |
-|--------|-------|
-| `src/App.tsx` | Import + ruta `RendimentDashboard` |
-| `src/features/student/RendimentDashboard.tsx` | Nou component (substitueix `.jsx`) |
-| `src/features/student/RendimentDashboard.jsx` | Eliminat |
-| `src/pages/dashboards/StudentDashboard.tsx` | Simplificat navigate + neteja |
+### Substitució del placeholder
+- Bloc "Més estadístiques" substituït: de `BarChartIcon` + "coming_soon" a **3 mètriques reals**:
+  - **Ratxa** (`WhatshotIcon`): dies de consecutius (des de `localStorage`)
+  - **Taxa d'encert** (`CheckCircleOutlinedIcon`): % de lliçons de codi completades
+  - **Temps restant** (`AccessTimeIcon`): hores estimades per completar les lliçons de codi pendents (0.5h/lliçó)
+- Color `#00A896` (Cian petroli) per ressaltar valors numèrics
+- `Divider` entre mètriques per llegibilitat
+- `justifyContent: 'space-evenly'` per ocupar tota l'alçada de la card
+
+### Imports afegits
+- `WhatshotIcon`, `CheckCircleOutlinedIcon`, `AccessTimeIcon` de `@mui/icons-material`
+- `Divider` de `@mui/material`
+- Eliminat `BarChartIcon` (ja no s'usa)
+
+### Constant `stats` (useMemo)
+- Calcula les 3 mètriques a partir de les dades reals del curs i estudiant
+- Filtra **només lliçons de codi** (`!isTestLesson(l)`) — excloent tests/exàmens
+- `streak`: llegeix de `localStorage` (`mooc_streak_{studentId}`)
+- `successRate`: `(doneCode / totalCode) * 100`
+- `remainingHours`: `lliçons_pendents * 0.5`
+- Deps: `[allCourses, courseTabIndex, selectedStudent, dbProgress]`
+- Col·locat **abans** del `if (loading) return ...` per evitar l'error de hooks order
+
+### Actualització en temps real
+- `dbProgress` afegit a les deps del `useMemo` de `stats`
+- Quan el user completa una activitat: `lessonProgressUpdated` → `fetchProgress()` → `dbProgress` canvia → `useMemo` recalcula → `remainingHours` baixa automàticament
+
+### Traduccions (ca, es, en)
+- Claus afegides a `src/i18n/ca.ts`, `es.ts`, `en.ts`:
+  - `dashboard.streak` / `dashboard.days`
+  - `dashboard.success_rate`
+  - `dashboard.remaining` / `dashboard.hours`
+
