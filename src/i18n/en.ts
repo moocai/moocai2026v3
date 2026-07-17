@@ -49,7 +49,12 @@ export default {
     view_full_course: "View Full Course",
     no_courses: "No courses available.",
     no_data: "No data",
-    add_course: "Add Course"
+    add_course: "Add Course",
+    streak: "Streak",
+    days: "days",
+    success_rate: "Success rate",
+    remaining: "Remaining",
+    hours: "hours"
   },
   home: {
     featured_title: "Featured Courses",

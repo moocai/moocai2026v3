@@ -1,12 +1,14 @@
 import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip,} from '@mui/material';
+import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip, Divider,} from '@mui/material';
 import Grid from '@mui/material/Grid';
 import AddIcon from '@mui/icons-material/Add';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import LaptopMacIcon from '@mui/icons-material/LaptopMac';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import BarChartIcon from '@mui/icons-material/BarChart';
+import WhatshotIcon from '@mui/icons-material/Whatshot';
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import {api} from '../../services/api';
@@ -247,6 +249,25 @@ export default function StudentDashboard() {
     return [...students].filter(s => s.role !== 'teacher').sort((a, b) => getCourseProgress(currentCourse, b.id) - getCourseProgress(currentCourse, a.id));
   }, [students, allCourses, courseTabIndex, getCourseProgress]);
 
+  const stats = useMemo(() => {
+    const course = allCourses[courseTabIndex] || null;
+    if (!course || !selectedStudent) return { streak: 0, successRate: 0, remainingHours: 0 };
+    const codeLessons = getFlatLessons(course).filter((l) => !isTestLesson(l));
+    const progress = selectedStudent ? getProgress(selectedStudent.id) : {};
+    const totalCode = codeLessons.length || 0;
+    const doneCode = codeLessons.filter(
+      (l) => progress[`${course.id}_${l.id}`] === true,
+    ).length;
+    const remainingLessons = totalCode - doneCode;
+    const successRate = totalCode > 0 ? Math.round((doneCode / totalCode) * 100) : 0;
+    const remainingHours = Math.round(remainingLessons * 0.5 * 10) / 10;
+    const streak = (() => {
+      const raw = localStorage.getItem(`mooc_streak_${selectedStudent.id}`);
+      return raw ? parseInt(raw, 10) || 0 : 0;
+    })();
+    return { streak, successRate, remainingHours };
+  }, [allCourses, courseTabIndex, selectedStudent, dbProgress]);
+
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: mode === 'fancy' ? 'transparent' : 'background.default', zIndex: 9999 }}>
       <CircularProgress color="primary" />
@@ -432,14 +453,30 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Més estadístiques (placeholder) */}
+                      {/* Més estadístiques */}
                       <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.more_stats')} muted compact={!isMdUp}>
-                          <Stack spacing={1} sx={{ flex: 1, py: 4, alignItems: 'center', justifyContent: 'center' }}>
-                            <BarChartIcon sx={{ color: 'text.disabled', fontSize: 32 }} />
-                            <Typography variant="caption" color="text.disabled">
-                              {t('dashboard.coming_soon')}
-                            </Typography>
+                        <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
+                          <Stack spacing={2} sx={{ flex: 1, py: 2, width: '100%', justifyContent: 'space-evenly' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <WhatshotIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <Typography variant="body2">
+                                {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
+                              </Typography>
+                            </Box>
+                            <Divider />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <CheckCircleOutlinedIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <Typography variant="body2">
+                                {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.successRate}%</Box>
+                              </Typography>
+                            </Box>
+                            <Divider />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <AccessTimeIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <Typography variant="body2">
+                                {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
+                              </Typography>
+                            </Box>
                           </Stack>
                         </DashboardCard>
                       </Grid>

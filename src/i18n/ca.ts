@@ -49,7 +49,12 @@ export default {
     view_full_course: "Veure curs sencer",
     no_courses: "No hi ha cursos disponibles.",
     no_data: "Sense dades",
-    add_course: "Afegir curs"
+    add_course: "Afegir curs",
+    streak: "Ratxa",
+    days: "dies",
+    success_rate: "Encerts",
+    remaining: "Falten",
+    hours: "hores"
   },
   home: {
     featured_title: "Cursos Destacats",

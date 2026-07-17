@@ -49,7 +49,12 @@ export default {
     view_full_course: "Ver curso completo",
     no_courses: "No hay cursos disponibles.",
     no_data: "Sin datos",
-    add_course: "Añadir curso"
+    add_course: "Añadir curso",
+    streak: "Racha",
+    days: "días",
+    success_rate: "Aciertos",
+    remaining: "Faltan",
+    hours: "horas"
   },
   home: {
     featured_title: "Cursos Destacados",
