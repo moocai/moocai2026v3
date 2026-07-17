@@ -259,6 +259,10 @@ export default function StudentDashboard() {
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
   const top3Ranking = rankedStudentsByCourse.slice(0, 3);
 
+  const handleStatsClick = () => {
+    navigate(`/courses/${currentCourse?.slug}/stats`);
+  };
+
   return (
     <Box sx={{ position: 'relative', bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#111827' : 'background.default', color: 'text.primary', width: '100%', maxWidth: '100vw', height: '100%', overflow: { xs: 'auto', md: 'hidden' }, display: 'flex', flexDirection: 'column' }}>
         {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
@@ -364,7 +368,11 @@ export default function StudentDashboard() {
                               <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                             )}
                           </Stack>
-                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1 }}>
+                          <Typography
+                            variant="caption"
+                            onClick={handleStatsClick}
+                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          >
                             {t('dashboard.view_stats')}
                           </Typography>
                         </DashboardCard>
@@ -393,7 +401,11 @@ export default function StudentDashboard() {
                               <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                             )}
                           </Stack>
-                          <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1 }}>
+                          <Typography
+                            variant="caption"
+                            onClick={handleStatsClick}
+                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          >
                             {t('dashboard.view_stats')}
                           </Typography>
                         </DashboardCard>
@@ -499,4 +511,3 @@ function DashboardCard({ title, children, muted, compact }: { title: string; chi
     </Box>
   );
 }
-

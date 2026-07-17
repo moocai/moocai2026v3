@@ -139,3 +139,47 @@
 ### Barra d'editor a mobile
 - Afegida la barra de capçalera de l'editor a mobile (abans no es veia): mostra el nom del fitxer.
 - El contenidor de l'editor a mobile té `bgcolor: '#1e1e1e'`, `borderRadius: 1` i `overflow: 'hidden'`.
+
+
+---
+
+# 17/07/2026
+
+## RendimentDashboard (nou component)
+
+- **Ruta**: `/courses/:courseId/stats` afegida a `App.tsx` dins `MainLayout`
+- **Convertit de JSX a TSX** amb Material UI (Box, Typography, Stack, CircularProgress, IconButton, Button)
+- **Dades reals**: fetch directe via `courseService.getFullCourseDetail(courseId)` — mostra **tots els topics** del curs
+- **Progrés real**: llegeix de `localStorage` amb la mateixa clau que StudentDashboard (`mooc_global_progress_${studentId}`)
+- **Sempre mostra els dos gràfics** (programació i test), fins i tot sense activitat (barres a 0%)
+- **Sincronització**: escolta `lessonProgressUpdated` per refrescar dades automàticament quan es completa una activitat
+
+### Estil i UX
+- Container `maxWidth={false}` (ocupa tota l'amplada)
+- ChartCard amb `minHeight: 460`, grid `gap: 4`, `minHeight: 500`
+- Bars amb alçada 18px, 6 línies verticals (0, 20, 40, 60, 80, 100)
+- Eix de percentatge a sota de cada targeta alineat amb les barres
+- Delta: sempre gris `#6B7280` per defecte, verd `#34D399` si l'usuari té activitat
+- Mitjana a 0% si no hi ha activitat
+- Botó "Tornar al dashboard" amb text blanc
+- Títol net "Rendiment" amb botó de tornar (sense terminal typewriter)
+
+### Neteja
+- Eliminat `useTypewriter` hook i terminal UI
+- Eliminats imports no utilitzats: `LinearProgress`, `Tooltip`, `useMediaQuery`, `TerminalIcon`, `TrendingDownIcon`
+- Normalitzat `type` de lessons a minúscules per filtre `isTestLesson` consistent
+
+## StudentDashboard
+
+- `handleStatsClick` simplificat: ja no passa `state` per navigate (RendimentDashboard fetcha les seves pròpies dades)
+- Ambdós "Veure estadístiques" (code + test) utilitzen la mateixa funció `handleStatsClick`
+- Import de `useLocation` eliminat (ja no es necessita)
+
+## Fitxers modificats
+
+| Fitxer | Canvi |
+|--------|-------|
+| `src/App.tsx` | Import + ruta `RendimentDashboard` |
+| `src/features/student/RendimentDashboard.tsx` | Nou component (substitueix `.jsx`) |
+| `src/features/student/RendimentDashboard.jsx` | Eliminat |
+| `src/pages/dashboards/StudentDashboard.tsx` | Simplificat navigate + neteja |

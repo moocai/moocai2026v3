@@ -6,6 +6,7 @@ import LessonPage from './pages/courses/LessonPage';
 import LessonTopic from './pages/courses/${courseId}/${lesson.id}/LessonTopic';
 import ExamPage from './pages/courses/ExamPage';
 import StudentDashboard from './pages/dashboards/StudentDashboard';
+import RendimentDashboard from './features/student/RendimentDashboard';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
 import TeacherIndex from './pages/teacher/TeacherIndex';
@@ -28,6 +29,7 @@ function App() {
           <Route path="/courses/:courseId/:lessonId" element={<LessonPage />} />
           <Route path="/courses/:courseId/:lessonId/topic" element={<LessonTopic />} />
           <Route path="/courses/:courseId/exam/:challengeSlug" element={<ExamPage />} />
+          <Route path="/courses/:courseId/stats" element={<RendimentDashboard />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
         </Route>
         <Route path="/teacher" element={<TeacherLayout />}>
