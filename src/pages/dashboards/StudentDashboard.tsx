@@ -312,7 +312,7 @@ export default function StudentDashboard() {
                 {/* --- Course tabs (Python / React / +) --- */}
                 <Box sx={{
                   display: 'inline-flex', alignItems: 'center', mb: 5,
-                  bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#8400ff', px: 5,
+                  bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: 5,
                 }}>
                   <Tabs
                     value={courseTabIndex}
@@ -458,23 +458,23 @@ export default function StudentDashboard() {
                         <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
                           <Stack spacing={2} sx={{ flex: 1, py: 2, width: '100%', justifyContent: 'space-evenly' }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WhatshotIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <WhatshotIcon sx={{ color: '#00685d', fontSize: 30 }} />
                               <Typography variant="body2">
-                                {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
+                                {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
                               </Typography>
                             </Box>
                             <Divider />
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CheckCircleOutlinedIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: 30 }} />
                               <Typography variant="body2">
-                                {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.successRate}%</Box>
+                                {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.successRate}%</Box>
                               </Typography>
                             </Box>
                             <Divider />
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <AccessTimeIcon sx={{ color: '#00A896', fontSize: 30 }} />
+                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: 30 }} />
                               <Typography variant="body2">
-                                {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00A896', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
+                                {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
                               </Typography>
                             </Box>
                           </Stack>
@@ -483,7 +483,7 @@ export default function StudentDashboard() {
                     </Grid>
 
                     {/* --- Continua estudiant --- */}
-                    <Box sx={{ border: '2px solid', borderColor: '#8400ff', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper' }}>
+                    <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper' }}>
                       <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 800 }}>
                         {t('dashboard.continue_studying')}
                       </Typography>
@@ -537,7 +537,7 @@ export default function StudentDashboard() {
 function DashboardCard({ title, children, muted, compact }: { title: string; children: React.ReactNode; muted?: boolean; compact?: boolean }) {
   return (
     <Box sx={{
-      border: '2px solid', borderColor: '#8400ff', borderRadius: 3, p: 2, minHeight: compact ? 260 : 390, height: '100%',
+      border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: 2, minHeight: compact ? 260 : 390, height: '100%',
       display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
       bgcolor: 'background.paper', opacity: muted ? 0.7 : 1,
     }}>
