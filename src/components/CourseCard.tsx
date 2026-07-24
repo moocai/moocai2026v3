@@ -25,21 +25,43 @@ export function CourseCard({ course, index }: CourseCardProps) {
   const queryClient = useQueryClient();
   const lang = i18n.language.split('-')[0] || 'en';
 
-  const handleEnroll = (e: MouseEvent) => {
+  const handleCardClick = (e: MouseEvent) => {
     if (course.disabled) return;
     e.preventDefault();
-    e.stopPropagation();
     navigate(`/courses/${course.id}`);
   };
+
   const logoW = course.logoWidth || course.logoSize || 100;
   const logoH = course.logoHeight || course.logoSize || 100;
 
   return (
     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.5, ease: "easeOut" }} viewport={{ once: true }} style={{ height: '100%' }}>
-      <Card onMouseEnter={() => prefetchCourse(queryClient, course.id)} sx={{height: '100%', width: {xs: '85%', md: '100%'}, mx: {xs: 'auto', md: 'unset'},display: 'flex',borderColor: theme.palette.mode === 'dark' ? '#8400ff' : 'black', flexDirection: 'column', transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', overflow: 'hidden', opacity: course.disabled ? 0.7 : 1, filter: course.disabled ? 'grayscale(0)' : 'none', '&:hover': course.disabled ? {} : {transform: { xs: 'none', md: 'translateY(-15px)' }, boxShadow: '0 0 10px 10px ' + theme.palette.primary.main + '40', borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#8400ff',bgcolor: theme.palette.mode === 'dark' ? '#fffff' : 'rgba(0,0,0,0.02)',},}}>
+      <Card 
+        onClick={handleCardClick}
+        onMouseEnter={() => prefetchCourse(queryClient, course.id)} 
+        sx={{
+          height: '100%', 
+          width: {xs: '85%', md: '100%'}, 
+          mx: {xs: 'auto', md: 'unset'},
+          display: 'flex',
+          borderColor: theme.palette.mode === 'dark' ? '#8400ff' : 'black', 
+          flexDirection: 'column', 
+          transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)', 
+          overflow: 'hidden', 
+          opacity: course.disabled ? 0.7 : 1, 
+          filter: course.disabled ? 'grayscale(0)' : 'none', 
+          cursor: course.disabled ? 'default' : 'pointer',
+          '&:hover': course.disabled ? {} : {
+            transform: { xs: 'none', md: 'translateY(-15px)' }, 
+            boxShadow: '0 0 10px 10px ' + theme.palette.primary.main + '40', 
+            borderColor: theme.palette.mode === 'dark' ? '#ffffff' : '#8400ff',
+            bgcolor: theme.palette.mode === 'dark' ? '#fffff' : 'rgba(0,0,0,0.02)',
+          }
+        }}
+      >
 
           <Box sx={{ p: { xs: 1.5, md: 2 }, pb: 0 }}>
-            <Box sx={{position: 'relative', height: {xs: '120px', md: '180px'}, width: '100%',borderRadius: 1, overflow: 'hidden',background: 'linear-gradient(135deg, ' + theme.palette.primary.main + '26 0%, ' + theme.palette.secondary?.main + '33 100%)', display: 'flex',alignItems: 'center', justifyContent: 'center', border: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#8400ff' : 'black'}}>         
+            <Box sx={{position: 'relative', height: {xs: '120px', md: '180px'}, width: '100%',borderRadius: 1, overflow: 'hidden',background: 'linear-gradient(135deg, ' + theme.palette.primary.main + '26 0%, ' + theme.palette.secondary?.main + '33 100%)', display: 'flex',alignItems: 'center', justifyContent: 'center', border: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#8400ff' : 'black'}}>    
               <motion.div whileHover={{ scale: 1.05, rotate: 2 }} transition={{ type: "spring", stiffness: 300 }}>
                 <Box
                   component="img" src={course.image || courseImages[course.slug || course.id] || ''} alt={getLocalizedText(course.title, lang)}
@@ -55,7 +77,7 @@ export function CourseCard({ course, index }: CourseCardProps) {
             </Box>
 
             <Box>
-              <Box onClick={handleEnroll} sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: 'divider', cursor: course.disabled ? 'default' : 'pointer'}}>
+              <Box sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: 'divider'}}>
                 <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.enroll')}</Typography>
                 <Box component={motion.div} animate={{ x: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
                   <ArrowRight size={18} color={theme.palette.primary.main} strokeWidth={2.5} />

@@ -22,8 +22,14 @@ export default function CourseLessons() {
   const theme = useTheme();
   const { mode } = useThemeMode();
   const { data: course, isLoading: loading } = useCourse(courseId);
-  const [mainTab, setMainTab] = useState(0);
-  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(new Set());
+  const [mainTab, setMainTab] = useState<number>(() => {
+    const saved = localStorage.getItem(`mooc_tab_${courseId}`);
+    return saved !== null ? JSON.parse(saved) : 0;
+  });
+  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => {
+    const saved = localStorage.getItem(`mooc_expanded_${courseId}`);
+    return saved !== null ? new Set(JSON.parse(saved)) : new Set();
+  });
   const toggleLessonExpand = (id: string) => {
     setExpandedLessons(prev => {
       const next = new Set(prev);
@@ -31,6 +37,14 @@ export default function CourseLessons() {
       return next;
     });
   };
+
+  useEffect(() => {
+    localStorage.setItem(`mooc_tab_${courseId}`, JSON.stringify(mainTab));
+  }, [mainTab, courseId]);
+
+  useEffect(() => {
+    localStorage.setItem(`mooc_expanded_${courseId}`, JSON.stringify([...expandedLessons]));
+  }, [expandedLessons, courseId]);
   const getProgressKey = () => {
     const saved = localStorage.getItem('currentStudent');
     const id = saved ? JSON.parse(saved).id : 'temp';
@@ -274,9 +288,9 @@ export default function CourseLessons() {
                   minHeight: 0,
                   py: 1.5,
                   px: { xs: 3, md: 5 },
-                  color: '#fff',
+                  color: mode === 'light' ? '#000' : '#fff',
                 },
-                '& .Mui-selected': { color: '#fff !important' },
+                '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
                 '& .MuiTabs-indicator': { bgcolor: '#149eca', height: 3 },
               }}
             >
@@ -310,7 +324,7 @@ export default function CourseLessons() {
                   const isOpen = expandedLessons.has(lesson.id);
                   return (
                     <Box key={lesson.id} sx={{
-                      border: '1px solid', borderColor: 'divider', borderRadius: 2,
+                      border: '1px solid', borderColor: mode === 'light' ? '#8400ff' : 'divider', borderRadius: 2,
                       mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper',
                     }}>
                       <Box
@@ -368,7 +382,7 @@ export default function CourseLessons() {
                 {getLessonsWithType('coding').map(({ lesson, items }) => {
                   const isOpen = expandedLessons.has(lesson.id);
                   return (
-                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
+                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#8400ff' : 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
                       <Box
                         onClick={() => toggleLessonExpand(lesson.id)}
                         sx={{
@@ -436,7 +450,7 @@ export default function CourseLessons() {
                 {getLessonsWithType('test').map(({ lesson, items }) => {
                   const isOpen = expandedLessons.has(lesson.id);
                   return (
-                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
+                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#8400ff' : 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
                       <Box
                         onClick={() => toggleLessonExpand(lesson.id)}
                         sx={{

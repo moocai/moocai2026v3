@@ -8,6 +8,7 @@ import { api } from '../../services/api';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useCourse } from '../../hooks/useCourse';
+import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
 
@@ -29,9 +30,11 @@ export default function LessonPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
+  const { mode } = useThemeMode();
   const navigate = useNavigate();
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isMdUp = useMediaQuery('(min-height:900px)');
   const { addNotification } = useNotifications();
   const { data: course, isLoading: loading } = useCourse(courseId);
   const [currentUser] = useState<Student | null>(() => {
@@ -80,6 +83,49 @@ export default function LessonPage() {
   const [submissionsRefreshKey, setSubmissionsRefreshKey] = useState(0);
   const [peerSolutions, setPeerSolutions] = useState<any[]>([]);
   const [loadingPeers, setLoadingPeers] = useState(false);
+
+  // --- Resizable columns (desktop 3-column layout) ---
+  const [col1Pct, setCol1Pct] = useState(30); // amplada % de la COLUMNA 1 (Enunciat)
+  const [editorPct, setEditorPct] = useState(60); // amplada % de l'Editor dins el wrapper COLUMNA 2+3
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ type: 'col1' | 'editor'; startX: number; startPct: number } | null>(null);
+
+  const handleDragStart = (type: 'col1' | 'editor') => (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = { type, startX: e.clientX, startPct: type === 'col1' ? col1Pct : editorPct };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current || !containerRef.current) return;
+      const { type, startX, startPct } = dragRef.current;
+      const containerWidth = containerRef.current.offsetWidth;
+      if (!containerWidth) return;
+      const deltaPct = ((e.clientX - startX) / containerWidth) * 100;
+      let newPct = startPct + deltaPct;
+      newPct = Math.min(70, Math.max(15, newPct));
+      if (type === 'col1') setCol1Pct(newPct);
+      else setEditorPct(newPct);
+    };
+    const handleMouseUp = () => {
+      dragRef.current = null;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
+  // Escala del text de les pestanyes en funció de l'amplada de la COLUMNA 1 (30% = escala 1)
+  const tabScale = Math.min(1.3, Math.max(0.6, col1Pct / 30));
+  const tabFontSize = Math.round(12 * tabScale * 9.5) / 10; // px
+  const tabIconSize = Math.max(8, Math.round(10 * tabScale));
 
   useEffect(() => {
     if (currentProblem) {
@@ -226,7 +272,7 @@ export default function LessonPage() {
         if (consoleWindowRef.current === newWindow) consoleWindowRef.current = null;
         return;
       }
-      setTimeout(checkClosed, 1000);
+      setTimeout(checkClosed, 100);
     };
     checkClosed();
   };
@@ -279,14 +325,26 @@ export default function LessonPage() {
       {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
       
       {/* Header */}
-      <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0,mt:10}}>
+      <Box sx={{height: 48, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0,mt:10}}>
       </Box>
+
+      {/* Tabs mobile */}
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => setActiveTab(v)}
+        sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center', gap: 1 }, '& .MuiTab-root': { minHeight: 20, fontSize: 7.3, fontWeight: 900, minWidth: 0, px: 1, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}
+      >
+        <Tab label={t('lesson.tab_statement', 'Enunciat')} />
+        <Tab label={t('lesson.tab_teacher_solution', 'Solució Profe')} icon={!unlocked ? <Lock size={8} /> : undefined} iconPosition="end" />
+        <Tab label={t('lesson.tab_other_solutions', 'Solucions Alumnes')} icon={!unlocked ? <Lock size={8} /> : undefined} iconPosition="end" />
+        <Tab label={t('lesson.tab_ai_help', 'Ajut IA')} icon={<Sparkles size={8} />} iconPosition="end" />
+      </Tabs>
 
       {/* Content - Vertical Stack */}
       <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%' }}>
 
         {/* 1r: ENUNCIAT */}
-        <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0}}>
+        <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 2, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0}}>
           <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
             <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
             <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: 600 }}>{currentProblem?.text || ''}</Typography>
@@ -297,8 +355,8 @@ export default function LessonPage() {
                   </Box>
                   )}
                 </Box>
-        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1,bgcolor: '#1e1e1e', borderRadius: 1, overflow: 'hidden' }}>
-          <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333', flexShrink: 0 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1,bgcolor: '#1e1e1e',overflow: 'hidden' }}>
+          <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
             <Typography sx={{ fontSize: 11, color: '#888', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
           </Box>
           <Box sx={{ flex: 1, p: 1, position: 'relative' }}>
@@ -311,7 +369,7 @@ export default function LessonPage() {
         </Box>
       </Box>
 
-        <Box sx={{ height: 230, display: 'flex', flexDirection: 'column', width: '100%', bgcolor: '#000', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+        <Box sx={{ height: 230, display: 'flex', flexDirection: 'column', width: '100%', bgcolor: '#000', borderTop: '1px solid', borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0 }}>
         <Box sx={{ height: 22, px: 1.5, bgcolor: '#111', display: 'flex', alignItems: 'center' }}>
           <Terminal size={10} style={{ opacity: 0.4, marginRight: 4, color: '#fff' }} />
           <Typography sx={{ fontSize: 8, color: '#888', fontWeight: 600 }}>CONSOLE</Typography>
@@ -332,15 +390,15 @@ export default function LessonPage() {
       </Box>
 
         {/* BOTONS ESTIL */}
-      <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
-        <IconButton onClick={handlePrevious} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+      <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
+        <IconButton onClick={handlePrevious} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1, p: 1 }}>
           <ChevronLeft size={20}/>
         </IconButton>
         <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
           <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
           <Button onClick={handleRunTests} variant="contained" fullWidth sx={{fontWeight: 900, borderRadius: 1, fontSize: 13 }}>{t('lesson.run')}</Button>
         </Stack>
-        <IconButton onClick={handleNext} disabled={status !== 'pass'} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1 }}>
+        <IconButton onClick={handleNext} disabled={status !== 'pass'} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1.5, p: 1 }}>
           <ChevronRight size={20}/>
         </IconButton>
       </Box>
@@ -350,55 +408,53 @@ export default function LessonPage() {
 
   // DESKTOP LAYOUT - 3 Columns
   return (
-    <Box sx={{ position: 'fixed', inset: 0, height: '91.5vh', width: '100vw', display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' , mt: 10}}>
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
       {/* Progress */}
       {progressPercent > 0 && <Box sx={{ height: 4, flexShrink: 0, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
       
       {/* Header - reduced height */}
-      <Box sx={{ height: 48, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', px: 3, justifyContent: 'space-between', bgcolor: 'background.paper' }}>
+      <Box sx={{ height: 55, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', px: 3, justifyContent: 'space-between', bgcolor: 'background.paper' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography sx={{ fontSize: 15, fontWeight: 900, color: 'primary.main' }}>{getText(course.title).toUpperCase()}</Typography>
         </Box>
       </Box>
 
       {/* 3 Columnas Desktop - reduced heights */}
-      <Box sx={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
-        {/* COLUMNA 1: Enunciat amb pestanyes (20%) */}
-        <Box sx={{ width: '30%', borderRight: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
+      <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0, mt: 3}}>
+        {/* COLUMNA 1: Enunciat amb pestanyes (redimensionable) */}
+        <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative'}}>
           <Tabs
             value={activeTab}
             onChange={(_, v) => setActiveTab(v)}
-            variant="scrollable"
-            scrollButtons="auto"
-            allowScrollButtonsMobile
-            sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTab-root': { minHeight: 20, fontSize: 12, fontWeight: 700, minWidth: 0}, '& .Mui-selected': { color: 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}
+            centered
+            sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 2, mb: 0.5, px: 1 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}
           >
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
             <Tab
               label={t('lesson.tab_teacher_solution', 'Solució Profe')}
-              icon={!unlocked ? <Lock size={10} /> : undefined}
+              icon={!unlocked ? <Lock size={tabIconSize} /> : undefined}
               iconPosition="end"
             />
             <Tab
               label={t('lesson.tab_other_solutions', 'Solucions Alumnes')}
-              icon={!unlocked ? <Lock size={10} /> : undefined}
+              icon={!unlocked ? <Lock size={tabIconSize} /> : undefined}
               iconPosition="end"
             />
            <Tab
               label={t('lesson.tab_ai_help', 'Ajut IA')}
-              icon={<Sparkles size={10} />}
+              icon={<Sparkles size={tabIconSize} />}
               iconPosition="end"
             />
           </Tabs>
 
-          <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+          <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, pb: isMdUp ? 8 : 6 }}>
             {/* PESTANYA 0: Enunciat */}
             {activeTab === 0 && (
               <Box sx={{ p: 2 }}>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 700, mb: 3, mt: 3 }}>{getText(currentProblem?.subtitle)}</Typography>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 900, mb: 3, mt: 3, color: mode === 'light' ? '#000' : 'inherit' }}>{getText(currentProblem?.subtitle)}</Typography>
                 <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: '3px solid', borderColor: alpha(theme.palette.primary.main, 0.5), mt: 5 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5 }}>{t('lesson.objective')}</Typography>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '1rem' }}>{currentProblem?.text || ''}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', mb: 0.5, color: mode === 'light' ? '#000' : 'inherit' }}>{t('lesson.objective')}</Typography>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '1rem', color: mode === 'light' ? '#000' : 'inherit' }}>{currentProblem?.text || ''}</Typography>
                 </Box>
               </Box>
             )}
@@ -470,24 +526,36 @@ export default function LessonPage() {
           </Box>
 
           {/* Points */}
-          <Box sx={{ p: 2, bgcolor: alpha('#8400ff', 0.05), borderTop: '1px solid #8400ff', textAlign: 'center', flexShrink: 0 }}>
+          <Box sx={{ p: 2, bgcolor: alpha('#8400ff', 0.3), borderTop: '1px solid #8400ff', textAlign: 'center', position: 'absolute', bottom: 0, left: 0, right: 0, transform: isMdUp ? 'translateY(-30px)' : 'none', zIndex: 1 }}>
             <Trophy size={24} color="#8400ff" style={{ display: 'block', margin: '0 auto 4px' }} />
-            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: 'white' }}>{t('lesson.points_label')}</Typography>
+            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: mode === 'light' ? '#000' : 'white' }}>{t('lesson.points_label')}</Typography>
             <Typography sx={{ fontSize: '1.25rem', fontWeight: 900 }}>{globalProgress * 10}</Typography>
           </Box>
         </Box>
 
-        {/* COLUMNA 2+3: Editor + Console */}
+        {/* Divisor arrossegable: COLUMNA 1 <-> COLUMNA 2+3 */}
+        <Box
+          onMouseDown={handleDragStart('col1')}
+          sx={{
+            width: 6,
+            flexShrink: 0,
+            cursor: 'col-resize',
+            bgcolor: mode === 'light' ? '#00000014' : 'divider',
+            '&:hover': { bgcolor: '#8400ff' },
+            transition: 'background-color 0.15s',
+          }}
+        />
+
+        {/* COLUMNA 2: Editor  */}
         <Box sx={{ flex: 1, display: 'flex', flexDirection: courseId === 'python-public-test' ? 'column' : 'row', minHeight: 0 }}>
-          {/* COLUMNA 2: Editor */}
-          <Box ref={contentRef} sx={{ [courseId === 'python-public-test' ? 'height' : 'flex']: courseId === 'python-public-test' ? '50%' : 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
-            <Box sx={{ height: 40, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid #333' }}>
+          <Box ref={contentRef} sx={{ [courseId === 'python-public-test' ? 'height' : 'width']: courseId === 'python-public-test' ? '70%' : `${editorPct}%`, flexShrink: courseId === 'python-public-test' ? undefined : 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+            <Box sx={{ height: 60, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}` }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ fontSize: 11, color: '#888', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
+                <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file')}</Typography>
               </Box>
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
-                <Button onClick={handleOpenConsole} startIcon={<Terminal size={10}/>} sx={{ bgcolor: 'transparent', color: '#888', height: 28, fontSize: 10, fontWeight: 600, px: 1.5, borderRadius: 1, border: '1px solid #444', '&:hover': { bgcolor: '#333', color: '#fff' } }}>Consola</Button>
+          <IconButton onClick={handleResetCode} sx={{ border: `1px solid ${mode === 'light' ? 'white' : 'white'}`, borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
+                <Button onClick={handleOpenConsole} startIcon={<Terminal size={10}/>} sx={{ bgcolor: 'transparent', color: 'white', height: 28, fontSize: 10, fontWeight: 600, px: 1.5, borderRadius: 1, border: `1px solid ${mode === 'light' ? 'white' : 'white'}`, '&:hover': { bgcolor: '#333', color: 'white' } }}>Consola</Button>
                 <Button onClick={handleRunTests} startIcon={<Play size={10} fill="#000"/>} sx={{ bgcolor: '#fff', color: '#000', height: 28, fontSize: 10, fontWeight: 700, px: 2, borderRadius: 1 }}>{t('lesson.run')}</Button>
               </Box>
             </Box>
@@ -497,14 +565,29 @@ export default function LessonPage() {
             </motion.div>
           </Box>
 
+          {/* Divisor arrossegable: Editor <-> Consola (només en layout de fila) */}
+          {courseId !== 'python-public-test' && (
+            <Box
+              onMouseDown={handleDragStart('editor')}
+              sx={{
+                width: 6,
+                flexShrink: 0,
+                cursor: 'col-resize',
+                bgcolor: mode === 'light' ? '#00000014' : 'divider',
+                '&:hover': { bgcolor: '#8400ff' },
+                transition: 'background-color 0.15s',
+              }}
+            />
+          )}
+
           {/* COLUMNA 3: Console */}
-          <Box sx={{ [courseId === 'python-public-test' ? 'height' : 'width']: courseId === 'python-public-test' ? '50%' : '50%', borderLeft: courseId === 'python-public-test' ? 'none' : '1px solid', borderTop: courseId === 'python-public-test' ? '1px solid' : 'none', borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', minHeight: 0 }}>
-          <Box sx={{ height: 40, px: 2, bgcolor: 'action.hover', display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
-            <Terminal size={14} style={{opacity: 0.4, marginRight: 6}} />
-            <Typography sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary' }}>{t('lesson.debug_console')}</Typography>
+          <Box sx={{ [courseId === 'python-public-test' ? 'height' : 'width']: courseId === 'python-public-test' ? '30%' : `${100 - editorPct}%`, flexShrink: courseId === 'python-public-test' ? undefined : 0, borderLeft: courseId === 'python-public-test' ? 'none' : '1px solid', borderTop: courseId === 'python-public-test' ? '1px solid' : 'none', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+          <Box sx={{ height: 40, px: 2, bgcolor: 'black', display: 'flex', alignItems: 'center', borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider' }}>
+            <Terminal size={14} style={{opacity: 1, marginRight: 6, color: mode === 'light' ? '#fff' : undefined }} />
+            <Typography sx={{ fontSize: 11, fontWeight: 900, color: 'white' }}>{t('lesson.debug_console')}</Typography>
           </Box>
           <Box sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
-            {consoleOutput.length === 0 && <Typography sx={{ fontFamily: 'monospace', fontSize: 11, color: 'text.disabled' }}>{`// ${t('lesson.run_code')}`}</Typography>}
+            {consoleOutput.length === 0 && <Typography sx={{ fontFamily: 'monospace', fontSize: 15, color: mode === 'light' ? 'white' : 'text.disabled' }}>{`// ${t('lesson.run_code')}`}</Typography>}
             {consoleOutput.map((line, i) => (
               <Typography key={i} sx={{ fontFamily: 'monospace', fontSize: 11, mb: 0.5, color: line.includes('✅') || line.includes('🏆') || line.includes('💾') ? 'success.main' : line.includes('❌') ? 'error.main' : 'text.secondary' }}>{'> '} {line}</Typography>
             ))}
@@ -520,10 +603,10 @@ export default function LessonPage() {
           </Box>
         </Box>
       </Box>
-    </Box>
+      </Box>
 
       {/* Footer Desktop - reduced */}
-      <Box sx={{ height: 56, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper' }}>
+      <Box sx={{ height: 56, flexShrink: 0, mt: isMdUp ? -4 : 0, borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper' }}>
         <Button onClick={handlePrevious} variant="outlined" sx={{ minWidth: 120, minHeight: 36, fontSize: '0.85rem' }}><ChevronLeft size={18}/> {t('lesson.previous')}</Button>
         <Button onClick={handleNext} disabled={status !== 'pass'} variant="outlined" sx={{ minWidth: 120, minHeight: 36, fontSize: '0.85rem' }}>{t('lesson.next')} <ChevronRight size={18}/></Button>
       </Box>
