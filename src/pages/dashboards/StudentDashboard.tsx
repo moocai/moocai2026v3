@@ -46,8 +46,9 @@ export default function StudentDashboard() {
   const [newPin, setNewPin] = useState("");
   const [newRole, setNewRole] = useState<'student' | 'teacher'>('student');
 
-  const isMdUp = useMediaQuery('(min-height:900px)');
-  const lessonsSliceLimit = isMdUp ? 7 : 5;
+  const isMdUp = useMediaQuery('(max-height:900px)');
+  const lessonsSliceLimit = isMdUp ? 7 : 7;
+  const isTallScreen = useMediaQuery('(min-height:1200px)');
 
   const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
   const getText = (field: any): string => {
@@ -311,7 +312,7 @@ export default function StudentDashboard() {
               <>
                 {/* --- Course tabs (Python / React / +) --- */}
                 <Box sx={{
-                  display: 'inline-flex', alignItems: 'center', mb: 5,
+                  display: 'inline-flex', alignItems: 'center', mb: 5, mt: isTallScreen ? 25 : 0,
                   bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: 5,
                 }}>
                   <Tabs
