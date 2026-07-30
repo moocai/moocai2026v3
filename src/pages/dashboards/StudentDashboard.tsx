@@ -47,7 +47,7 @@ export default function StudentDashboard() {
   const [newRole, setNewRole] = useState<'student' | 'teacher'>('student');
 
   const isMdUp = useMediaQuery('(max-height:900px)');
-  const lessonsSliceLimit = isMdUp ? 7 : 7;
+  const lessonsSliceLimit = isMdUp ? 5 : 7;
   const isTallScreen = useMediaQuery('(min-height:1200px)');
 
   const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
@@ -288,7 +288,7 @@ export default function StudentDashboard() {
   return (
     <Box sx={{ position: 'relative', bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#111827' : 'background.default', color: 'text.primary', width: '100%', maxWidth: '100vw', height: '100%', overflow: { xs: 'auto', md: 'hidden' }, display: 'flex', flexDirection: 'column' }}>
         {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
-        <Container maxWidth={false} sx={{ pt: { xs: 2, md: 6 }, px: { xs: 3, sm: 1.5, md: 8, lg: 8, xl: 10 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'auto' } }}>
+        <Container maxWidth={false} sx={{ pt: { xs: 2, md: 6 }, px: { xs: 2, sm: 1.5, md: 8, lg: 8, xl: 10 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'auto' } }}>
           <Box sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {!selectedStudent ? (
                 <Login
@@ -313,13 +313,16 @@ export default function StudentDashboard() {
                 {/* --- Course tabs (Python / React / +) --- */}
                 <Box sx={{
                   display: 'inline-flex', alignItems: 'center', mb: 5, mt: isTallScreen ? 25 : 0,
-                  bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: 5,
+                  bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 5 },
+                  flexWrap: 'wrap', maxWidth: '100%',
                 }}>
                   <Tabs
                     value={courseTabIndex}
                     onChange={(_e, val) => setCourseTabIndex(val)}
                     slotProps={{ indicator: { style: { display: 'none' } } }}
-                    sx={{ minHeight: 40 }}
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{ minHeight: 40, maxWidth: { xs: 200, sm: 'none' } }}
                   >
                     {allCourses.map((course) => (
                       <Tab
@@ -349,18 +352,18 @@ export default function StudentDashboard() {
                 </Box>
 
                 {currentCourse ? (
-                  <>
+                  <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                     {/* --- 5-card summary row --- */}
-                    <Grid container spacing={{ xs: 2, xl: 4 }} sx={{ mb: 5, ml: { xl: 2 } }}>
+                    <Grid container spacing={{ xs: 1.5, md: 2, xl: 4 }} sx={{ mb: { xs: 1.5, md: 5 }, ml: { xl: 2 }, order: { xs: 1, md: 0 } }}>
                       {/* Progrés general */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.2 }} sx={{ height: '100%' }}>
-                        <DashboardCard title={t('dashboard.overall_progress')} compact={!isMdUp}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.2 }} sx={{ height: { xs: 'auto', md: '100%' } }}>
+                        <DashboardCard title={t('dashboard.overall_progress')} compact minHeightXs={110}>
                           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                            <Box sx={{ position: 'relative', display: 'inline-flex', width: isMdUp ? 190 : 150, height: isMdUp ? 190 : 180 }}>
-                              <CircularProgress variant="determinate" value={100} thickness={5} size="100%" sx={{ color: 'action.disabledBackground', position: 'absolute', ml: isMdUp ? 0 : 1 }} />
+                            <Box sx={{ position: 'relative', display: 'inline-flex', width: { xs: 64, md: isMdUp ? 160 : 180 }, height: { xs: 64, md: isMdUp ? 160 : 200 } }}>
+                              <CircularProgress variant="determinate" value={100} thickness={5} size="100%" sx={{ color: 'action.disabledBackground', position: 'absolute', ml: { xs: 0, md: isMdUp ? 0 : 1 } }} />
                               <CircularProgress variant="determinate" value={currentProgress} thickness={5} size="100%" sx={{ color: 'primary.main' }} />
-                              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: isMdUp ? 0 : 1 }}>
-                                <Typography variant={isMdUp ? 'h4' : 'h6'} sx={{ fontWeight: 900, fontSize: isMdUp ? '2.5rem' : '1.5rem' }}>{currentProgress}%</Typography>
+                              <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: { xs: 0, md: isMdUp ? 0 : 1 } }}>
+                                <Typography variant={isMdUp ? 'h4' : 'h6'} sx={{ fontWeight: 900, fontSize: { xs: '0.85rem', md: isMdUp ? '1.5rem' : '2.5rem' } }}>{currentProgress}%</Typography>
                               </Box>
                             </Box>
                           </Box>
@@ -368,7 +371,7 @@ export default function StudentDashboard() {
                       </Grid>
 
                       {/* Topics del curs */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.code_problems')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
                             {flatLessons.filter(isCodeLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
@@ -381,7 +384,7 @@ export default function StudentDashboard() {
                                   onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}`)}
                                 >
                                   <LaptopMacIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
-                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
+                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
                                   <LinearProgress variant="determinate" value={done ? 100 : 0} sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }} />
                                 </Stack>
                               );
@@ -393,7 +396,7 @@ export default function StudentDashboard() {
                           <Typography
                             variant="caption"
                             onClick={handleStatsClick}
-                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                           >
                             {t('dashboard.view_stats')}
                           </Typography>
@@ -401,7 +404,7 @@ export default function StudentDashboard() {
                       </Grid>
 
                       {/* Subtopics del temari */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.test_exercises')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
                             {flatLessons.filter(isTestLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
@@ -414,7 +417,7 @@ export default function StudentDashboard() {
                                   onClick={() => navigate(`/courses/${currentCourse.slug}/exam/${lesson.id}`)}
                                 >
                                   <MenuBookIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
-                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
+                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
                                   <LinearProgress variant="determinate" value={done ? 100 : 0} sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }} />
                                 </Stack>
                               );
@@ -426,7 +429,7 @@ export default function StudentDashboard() {
                           <Typography
                             variant="caption"
                             onClick={handleStatsClick}
-                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: '0.85rem', letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
                           >
                             {t('dashboard.view_stats')}
                           </Typography>
@@ -434,17 +437,17 @@ export default function StudentDashboard() {
                       </Grid>
 
                       {/* Leaderboard */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.leaderboard')} compact={!isMdUp}>
-                          <Stack spacing={2.5} sx={{ width: '100%', mt: 1, alignItems: 'center' }}>
+                          <Stack spacing={{ xs: 1.5, md: 2.5 }} sx={{ width: '100%', mt: 1, alignItems: 'center' }}>
                             {top3Ranking.map((s) => (
                               <Stack key={s.id} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                                 <Avatar sx={{
-                                  width: 32, height: 32,
+                                  width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
                                   bgcolor: s.id === selectedStudent?.id ? 'primary.main' : 'action.disabledBackground',
                                 }}>{s.name.charAt(0).toUpperCase()}</Avatar>
-                                <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }} noWrap>{s.name}</Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700 }}>{getCoursePoints(currentCourse, s.id)}</Typography>
+                                <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontSize: { xs: '0.8rem', md: '0.875rem' } }} noWrap>{s.name}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>{getCoursePoints(currentCourse, s.id)}</Typography>
                               </Stack>
                             ))}
                             {top3Ranking.length === 0 && (
@@ -455,26 +458,31 @@ export default function StudentDashboard() {
                       </Grid>
 
                       {/* Més estadístiques */}
-                      <Grid size={{ xs: 6, sm: 6, md: 2.4, xl: 2.4 }}>
+                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
-                          <Stack spacing={2} sx={{ flex: 1, py: 2, width: '100%', justifyContent: 'space-evenly' }}>
+                          <Stack
+                            direction={{ xs: 'row', md: 'column' }}
+                            spacing={2}
+                            sx={{ flex: 1, py: 2, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
+                          >
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WhatshotIcon sx={{ color: '#00685d', fontSize: 30 }} />
-                              <Typography variant="body2">
+                              <WhatshotIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
                               </Typography>
                             </Box>
-                            <Divider />
+                            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'none' } }} />
+                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: 30 }} />
-                              <Typography variant="body2">
+                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.successRate}%</Box>
                               </Typography>
                             </Box>
-                            <Divider />
+                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: 30 }} />
-                              <Typography variant="body2">
+                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
                               </Typography>
                             </Box>
@@ -484,26 +492,35 @@ export default function StudentDashboard() {
                     </Grid>
 
                     {/* --- Continua estudiant --- */}
-                    <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper' }}>
-                      <Typography variant="subtitle1" sx={{ mb: 2, fontWeight: 800 }}>
-                        {t('dashboard.continue_studying')}
-                      </Typography>
+                    <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper', order: { xs: 2, md: 0 } }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
+                          {t('dashboard.continue_studying')}
+                        </Typography>
+                        <Button
+                          onClick={() => navigate(`/courses/${currentCourse.slug}`)}
+                          endIcon={<ArrowForwardIcon fontSize="small" />}
+                          sx={{ textTransform: 'none', fontWeight: 900 }}
+                        >
+                          {t('dashboard.view_full_course')}
+                        </Button>
+                      </Stack>
                       <Stack spacing={2}>
                         {(() => {
                           const attemptedLessons = flatLessons.filter((lesson: any) => selectedStudent && dbProgress[`${currentCourse.id}_${lesson.id}`]);
                           return attemptedLessons.length > 0 ? attemptedLessons.slice(-5).reverse().map((lesson: any, idx: number) => {
                             const isCompleted = dbProgress[`${currentCourse.id}_${lesson.id}`] === true;
                             return (
-                            <Stack key={lesson.id || idx} direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-                              {isCodeLesson(lesson) ? <LaptopMacIcon sx={{ color: 'text.secondary' }} /> : <MenuBookIcon sx={{ color: 'text.secondary' }} />}
-                              <Typography variant="body2" sx={{ width: { xs: 120, md: 220, xl: 280 } }} noWrap>{getText(lesson.title)}</Typography>
+                            <Stack key={lesson.id || idx} direction="row" spacing={{ xs: 1, md: 2 }} sx={{ alignItems: 'center' }}>
+                              {isCodeLesson(lesson) ? <LaptopMacIcon sx={{ color: 'text.secondary', fontSize: { xs: 18, md: 24 } }} /> : <MenuBookIcon sx={{ color: 'text.secondary', fontSize: { xs: 18, md: 24 } }} />}
+                              <Typography variant="body2" sx={{ width: { xs: 90, md: 220, xl: 280 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }} noWrap>{getText(lesson.title)}</Typography>
                               <Tooltip title={t('dashboard.continue_activity', 'Continuar l\'activitat')} arrow placement="top">
                                 <IconButton size="small" onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}`)}>
                                   <InfoOutlinedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
                               <LinearProgress variant="determinate" value={isCompleted ? 100 : 50} sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'action.disabledBackground' }} />
-                              <Typography variant="body2" sx={{ width: 44, textAlign: 'right' }} color="text.secondary">{isCompleted ? '100%' : '50%'}</Typography>
+                              <Typography variant="body2" sx={{ width: 44, textAlign: 'right', fontSize: { xs: '0.75rem', md: '0.875rem' } }} color="text.secondary">{isCompleted ? '100%' : '50%'}</Typography>
                             </Stack>
                             );
                           }) : (
@@ -515,15 +532,8 @@ export default function StudentDashboard() {
                           );
                         })()}
                       </Stack>
-                      <Button
-                        onClick={() => navigate(`/courses/${currentCourse.slug}`)}
-                        endIcon={<ArrowForwardIcon fontSize="small" />}
-                        sx={{ mt: 2, textTransform: 'none', fontWeight: 700 }}
-                      >
-                        {t('dashboard.view_full_course')}
-                      </Button>
                     </Box>
-                  </>
+                  </Box>
                 ) : (
                   <Typography color="text.secondary">{t('dashboard.no_courses')}</Typography>
                 )}
@@ -535,14 +545,17 @@ export default function StudentDashboard() {
   );
 }
 
-function DashboardCard({ title, children, muted, compact }: { title: string; children: React.ReactNode; muted?: boolean; compact?: boolean }) {
+function DashboardCard({ title, children, muted, compact, minHeightXs }: { title: string; children: React.ReactNode; muted?: boolean; compact?: boolean; minHeightXs?: number }) {
   return (
     <Box sx={{
-      border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: 2, minHeight: compact ? 260 : 390, height: '100%',
+      border: '2px solid', borderColor: '#00685d', borderRadius: 3,
+      p: { xs: 1.5, md: 2 },
+      minHeight: { xs: minHeightXs ?? (compact ? 180 : 210), md: compact ? 260 : 270 },
+      height: '100%',
       display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
       bgcolor: 'background.paper', opacity: muted ? 0.7 : 1,
     }}>
-      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 700, textAlign: 'center', width: '100%' }}>
+      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 700, textAlign: 'center', width: '100%', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
         {title}
       </Typography>
       {children}
