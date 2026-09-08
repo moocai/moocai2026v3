@@ -57,7 +57,7 @@ export function Login({
 
           <TextField
             fullWidth
-            label="Username"
+            label="Username or email"
             variant="filled"
             value={username}
             onChange={e => onUsernameChange(e.target.value)}
