@@ -32,9 +32,7 @@ export default function Hero() {
   const { mode } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const getStudentCount = useCallback(() => {
-    const local = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
-    const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-    return [...local].filter((s: any) => !deletedIds.includes(s.id) && s.role !== 'teacher').length;
+    return 0;
   }, []);
 
   const [studentCount, setStudentCount] = useState(getStudentCount);  const [courseCount, setCourseCount] = useState(0);

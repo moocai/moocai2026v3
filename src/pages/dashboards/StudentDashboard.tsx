@@ -34,7 +34,6 @@ export default function StudentDashboard() {
   const { mode } = useThemeMode();
   const [loading, setLoading] = useState(true);
   const [, setActionLoading] = useState(false);
-  const [students, setStudents] = useState<Student[]>([]);
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dbProgress, setDbProgress] = useState<Record<string, boolean>>({});
@@ -116,11 +115,6 @@ export default function StudentDashboard() {
           );
           setAllCourses(fullCourses);
         } catch (err) { console.error("Error carregant cursos:", err); }
-
-        const localStudents = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
-        const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-        const merged = localStudents.filter((s: any) => !deletedIds.includes(s.id));
-        setStudents(merged);
 
         const saved = localStorage.getItem('currentStudent');
         if (saved) {
@@ -217,10 +211,8 @@ export default function StudentDashboard() {
   };
 
   const rankedStudentsByCourse = useMemo(() => {
-    const currentCourse = allCourses[courseTabIndex];
-    if (!currentCourse) return [];
-    return [...students].filter(s => s.role !== 'teacher').sort((a, b) => getCourseProgress(currentCourse, b.id) - getCourseProgress(currentCourse, a.id));
-  }, [students, allCourses, courseTabIndex, getCourseProgress]);
+    return [] as Student[];
+  }, []);
 
   const stats = useMemo(() => {
     const course = allCourses[courseTabIndex] || null;

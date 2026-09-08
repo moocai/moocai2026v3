@@ -93,8 +93,3 @@
 - `POST /api/v1/users/auth/login/` → retorna `{ token, user }` i set a session cookie.
 - `POST /api/v1/users/auth/logout/` → invalida la sessió.
 
-### Nota CORS (pendent)
-- El servidor no envia el header `Access-Control-Allow-Origin`, així que des del navegador la petició directa pot fallar per CORS.
-- Es va provar el proxy de Vite com a solució, però es va revertir a la URL absoluta per decisió de l'usuari.
-- Si falla CORS al navegador, caldrà usar un proxy o que Algorien habiliti CORS.
-

@@ -375,15 +375,13 @@ Base URL: `VITE_API_URL` env var o `https://algorien.com/api/v1`
 ## 11. Flux de Dades
 
 ### Fonts de Dades
-1. **`src/data/`** — Image mappings (`courses.ts`), 3 estudiants predefinits (`students.ts`)
+1. **`src/data/`** — Image mappings (`courses.ts`)
 2. **API REST** — `https://algorien.com` (proxy Vite `/api`). `courseService.ts` amb axios (token aut o timeout 10s)
-3. **localStorage** — 11+ claus:
+3. **localStorage** — 9+ claus:
    - `mooc_global_progress`: `{courseId_lessonId: true}`
    - `code_{userId}_{courseId}_{lessonId}`: Codi guardat
    - `points_{userId}`: Punts acumulats (10 per lliçó)
    - `currentStudent`: Estudiant sessió activa
-   - `mooc_local_students`: Estudiants creats localment
-   - `mooc_deleted_ids`: IDs eliminats
    - `mooc_submissions_{courseId}_{lessonId}`: Submissions
    - `mooc_last_session`: Última sessió `{courseId, lessonId, courseTitle, lessonTitle, timestamp}`
    - `mooc-theme-mode`: Tema (light/dark/fancy)
