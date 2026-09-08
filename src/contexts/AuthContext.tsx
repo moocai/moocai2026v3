@@ -13,7 +13,7 @@ interface AuthContextValue {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
-  login: (credentials: { email: string; code: string }) => Promise<void>;
+  login: (credentials: { username: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -33,25 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const init = async () => {
       const savedToken = localStorage.getItem('token');
       if (savedToken) {
-        try {
-          const userData = await authService.getMe();
-          setUser(userData);
-          setToken(savedToken);
-        } catch {
-          localStorage.removeItem('token');
-          localStorage.removeItem('currentStudent');
-          setUser(null);
-          setToken(null);
-        }
+        setToken(savedToken);
       }
       setLoading(false);
     };
     init();
   }, []);
 
-  const login = async (credentials: { email: string; code: string }) => {
-    const data = await authService.login(credentials);
-    setUser(data.user);
+  const login = async (credentials: { username: string; password: string }) => {
+    const data = await authService.login(credentials.username, credentials.password);
     setToken(data.token);
     window.dispatchEvent(new Event('auth-state-change'));
   };

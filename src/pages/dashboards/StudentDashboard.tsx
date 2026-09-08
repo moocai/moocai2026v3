@@ -12,12 +12,12 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import {api} from '../../services/api';
+import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
 import {useNotifications} from '../../contexts/NotificationContext';
 import {Login} from '../../features/student/Login';
 import {Student, Topic, Course} from '../../features/student/types';
 import { courseService } from '../../services/courseService';
-import { students as baseStudents } from '../../data/students';
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 
@@ -38,13 +38,11 @@ export default function StudentDashboard() {
   const [allCourses, setAllCourses] = useState<Course[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dbProgress, setDbProgress] = useState<Record<string, boolean>>({});
-  const [errorId, setErrorId] = useState<string | null>(null);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
   const [courseTabIndex, setCourseTabIndex] = useState(0);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newEmail, setNewEmail] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [newRole, setNewRole] = useState<'student' | 'teacher'>('student');
 
   const isMdUp = useMediaQuery('(max-height:900px)');
   const lessonsSliceLimit = isMdUp ? 5 : 7;
@@ -121,7 +119,7 @@ export default function StudentDashboard() {
 
         const localStudents = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
         const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-        const merged = [...baseStudents, ...localStudents].filter(s => !deletedIds.includes(s.id));
+        const merged = localStudents.filter((s: any) => !deletedIds.includes(s.id));
         setStudents(merged);
 
         const saved = localStorage.getItem('currentStudent');
@@ -150,59 +148,33 @@ export default function StudentDashboard() {
     };
   }, [fetchProgress]);
 
-  const handleCreateStudent = (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
-    if (!newName || !newEmail || !newPin) return;
-    const newStudent = { id: `local-${Date.now()}`, name: newName, email: newEmail, code: newPin, role: newRole };
-    const updatedLocal = [...JSON.parse(localStorage.getItem('mooc_local_students') || '[]'), newStudent];
-    localStorage.setItem('mooc_local_students', JSON.stringify(updatedLocal));
-    setStudents(prev => [...prev, newStudent]);
-    setNewName(""); setNewEmail(""); setNewPin(""); setNewRole("student");
-    setShowCreateForm(false);
-    addNotification(t('notifications.account_created', { name: newName, role: newRole }), 'success');
-    window.dispatchEvent(new Event('studentsUpdated'));
-  };
-
-  const handleDeleteStudent = (id: string, pin: string): boolean => {
-    const target = students.find(s => s.id === id);
-    if (!target || target.code !== pin) return false;
-    const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-    localStorage.setItem('mooc_deleted_ids', JSON.stringify([...deletedIds, id]));
-    const localOnly = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
-    localStorage.setItem('mooc_local_students', JSON.stringify(localOnly.filter((s: any) => s.id !== id)));
-    setStudents(prev => prev.filter(s => s.id !== id));
-    addNotification(t('notifications.user_deleted', { name: target.name, role: target.role || 'student' }), 'info');
-    window.dispatchEvent(new Event('studentsUpdated'));
-    if (selectedStudent?.id === id) {handleLogoutAction();}
-    return true;
-  };
-
-  const handleLogin = (student: Student, pin: string) => {
-    if (student.code !== pin) {
-      setErrorId(student.id);
-      addNotification(t('notifications.incorrect_pin'), 'error');
-      setTimeout(() => setErrorId(null), 500);
-      return;
-    }
-    if (student.role === 'teacher') {
-      localStorage.setItem('mooc_role', 'teacher');
-      window.dispatchEvent(new Event('auth-state-change'));
-      navigate('/teacher');
-    } else {
+    setLoginLoading(true);
+    try {
+      const data = await authService.login(username, password);
+      const role = 'student';
+      const student: Student = {
+        id: data?.user?.id != null ? String(data.user.id) : username,
+        name: data?.user?.name || username,
+        code: password,
+        email: data?.user?.email || username,
+        role,
+      };
       setSelectedStudent(student);
       localStorage.setItem('currentStudent', JSON.stringify(student));
       fetchProgress(student.id);
+      setUsername("");
+      setPassword("");
+      setLoginLoading(false);
       addNotification(t('notifications.welcome', { name: student.name }), 'success');
       window.dispatchEvent(new Event('auth-state-change'));
+    } catch (err: any) {
+      setLoginError(true);
+      setLoginLoading(false);
+      addNotification(t('notifications.incorrect_pin'), 'error');
+      setTimeout(() => setLoginError(false), 1500);
     }
-  };
-
-  const handleLogoutAction = () => {
-    localStorage.removeItem('currentStudent');
-    setSelectedStudent(null);
-    setDbProgress({});
-    addNotification(t('notifications.session_closed'), 'info');
-    window.dispatchEvent(new Event('auth-state-change'));
   };
 
   const handleResetCourse = async (courseId: string) => {
@@ -292,21 +264,13 @@ export default function StudentDashboard() {
           <Box sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {!selectedStudent ? (
                 <Login
-                  students={students}
-                  newRole={newRole}
-                  onRoleChange={(role) => setNewRole(role)}
-                  showCreateForm={showCreateForm}
-                  onShowCreateForm={(show) => setShowCreateForm(show)}
-                  newName={newName}
-                  onNewNameChange={(name) => setNewName(name)}
-                  newEmail={newEmail}
-                  onNewEmailChange={(email) => setNewEmail(email)}
-                  newPin={newPin}
-                  onNewPinChange={(pin) => setNewPin(pin)}
-                  onCreateStudent={handleCreateStudent}
-                  onLogin={handleLogin}
-                  onDeleteStudent={handleDeleteStudent}
-                  errorId={errorId}
+                  username={username}
+                  onUsernameChange={setUsername}
+                  password={password}
+                  onPasswordChange={setPassword}
+                  onSubmit={handleLogin}
+                  error={loginError}
+                  loading={loginLoading}
                 />
             ) : (
               <>

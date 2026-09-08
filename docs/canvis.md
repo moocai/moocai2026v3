@@ -57,3 +57,44 @@
 ### 3 Columnes: sense overflow clipping
 - Eliminat `overflow: 'hidden'` / `overflow: 'clip'` del wrapper de 3 columnes per permetre que el Points Box absolut pugui elevar-se amb `translateY`.
 
+
+# 07/09/2026
+
+## Login amb servidor (auth)
+
+### authService.ts (`src/services/authService.ts`)
+- `login(username, password)` ara crida a `POST /api/v1/users/auth/login/` amb `{ username, password }` (JSON).
+- Base URL: `https://algorien.com/api/v1`.
+- Es guarda només el `token` a `localStorage` (clau `token`).
+- Eliminats `getMe` i `getCurrentUser`; afegit `getToken()`.
+- `logout()` crida a `POST /api/v1/users/auth/logout/` (neteja local si el servidor no respon).
+
+### StudentDashboard.tsx (`src/pages/dashboards/StudentDashboard.tsx`)
+- `handleLogin` ara és `async` i rep el formulari (`username`, `password`), crida a `authService.login(username, password)` i, si el servidor retorna l'usuari, entra al dashboard.
+- S'elimina l'estat d'ànim de targetes/creació/eliminació d'estudiants (`handleCreateStudent`, `handleDeleteStudent`, `handleLogoutAction`).
+- Del leaderboard només es carreguen els estudiants locals de `localStorage` (ja no els fake).
+- Afegit estat `loginLoading` per a la roda de càrrega al botó.
+
+### Login.tsx (`src/features/student/Login.tsx`)
+- Formulari simple amb camps **Username** i **Password** (eliminades les targetes d'estudiants i el PIN).
+- Botó "Iniciar Sessió": es desactiva i mostra una roda de càrrega (`CircularProgress`) al costat del text mentre comprova amb el servidor.
+- A la prop `onSubmit` que permet retorn de `Promise`; afegida la prop `loading`.
+
+### AuthContext.tsx (`src/contexts/AuthContext.tsx`)
+- Adaptada la signatura de `login` a `{ username, password }`.
+- Eliminada la dependènciia de `getMe` a la inicialització (només es llegeix el `token` de `localStorage`).
+
+### Usuaris fake eliminats
+- Eliminats els 3 estudiants fake (`Marc`, `Jordi`, `Miquel`) de `src/data/students.ts`.
+- Eliminat el fitxer `src/data/students.ts` sencer (inclosa la interfície `Student`).
+- Actualitzats `Hero.tsx` i `StudentDashboard.tsx` perquè no carreguin els usuaris fake (només usuaris locals de `localStorage`).
+
+### Endpoints utilitzats
+- `POST /api/v1/users/auth/login/` → retorna `{ token, user }` i set a session cookie.
+- `POST /api/v1/users/auth/logout/` → invalida la sessió.
+
+### Nota CORS (pendent)
+- El servidor no envia el header `Access-Control-Allow-Origin`, així que des del navegador la petició directa pot fallar per CORS.
+- Es va provar el proxy de Vite com a solució, però es va revertir a la URL absoluta per decisió de l'usuari.
+- Si falla CORS al navegador, caldrà usar un proxy o que Algorien habiliti CORS.
+

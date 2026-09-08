@@ -5,7 +5,6 @@ import { Box, Container, Typography, useTheme, useMediaQuery } from '@mui/materi
 import { useTranslation } from 'react-i18next';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { courseService } from '../services/courseService';
-import { students as localStudents } from '../data/students';
 import { useThemeMode } from '../hooks/useTheme';
 
 interface TypewriterProps {words: string[];}
@@ -35,11 +34,10 @@ export default function Hero() {
   const getStudentCount = useCallback(() => {
     const local = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
     const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-    return [...localStudents, ...local].filter((s: any) => !deletedIds.includes(s.id) && s.role !== 'teacher').length;
+    return [...local].filter((s: any) => !deletedIds.includes(s.id) && s.role !== 'teacher').length;
   }, []);
 
-  const [studentCount, setStudentCount] = useState(getStudentCount);
-  const [courseCount, setCourseCount] = useState(0);
+  const [studentCount, setStudentCount] = useState(getStudentCount);  const [courseCount, setCourseCount] = useState(0);
 
   useEffect(() => {
     const handler = () => setStudentCount(getStudentCount());
