@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = 'https://algorien.com/api/v1';
+// @ts-ignore - Vite replaces import.meta.env statically at build time
+const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
 
 export const authService = {
   login: async (username: string, password: string) => {

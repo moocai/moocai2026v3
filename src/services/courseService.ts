@@ -7,7 +7,7 @@ import { getLocalizedText } from '../utils/formatters';
 /* Configuració d'URL (Blindada)                                     */
 /* ------------------------------------------------------------------ */
 // @ts-ignore - Vite replaces import.meta.env statically at build time
-const API_BASE_URL = import.meta.env.DEV ? '' : import.meta.env.VITE_API_URL || 'https://algorien.com';
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
