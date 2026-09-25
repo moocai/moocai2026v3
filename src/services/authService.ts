@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { registerUser, type RegisterPayload } from './register';
 
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
@@ -14,6 +15,8 @@ export const authService = {
 
     return data;
   },
+
+  register: (payload: RegisterPayload) => registerUser(payload),
 
   logout: async () => {
     try {

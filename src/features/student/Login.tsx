@@ -2,8 +2,8 @@ import {motion} from 'framer-motion';
 import {Typography, Card, TextField, Button, Stack, CircularProgress, useTheme, Avatar, Box, Grid, FormControl, InputLabel, Select, MenuItem} from '@mui/material';
 import {Lock, User, Mail, UserRound, Camera, ArrowLeft, Upload, Check} from 'lucide-react';
 import {useTranslation} from 'react-i18next';
-import {type ChangeEvent, type FormEvent, useState} from 'react';
-import {authService} from '../../services/authService';
+import {type ChangeEvent, type FormEvent, useEffect, useState} from 'react';
+import {type Organization, extractRegisterErrors, loadRegistrationData, registerUser} from '../../services/register';
 
 interface LoginProps {
   username: string;
@@ -34,7 +34,9 @@ export function Login({
   const [cognoms, setCognoms] = useState('');
   const [email, setEmail] = useState('');
   const [regUsername, setRegUsername] = useState('');
-  const [org, setOrg] = useState('CIFO BCN La Violeta');
+  const [org, setOrg] = useState('');
+  const [orgs, setOrgs] = useState<Organization[]>([]);
+  const [defaultAvatar, setDefaultAvatar] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [regConfirm, setRegConfirm] = useState('');
   const [avatar, setAvatar] = useState<File | null>(null);
@@ -42,6 +44,25 @@ export function Login({
   const [registerError, setRegisterError] = useState<string | null>(null);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadRegistrationData()
+      .then(data => {
+        if (cancelled) return;
+        setOrgs(data.organizations ?? []);
+        setDefaultAvatar(data.default_avatar ?? '');
+        if (data.default_organization_id) {
+          setOrg(String(data.default_organization_id));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setOrgs([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fieldSx = { '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } };
 
@@ -62,10 +83,20 @@ export function Login({
     }
     setRegisterLoading(true);
     try {
-      await authService.login(regUsername, regPassword);
+      await registerUser({
+        first_name: nom,
+        last_name: cognoms,
+        email,
+        username: regUsername,
+        password1: regPassword,
+        password2: regConfirm,
+        organization: org !== '' ? Number(org) : undefined,
+        default_avatar: avatar ? undefined : defaultAvatar || undefined,
+        avatar,
+      });
       setRegistered(true);
-    } catch {
-      setRegisterError('No s\'ha pogut crear el compte. Revisa les dades.');
+    } catch (err) {
+      setRegisterError(extractRegisterErrors(err));
     } finally {
       setRegisterLoading(false);
     }
@@ -337,14 +368,17 @@ export function Login({
               </Grid>
 
               <Grid size={{ xs: 12 }}>
-                <FormControl fullWidth variant="filled" required sx={fieldSx}>
+                <FormControl fullWidth variant="filled" sx={fieldSx}>
                   <InputLabel>Organització</InputLabel>
                   <Select
                     value={org}
-                    onChange={e => setOrg(e.target.value)}
+                    onChange={e => setOrg(e.target.value as string)}
                     label="Organització"
                   >
-                    <MenuItem value="CIFO BCN La Violeta">CIFO BCN La Violeta</MenuItem>
+                    <MenuItem value="">Sense organització</MenuItem>
+                    {orgs.map(o => (
+                      <MenuItem key={o.id} value={String(o.id)}>{o.name}</MenuItem>
+                    ))}
                   </Select>
                 </FormControl>
               </Grid>

@@ -11,6 +11,7 @@
   "dependencies": {
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
+    "@monaco-editor/react": "^4.7.0",
     "@mui/icons-material": "^9.0.0",
     "@mui/material": "^9.0.0",
     "@react-spring/web": "^10.1.0",
@@ -28,7 +29,7 @@
     "react-dom": "^19.2.7",
     "react-i18next": "^17.0.4",
     "react-markdown": "^10.1.0",
-    "react-router-dom": "^6.30.3",
+    "react-router-dom": "^7.18.4",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^3.5.0",
     "tailwindcss-animate": "^1.0.7",

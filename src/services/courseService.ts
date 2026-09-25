@@ -78,7 +78,7 @@ export const courseService = {
     return Array.isArray(data) ? data : (data.results || []);
   },
 
-  async submitChallenge(courseSlug: string, topicSlug: string, problemSlug: string, data: { code?: string; answers?: string[] }): Promise<any> {
+  async submitChallenge(courseSlug: string, topicSlug: string, problemSlug: string, data: { code?: string; answers?: string[]; language?: string }): Promise<any> {
     const { data: response } = await apiClient.post(
       `/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`,
       data
