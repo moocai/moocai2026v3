@@ -91,6 +91,7 @@ export function Header() {
       localStorage.removeItem('currentStudent');
       setIsLoggedIn(false);
       setMobileOpen(false);
+      window.dispatchEvent(new Event('authChange'));
       navigate('/');
     }
   };

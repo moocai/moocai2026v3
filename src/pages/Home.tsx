@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +56,28 @@ export default function Home() {
   const location = useLocation();
   const [coursesList, setCoursesList] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
+  // @ts-ignore
+  const [_isLoggedIn, setIsLoggedIn] = useState(() => Boolean(localStorage.getItem('currentStudent')));
+
+  const fetchCourses = useCallback(async () => {
+    const isLoggedIn = Boolean(localStorage.getItem('currentStudent'));
+    if (!isLoggedIn) {
+      setCoursesList([]); // Si no està loguejat, buida la llista a 0
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const data = await courseService.getAllCourses();
+      setCoursesList(data);
+      data.forEach(course => courseService.getFullCourseDetail(course.slug!));
+    } catch (error) {
+      console.error("Error carregant cursos des de l'API:", error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem('currentStudent');
@@ -63,23 +85,26 @@ export default function Home() {
       navigate('/dashboards/student', { replace: true });
       return;
     }
-    const fetchCourses = async () => {
-      try {
-        const data = await courseService.getAllCourses();
-        setCoursesList(data);
-        // Preload course details for instant navigation
-        data.forEach(course => courseService.getFullCourseDetail(course.slug!));
-      } catch (error) {
-        console.error("Error carregant cursos des de l'API:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
+
     fetchCourses();
+
     const onVisible = () => { if (document.visibilityState === 'visible') fetchCourses(); };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+    
+    const handleAuthChange = () => {
+      setIsLoggedIn(Boolean(localStorage.getItem('currentStudent')));
+      fetchCourses();
+    };
+
+    window.addEventListener('authChange', handleAuthChange);
+    window.addEventListener('storage', handleAuthChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('authChange', handleAuthChange);
+      window.removeEventListener('storage', handleAuthChange);
+    };
+  }, [location, navigate, fetchCourses]);
 
   const features = [
     {icon: '⚡', title: t('home.features.code_title'), desc: t('home.features.code_desc') },
@@ -91,12 +116,12 @@ export default function Home() {
   ];
 
   return (
-    <Box sx={{Height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflowX: 'hidden' }}>
+    <Box sx={{ height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflowX: 'hidden' }}>
       <Header />
       <Hero />
       
       {/* SECCIÓ 2: CURSOS */}
-      <Box component="section" id="courses" sx={{position: 'relative', zIndex: 2, py: { xs: 1, md: 10 }}}>
+      <Box component="section" id="courses" sx={{ position: 'relative', zIndex: 2, py: { xs: 1, md: 10 } }}>
         <Container maxWidth="lg">
           <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}>
             <Box sx={{ textAlign: 'center', mb: 10 }}>

@@ -62,7 +62,7 @@ export default {
   home: {
     featured_title: "Cursos Destacados",
     featured_subtitle: "Comienza tu viaje con nuestros cursos mejor valorados. Proyectos prácticos incluidos.",
-    no_courses: "No hay cursos disponibles actualmente.",
+    no_courses: "Inicia Sessión para ver los cursos disponibles",
     why_choose_title: "¿Por qué elegir MOOC 2026?",
     features: {
       code_title: "Código de Grado Empresarial",

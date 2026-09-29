@@ -62,7 +62,7 @@ export default {
   home: {
     featured_title: "Featured Courses",
     featured_subtitle: "Start your journey with our top-rated courses. Hands-on projects included.",
-    no_courses: "No courses available at the moment.",
+    no_courses: "Login to see courses available",
     why_choose_title: "Why Choose MOOC 2026?",
     features: {
       code_title: "Enterprise Grade Code",

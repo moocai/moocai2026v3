@@ -62,7 +62,7 @@ export default {
   home: {
     featured_title: "Cursos Destacats",
     featured_subtitle: "Comença el teu viatge amb els nostres cursos millor valorats. Projectes pràctics inclosos.",
-    no_courses: "No hi ha cursos disponibles actualment.",
+    no_courses: "Inicia Sessió per veure els cursos disponibles",
     why_choose_title: "Per què triar MOOC 2026?",
     features: {
       code_title: "Codi de Grau Empresarial",
