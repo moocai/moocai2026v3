@@ -62,7 +62,7 @@ export default function Home() {
   const fetchCourses = useCallback(async () => {
     const isLoggedIn = Boolean(localStorage.getItem('currentStudent'));
     if (!isLoggedIn) {
-      setCoursesList([]); // Si no està loguejat, buida la llista a 0
+      setCoursesList([]);
       setLoading(false);
       return;
     }
@@ -81,12 +81,23 @@ export default function Home() {
 
   useEffect(() => {
     const saved = localStorage.getItem('currentStudent');
-    if (saved && !location.state?.fromNav) {
+    // CORRECCIÓ: Permetem la navegació si ve de qualsevol estat vàlid (fromNav o scrollTo)
+    if (saved && !location.state?.fromNav && !location.state?.scrollTo) {
       navigate('/dashboards/student', { replace: true });
       return;
     }
 
     fetchCourses();
+
+    // Si veníem amb la intenció de fer scroll cap a "courses", ho executem ara
+    if (location.state?.scrollTo === 'courses') {
+      setTimeout(() => {
+        const element = document.getElementById('courses');
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
+    }
 
     const onVisible = () => { if (document.visibilityState === 'visible') fetchCourses(); };
     document.addEventListener('visibilitychange', onVisible);
@@ -116,7 +127,7 @@ export default function Home() {
   ];
 
   return (
-    <Box sx={{ height: '100vh', bgcolor: 'background.default', color: 'text.primary', overflowX: 'hidden' }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', color: 'text.primary', overflowX: 'hidden' }}>
       <Header />
       <Hero />
       

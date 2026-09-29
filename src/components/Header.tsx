@@ -23,17 +23,17 @@ export function Header() {
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
-  const scrollToDynamic = (desktopPx: number, mobilePx: number) => {
+  const scrollToCourses = () => {
     setMobileOpen(false); 
     const performScroll = () => {
-      const isMobile = window.innerWidth < 900;
-      const finalPosition = isMobile ? mobilePx : desktopPx;
-      window.scrollTo({ top: finalPosition, behavior: 'smooth' });
+      const element = document.getElementById('courses');
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' });
+      }
     };
 
     if (location.pathname !== '/') {
-      navigate('/', { state: { fromNav: true } });
-      setTimeout(performScroll, 100);
+      navigate('/', { state: { scrollTo: 'courses' } });
     } else {
       performScroll();
     }
@@ -119,9 +119,9 @@ export function Header() {
             </Stack>
           </Box>
 
-          {/* DESKTOP NAV (Cursos > Dashboard > Accedir > Language > Theme > Avatar > Logout) */}
+          {/* DESKTOP NAV */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3 }}>
-            <Button onClick={() => scrollToDynamic(1000, 1800)} sx={commonButtonStyle}>
+            <Button onClick={scrollToCourses} sx={commonButtonStyle}>
               {t('footer.courses')}
             </Button>
 
@@ -150,7 +150,7 @@ export function Header() {
             )}
           </Box>
 
-          {/* MOBILE CONTROLS (Theme + Menu al costat) */}
+          {/* MOBILE CONTROLS */}
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
@@ -168,7 +168,7 @@ export function Header() {
 
               {/* 1. Cursos + Dashboard + nom usuari */}
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%' }}>
-                <Button onClick={() => scrollToDynamic(1000, 700)} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
+                <Button onClick={scrollToCourses} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
                   {t('footer.courses').toUpperCase()}
                 </Button>
                 {isLoggedIn && (
@@ -185,7 +185,7 @@ export function Header() {
 
               <Divider sx={{ width: '100%', opacity: 0.1 }} />
 
-              {/* 2. Accedir (no loguejat) o Rol (loguejat) */}
+              {/* 2. Accedir o Rol */}
               {!isLoggedIn ? (
                 <Button fullWidth onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ ...commonButtonStyle, py: 2, fontSize: '1.1rem' }}>{t('auth.access').toUpperCase()}</Button>
               ) : (
@@ -207,7 +207,9 @@ export function Header() {
 
               {/* 4. Sortir */}
               {isLoggedIn && (
-                <Button fullWidth color="error" onClick={handleLogout}></Button>
+                <Button fullWidth color="error" startIcon={<LogoutIcon />} onClick={handleLogout} sx={{ fontWeight: 800, textTransform: 'none' }}>
+                  {t('auth.logout')}
+                </Button>
               )}
 
             </Stack>

@@ -169,21 +169,34 @@ export function Login({
               onChange={e => onUsernameChange(e.target.value)}
               required
               autoComplete="username"
-              slotProps={{ input: { startAdornment: <User size={18} style={{ marginRight: 8 }} /> } }}
-              sx={fieldSx}
+              slotProps={{ input: { startAdornment: <User size={18} style={{ marginRight: 8,marginTop:15}} /> } }}
+              sx={{
+                ...fieldSx,
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 1000px transparent inset !important',
+                  WebkitTextFillColor: 'white !important',
+                  transition: 'background-color 5000s ease-in-out 0s',
+                },
+              }}
             />
 
             <TextField
               fullWidth
               label="Password"
-              variant="filled"
               type="password"
               value={password}
               onChange={e => onPasswordChange(e.target.value)}
               required
               autoComplete="current-password"
-              slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8 }} /> } }}
-              sx={fieldSx}
+              slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8}} /> } }}
+             sx={{
+                ...fieldSx,
+                '& input:-webkit-autofill': {
+                  WebkitBoxShadow: '0 0 0 1000px transparent inset !important',
+                  WebkitTextFillColor: 'white !important',
+                  transition: 'background-color 5000s ease-in-out 0s',
+                },
+              }}
             />
 
             {error && (
