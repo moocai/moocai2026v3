@@ -1,37 +1,21 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Box, IconButton, Button, Typography, Stack, Avatar, Popover, Divider } from '@mui/material';
+import { Box, IconButton, Typography, Stack, Avatar } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
-import LogoutIcon from '@mui/icons-material/Logout';
+import SchoolIcon from '@mui/icons-material/School';
 const logo = '/img/logo.webp';
 import { Sidebar } from '../features/teacher/Sidebar';
-import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import { ChatWidget } from '../features/teacher/ChatWidget';
 import { useThemeMode } from '../hooks/useTheme';
-import { useTranslation } from 'react-i18next';
 
 export function TeacherLayout() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [role, setRole] = useState<'student' | 'teacher'>('teacher');
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
-  const [profileAnchor, setProfileAnchor] = useState<null | HTMLElement>(null);
-
-  const handleRoleChange = (newRole: 'student' | 'teacher') => {
-    setRole(newRole);
-    localStorage.setItem('mooc_role', newRole);
-    window.dispatchEvent(new Event('auth-state-change'));
-    if (newRole === 'teacher') {
-      navigate('/teacher');
-    } else {
-      navigate('/dashboards/student');
-    }
-  };
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 900) setMobileOpen(false); };
@@ -72,13 +56,26 @@ export function TeacherLayout() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ThemeToggleButton />
             <IconButton
-              onClick={(e) => setProfileAnchor(e.currentTarget)}
+              onClick={() => navigate('/dashboards/student')}
               sx={{
                 width: 40, height: 40,
                 bgcolor: 'action.hover',
                 border: 2,
-                borderColor: profileAnchor ? 'primary.main' : 'divider',
-                '&:hover': { bgcolor: 'action.selected' },
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
+              }}
+              title="Vista de estudiante"
+            >
+              <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />
+            </IconButton>
+            <IconButton
+              onClick={() => navigate('/teacher/profile')}
+              sx={{
+                width: 40, height: 40,
+                bgcolor: 'action.hover',
+                border: 2,
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
               }}
             >
               <Avatar sx={{ width: 28, height: 28, bgcolor: 'primary.main', fontSize: '0.85rem', fontWeight: 700 }}>
@@ -87,48 +84,6 @@ export function TeacherLayout() {
             </IconButton>
           </Box>
         </Box>
-
-        <Popover
-          open={Boolean(profileAnchor)}
-          anchorEl={profileAnchor}
-          onClose={() => setProfileAnchor(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          slotProps={{ paper: { sx: { borderRadius: 3, p: 2, minWidth: 220, boxShadow: 4 } } }}
-        >
-          <Stack spacing={2}>
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mb: 1, display: 'block' }}>
-                {t('teacher.idioma')}
-              </Typography>
-              <LanguageSwitcher />
-            </Box>
-            <Box>
-              <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', mb: 1, display: 'block' }}>
-                {t('teacher.rol')}
-              </Typography>
-              <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '8px', p: 0.3, position: 'relative', width: '100%', height: '32px' }}>
-                <Box sx={{ position: 'absolute', top: 3, bottom: 3, left: role === 'student' ? 3 : 'calc(50% + 1px)', width: 'calc(50% - 4px)', bgcolor: 'primary.main', borderRadius: '6px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-                <Button disableRipple onClick={() => handleRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                <Button disableRipple onClick={() => handleRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-              </Box>
-            </Box>
-            <Divider />
-            <Button
-              fullWidth
-              startIcon={<LogoutIcon />}
-              onClick={() => {
-                setProfileAnchor(null);
-                localStorage.removeItem('currentStudent');
-                localStorage.removeItem('mooc_role');
-                navigate('/dashboards/student');
-              }}
-              sx={{ justifyContent: 'flex-start', fontWeight: 700, color: 'error.main', textTransform: 'none', borderRadius: 2 }}
-            >
-              {t('teacher.cerrarSesion')}
-            </Button>
-          </Stack>
-        </Popover>
 
         <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
           <Outlet />

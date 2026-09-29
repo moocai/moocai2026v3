@@ -36,13 +36,16 @@ export default function Exercises() {
           (topic.subTopics || []).forEach((st: any) => {
             all.push({
               id: st.problemSlug || st.subtitle || Math.random().toString(),
-              titulo: { es: st.subtitle },
-              descripcion: { es: st.text },
+              titulo: typeof st.subtitle === 'object' ? st.subtitle : { es: st.subtitle || '' },
+              descripcion: typeof st.text === 'object' ? st.text : { es: st.text || '' },
               nivel: nivelFromDifficulty(st.difficulty || ''),
               categoria: topic.title || '',
               codigoInicio: st.precode || '',
-              pista: { es: '' },
+              pista: typeof st.hint === 'object' ? st.hint : { es: st.hint || '' },
               solucion: st.solution || '',
+              teacherSolution: st.teacherSolution || '',
+              type: st.type || 'code',
+              choices: st.choices || [],
             });
           });
         });
@@ -152,7 +155,10 @@ export default function Exercises() {
             initialCode={selected.codigoInicio || ''}
             hint={selected.pista?.es}
             solution={selected.solucion}
+            teacherSolution={selected.teacherSolution}
             statement={selected.descripcion?.es}
+            type={selected.type}
+            choices={selected.choices}
           />
         ) : (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', py: 8 }}>

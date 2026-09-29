@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Stack, CircularProgress, ToggleButton, ToggleButtonGroup, Accordion, AccordionSummary, AccordionDetails, Card, CardContent, Radio, RadioGroup, FormControlLabel, FormControl, Button, Chip, Alert } from '@mui/material';
+import { Box, Typography, Stack, CircularProgress, ToggleButton, ToggleButtonGroup, Accordion, AccordionSummary, AccordionDetails, Card, CardContent, Radio, RadioGroup, FormControlLabel, FormControl, Button, Chip, Alert, alpha, useTheme } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import FolderIcon from '@mui/icons-material/Folder';
 import FolderOpenIcon from '@mui/icons-material/FolderOpen';
@@ -15,7 +15,7 @@ interface TestQuestion {
   descripcion: string;
   nivel: 'básico' | 'intermedio' | 'avanzado';
   categoria: string;
-  choices: { label: string; correct: boolean }[];
+  choices: any[];
 }
 
 function nivelFromDifficulty(d: string): 'básico' | 'intermedio' | 'avanzado' {
@@ -30,6 +30,7 @@ const nivelColor = (nivel: string) => nivel === 'avanzado' ? 'error.main' : nive
 
 export default function Test() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('temas');
@@ -49,10 +50,10 @@ export default function Test() {
             if (st.choices && Array.isArray(st.choices) && st.choices.length > 0) {
               all.push({
                 id: st.problemSlug || st.subtitle || Math.random().toString(),
-                titulo: st.subtitle || '',
-                descripcion: st.text || '',
+                titulo: typeof st.subtitle === 'object' ? (st.subtitle.es || st.subtitle.ca || st.subtitle.en || '') : (st.subtitle || ''),
+                descripcion: typeof st.text === 'object' ? (st.text.es || st.text.ca || st.text.en || '') : (st.text || ''),
                 nivel: nivelFromDifficulty(st.difficulty || ''),
-                categoria: topic.title || '',
+                categoria: typeof topic.title === 'object' ? (topic.title.es || topic.title.ca || topic.title.en || '') : (topic.title || ''),
                 choices: st.choices,
               });
             }
@@ -154,40 +155,71 @@ export default function Test() {
                       </Stack>
 
                       {q.descripcion && (
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>{q.descripcion}</Typography>
+                        <Box 
+                          sx={{ 
+                            mb: 2,
+                            '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2, m: 0 },
+                            '& .codehilite': { 
+                              bgcolor: alpha(theme.palette.primary.main, 0.05), 
+                              p: 2, 
+                              borderRadius: 1, 
+                              overflow: 'auto',
+                              '& pre': { m: 0, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', lineHeight: 1.6 },
+                              '& code': { color: 'text.primary' },
+                            },
+                            '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' },
+                          }}
+                          dangerouslySetInnerHTML={{ __html: q.descripcion }}
+                        />
                       )}
 
                       <FormControl component="fieldset" sx={{ width: '100%' }}>
                         <RadioGroup>
-                          {q.choices.map((choice, idx) => {
-                            const isCorrect = choice.correct;
+                          {q.choices.map((choice: any, idx: number) => {
+                            const isCorrect = choice.correct || choice.is_correct;
                             const revealed = showAnswers[q.id];
+                            const html = choice.textHtml || choice.text || choice.label || '';
+                            
                             return (
-                              <FormControlLabel
+                              <Box
                                 key={idx}
-                                value={idx}
-                                control={<Radio size="small" disabled />}
-                                label={
-                                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                                    <Typography variant="body2" sx={{ fontWeight: revealed && isCorrect ? 700 : 400 }}>
-                                      {choice.label}
-                                    </Typography>
-                                    {revealed && isCorrect && (
-                                      <CheckCircleIcon sx={{ fontSize: 18, color: 'success.main' }} />
-                                    )}
-                                  </Stack>
-                                }
                                 sx={{
-                                  mb: 0.5,
-                                  mx: 0,
+                                  mb: 1,
+                                  p: 1,
                                   borderRadius: 1,
-                                  px: 1,
-                                  py: 0.25,
-                                  bgcolor: revealed && isCorrect ? 'success.main' + '15' : 'transparent',
+                                  bgcolor: revealed && isCorrect ? alpha('#4caf50', 0.15) : 'transparent',
                                   border: 1,
                                   borderColor: revealed && isCorrect ? 'success.main' : 'divider',
                                 }}
-                              />
+                              >
+                                <FormControlLabel
+                                  control={<Radio size="small" disabled />}
+                                  label={
+                                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                                      <Box 
+                                        sx={{ 
+                                          flex: 1,
+                                          '& p': { m: 0, lineHeight: 1.6 },
+                                          '& .codehilite': { 
+                                            bgcolor: alpha(theme.palette.primary.main, 0.05), 
+                                            p: 1.5, 
+                                            borderRadius: 1, 
+                                            overflow: 'auto',
+                                            '& pre': { m: 0, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.8rem', lineHeight: 1.5 },
+                                            '& code': { color: 'text.primary' },
+                                          },
+                                          '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' },
+                                        }}
+                                        dangerouslySetInnerHTML={{ __html: html }}
+                                      />
+                                      {revealed && isCorrect && (
+                                        <CheckCircleIcon sx={{ fontSize: 20, color: 'success.main', flexShrink: 0 }} />
+                                      )}
+                                    </Stack>
+                                  }
+                                  sx={{ mx: 0, width: '100%' }}
+                                />
+                              </Box>
                             );
                           })}
                         </RadioGroup>
@@ -200,7 +232,7 @@ export default function Test() {
                         sx={{ mt: 1.5, textTransform: 'none', borderRadius: 2 }}
                         startIcon={showAnswers[q.id] ? <CheckCircleIcon /> : undefined}
                       >
-                        {showAnswers[q.id] ? t('teacher.ocultarRespuesta') : t('teacher.mostrarRespuesta')}
+                        {showAnswers[q.id] ? t('teacher.ocultarRespuesta', 'Ocultar respuesta') : t('teacher.mostrarRespuesta', 'Mostrar respuesta')}
                       </Button>
                     </CardContent>
                   </Card>

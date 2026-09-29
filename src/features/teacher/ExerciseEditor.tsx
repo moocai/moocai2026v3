@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Tabs, Tab, Accordion, AccordionSummary, AccordionDetails, Typography, Button, Stack, useTheme } from '@mui/material';
+import { Box, Tabs, Tab, Accordion, AccordionSummary, AccordionDetails, Typography, Button, Stack, useTheme, Card, CardContent, Radio, RadioGroup, FormControlLabel, FormControl } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Editor from '@monaco-editor/react';
 import { CodePreview } from './CodePreview';
 import { ConsolePanel } from '../../components/ConsolePanel';
@@ -10,16 +11,24 @@ import { useTranslation } from 'react-i18next';
 
 type EditorLang = 'python' | 'react';
 
+interface Choice {
+  label: string;
+  correct: boolean;
+}
+
 interface ExerciseEditorProps {
   exerciseId?: string;
   initialCode?: string;
   hint?: string;
   solution?: string;
+  teacherSolution?: string;
   statement?: string;
+  type?: string;
+  choices?: Choice[];
   onCodeChange?: (code: string) => void;
 }
 
-export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, statement, onCodeChange }: ExerciseEditorProps) {
+export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, teacherSolution, statement, type = 'code', choices = [], onCodeChange }: ExerciseEditorProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -49,8 +58,10 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, s
   const [codeByLang, setCodeByLang] = useState<Record<EditorLang, string>>(initialCodeState);
   const [monacoInstance, setMonacoInstance] = useState<any>(null);
   const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [showAnswers, setShowAnswers] = useState(false);
   const editorRef = useRef<any>(null);
   const currentCode = codeByLang[selectedLanguage];
+  const isTest = type === 'test' || type === 'quiz' || type === 'exam' || type === 'multiple_choice' || choices.length > 0;
 
   // Guardar en localStorage cuando cambia el código
   useEffect(() => {
@@ -268,126 +279,206 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, s
         flexShrink: 0 
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>Código</Typography>
-          <Tabs
-            value={selectedLanguage}
-            onChange={handleLanguageChange}
-            sx={{
-              minHeight: 32,
-              '& .MuiTab-root': {
+          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>
+            {isTest ? 'Test' : 'Código'}
+          </Typography>
+          {!isTest && (
+            <Tabs
+              value={selectedLanguage}
+              onChange={handleLanguageChange}
+              sx={{
                 minHeight: 32,
-                py: 0,
-                px: 1.5,
-                fontSize: '0.7rem',
-                fontWeight: 800,
-                textTransform: 'none',
-                color: '#9ca3af',
-                minWidth: 0,
-                '&.Mui-selected': {
-                  color: '#fff',
-                  bgcolor: '#8400ff',
-                  borderRadius: 1,
+                '& .MuiTab-root': {
+                  minHeight: 32,
+                  py: 0,
+                  px: 1.5,
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  textTransform: 'none',
+                  color: '#9ca3af',
+                  minWidth: 0,
+                  '&.Mui-selected': {
+                    color: '#fff',
+                    bgcolor: '#8400ff',
+                    borderRadius: 1,
+                  },
                 },
-              },
-              '& .MuiTabs-indicator': {
-                display: 'none',
-              },
-            }}
-          >
-            <Tab label="Python" value="python" />
-            <Tab label="React" value="react" />
-          </Tabs>
-        </Box>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Button 
-            onClick={handleReset} 
-            startIcon={<RestartAltIcon />}
-            sx={{ 
-              border: '1px solid #444', 
-              borderRadius: 1, 
-              height: 32, 
-              fontSize: 11, 
-              fontWeight: 700, 
-              px: 2, 
-              color: '#fff',
-              '&:hover': { bgcolor: '#333', borderColor: '#888' } 
-            }}
-          >
-            Reset
-          </Button>
-          <Button 
-            onClick={handleRun} 
-            variant="contained"
-            startIcon={<PlayArrowIcon />}
-            sx={{ 
-              bgcolor: '#fff', 
-              color: '#000', 
-              height: 32, 
-              fontSize: 11, 
-              fontWeight: 900, 
-              px: 2.5, 
-              borderRadius: 1, 
-              '&:hover': { bgcolor: '#e0e0e0' } 
-            }}
-          >
-            Ejecutar
-          </Button>
-        </Stack>
-      </Box>
-
-      {/* Editor y Preview */}
-      <Box sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* Editor */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', borderRight: '1px solid #333', minHeight: 0 }}>
-          <Box sx={{ flex: 1 }}>
-            <Editor
-              height="100%"
-              language={selectedLanguage === 'python' ? 'python' : 'typescript'}
-              defaultValue={codeByLang.python}
-              value={currentCode}
-              onChange={handleChange}
-              onMount={handleEditorDidMount}
-              theme={isDark ? 'vs-dark' : 'vs-light'}
-              options={{
-                minimap: { enabled: false },
-                fontSize: 15,
-                fontFamily: '"Fira Code", "Consolas", monospace',
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                tabSize: selectedLanguage === 'python' ? 4 : 2,
-                wordWrap: 'on',
+                '& .MuiTabs-indicator': {
+                  display: 'none',
+                },
               }}
-            />
-          </Box>
-        </Box>
-
-        {/* Preview */}
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
-          {selectedLanguage === 'react' ? (
-            <CodePreview 
-              code={currentCode} 
-              monaco={monacoInstance} 
-              onOutput={setConsoleOutput}
-            />
-          ) : (
-            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#151515' }}>
-              <Typography sx={{ fontSize: 12, color: '#555', fontWeight: 600 }}>Python no necessita renderitzar</Typography>
-            </Box>
+            >
+              <Tab label="Python" value="python" />
+              <Tab label="React" value="react" />
+            </Tabs>
           )}
         </Box>
+        {!isTest && (
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Button 
+              onClick={handleReset} 
+              startIcon={<RestartAltIcon />}
+              sx={{ 
+                border: '1px solid #444', 
+                borderRadius: 1, 
+                height: 32, 
+                fontSize: 11, 
+                fontWeight: 700, 
+                px: 2, 
+                color: '#fff',
+                '&:hover': { bgcolor: '#333', borderColor: '#888' } 
+              }}
+            >
+              Reset
+            </Button>
+            <Button 
+              onClick={handleRun} 
+              variant="contained"
+              startIcon={<PlayArrowIcon />}
+              sx={{ 
+                bgcolor: '#fff', 
+                color: '#000', 
+                height: 32, 
+                fontSize: 11, 
+                fontWeight: 900, 
+                px: 2.5, 
+                borderRadius: 1, 
+                '&:hover': { bgcolor: '#e0e0e0' } 
+              }}
+            >
+              Ejecutar
+            </Button>
+          </Stack>
+        )}
+        {isTest && (
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={() => setShowAnswers(!showAnswers)}
+            sx={{ textTransform: 'none', borderRadius: 2, color: '#fff', borderColor: '#444', '&:hover': { bgcolor: '#333', borderColor: '#888' } }}
+            startIcon={showAnswers ? <CheckCircleIcon /> : undefined}
+          >
+            {showAnswers ? t('teacher.ocultarRespuesta', 'Ocultar respuesta') : t('teacher.mostrarRespuesta', 'Mostrar respuesta')}
+          </Button>
+        )}
       </Box>
 
-      {/* Consola */}
-      <Box sx={{ height: 180, flexShrink: 0 }}>
-        <ConsolePanel 
-          output={consoleOutput}
-          emptyMessage="Esperando ejecución..."
-        />
+      {/* Contenido: Editor o Test */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        {isTest ? (
+          <Box sx={{ p: 3 }}>
+            <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
+              <CardContent>
+                {statement && (
+                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 2, whiteSpace: 'pre-wrap' }}>
+                    {statement}
+                  </Typography>
+                )}
+
+                <FormControl component="fieldset" sx={{ width: '100%' }}>
+                  <RadioGroup>
+                    {choices.map((choice, idx) => {
+                      const isCorrect = choice.correct;
+                      return (
+                        <FormControlLabel
+                          key={idx}
+                          value={idx}
+                          control={<Radio size="small" disabled />}
+                          label={
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                              <Typography variant="body1" sx={{ fontWeight: showAnswers && isCorrect ? 700 : 400 }}>
+                                {choice.label}
+                              </Typography>
+                              {showAnswers && isCorrect && (
+                                <CheckCircleIcon sx={{ fontSize: 20, color: 'success.main' }} />
+                              )}
+                            </Stack>
+                          }
+                          sx={{
+                            mb: 1,
+                            mx: 0,
+                            borderRadius: 1,
+                            px: 1.5,
+                            py: 0.75,
+                            bgcolor: showAnswers && isCorrect ? 'success.main' + '15' : 'transparent',
+                            border: 1,
+                            borderColor: showAnswers && isCorrect ? 'success.main' : 'divider',
+                          }}
+                        />
+                      );
+                    })}
+                  </RadioGroup>
+                </FormControl>
+              </CardContent>
+            </Card>
+          </Box>
+        ) : (
+          <Box sx={{ flex: 1, display: 'flex', minHeight: 0, height: '100%' }}>
+            {/* Editor */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', borderRight: '1px solid #333', minHeight: 0 }}>
+              <Box sx={{ flex: 1 }}>
+                <Editor
+                  height="100%"
+                  language={selectedLanguage === 'python' ? 'python' : 'typescript'}
+                  defaultValue={codeByLang.python}
+                  value={currentCode}
+                  onChange={handleChange}
+                  onMount={handleEditorDidMount}
+                  theme={isDark ? 'vs-dark' : 'vs-light'}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 15,
+                    fontFamily: '"Fira Code", "Consolas", monospace',
+                    lineNumbers: 'on',
+                    scrollBeyondLastLine: false,
+                    automaticLayout: true,
+                    tabSize: selectedLanguage === 'python' ? 4 : 2,
+                    wordWrap: 'on',
+                  }}
+                />
+              </Box>
+            </Box>
+
+            {/* Preview */}
+            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+              {selectedLanguage === 'react' ? (
+                <CodePreview 
+                  code={currentCode} 
+                  monaco={monacoInstance} 
+                  onOutput={setConsoleOutput}
+                />
+              ) : (
+                <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#151515' }}>
+                  <Typography sx={{ fontSize: 12, color: '#555', fontWeight: 600 }}>Python no necessita renderitzar</Typography>
+                </Box>
+              )}
+            </Box>
+          </Box>
+        )}
       </Box>
+
+      {/* Consola (solo para código) */}
+      {!isTest && (
+        <Box sx={{ height: 180, flexShrink: 0 }}>
+          <ConsolePanel 
+            output={consoleOutput}
+            emptyMessage="Esperando ejecución..."
+          />
+        </Box>
+      )}
 
       {/* Accordions para pista, solución y enunciado */}
       <Box sx={{ flexShrink: 0 }}>
+        {!isTest && statement && (
+          <Accordion defaultExpanded>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('teacher.enunciado')}</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{statement}</Typography>
+            </AccordionDetails>
+          </Accordion>
+        )}
         {hint && (
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -398,6 +489,16 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, s
             </AccordionDetails>
           </Accordion>
         )}
+        {teacherSolution && (
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('teacher.solucionProfesor', 'Solución del profesor')}</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap', bgcolor: isDark ? 'grey.900' : 'grey.100', p: 2, borderRadius: 1 }}>{teacherSolution}</Typography>
+            </AccordionDetails>
+          </Accordion>
+        )}
         {solution && (
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
@@ -405,16 +506,6 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, s
             </AccordionSummary>
             <AccordionDetails>
               <Typography variant="body2" component="pre" sx={{ fontFamily: 'monospace', fontSize: 13, whiteSpace: 'pre-wrap', bgcolor: isDark ? 'grey.900' : 'grey.100', p: 2, borderRadius: 1 }}>{solution}</Typography>
-            </AccordionDetails>
-          </Accordion>
-        )}
-        {statement && (
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('teacher.enunciado')}</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{statement}</Typography>
             </AccordionDetails>
           </Accordion>
         )}

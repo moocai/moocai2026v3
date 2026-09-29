@@ -44,6 +44,7 @@ function App() {
           <Route path="test" element={<Test />} />
           <Route path="hackathon" element={<Hackathon />} />
           <Route path="invite" element={<InviteStudents />} />
+          <Route path="profile" element={<ProfilePage />} />
         </Route>
       </Routes>
     </Box>

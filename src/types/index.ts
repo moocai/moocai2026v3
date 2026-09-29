@@ -99,9 +99,12 @@ export interface Ejercicio {
   descripcion: Record<string, string>;
   codigoInicio: string;
   solucion: string;
+  teacherSolution?: string;
   pista: Record<string, string>;
   nivel: Nivel;
   categoria: string;
+  type?: string;
+  choices?: { label: string; correct: boolean }[];
 }
 
 export interface Equipo {
