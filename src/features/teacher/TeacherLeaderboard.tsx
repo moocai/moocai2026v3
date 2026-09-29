@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Card, Avatar, Stack, Tabs, Tab, Chip, useTheme } from '@mui/material';
+import { Box, Typography, Card, Avatar, Stack, Tabs, Tab, Chip, useTheme, Grid } from '@mui/material';
 import { Trophy, Medal, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { courseService } from '../../services/courseService';
@@ -180,8 +180,8 @@ export function TeacherLeaderboard() {
         </Box>
       </Stack>
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-        <Box sx={{ flex: 1 }}>
+      <Stack direction="column" spacing={3}>
+        <Box>
           <Card sx={{ 
             borderRadius: 3, 
             overflow: 'hidden',
@@ -296,79 +296,87 @@ export function TeacherLeaderboard() {
           </Card>
         </Box>
 
-        <Stack spacing={2} sx={{ width: { md: 280 } }}>
-          <Card sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}>
-            <Box sx={{ color: 'primary.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
-              <TrendingUp size={40} />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main' }}>
-              {stats.totalStudents}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('teacher.totalEstudiantes')}
-            </Typography>
-          </Card>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Card sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}>
+              <Box sx={{ color: 'primary.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
+                <TrendingUp size={40} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                {stats.totalStudents}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('teacher.totalEstudiantes')}
+              </Typography>
+            </Card>
+          </Grid>
 
-          <Card sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}>
-            <Box sx={{ color: 'success.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
-              <Medal size={40} />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: 'success.main' }}>
-              {stats.activeStudents}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('teacher.alumnosActivos')}
-            </Typography>
-          </Card>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Card sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}>
+              <Box sx={{ color: 'success.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
+                <Medal size={40} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: 'success.main' }}>
+                {stats.activeStudents}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('teacher.alumnosActivos')}
+              </Typography>
+            </Card>
+          </Grid>
 
-          <Card sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}>
-            <Box sx={{ fontSize: 40, mb: 1, display: 'flex', justifyContent: 'center' }}>
-              <Trophy size={40} color={theme.palette.warning.main} />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: 'warning.main' }}>
-              {stats.avgProgress}%
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('teacher.promedioProgreso')}
-            </Typography>
-          </Card>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Card sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}>
+              <Box sx={{ fontSize: 40, mb: 1, display: 'flex', justifyContent: 'center' }}>
+                <Trophy size={40} color={theme.palette.warning.main} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: 'warning.main' }}>
+                {stats.avgProgress}%
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('teacher.promedioProgreso')}
+              </Typography>
+            </Card>
+          </Grid>
 
-          <Card sx={{ 
-            p: 3, 
-            borderRadius: 3,
-            border: '1px solid',
-            borderColor: 'divider',
-            textAlign: 'center',
-          }}>
-            <Box sx={{ color: 'info.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
-              <Medal size={40} />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 900, color: 'info.main' }}>
-              {stats.totalExercises}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {t('teacher.ejerciciosTotales')}
-            </Typography>
-          </Card>
-        </Stack>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Card sx={{ 
+              p: 3, 
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              textAlign: 'center',
+            }}>
+              <Box sx={{ color: 'info.main', mb: 1, display: 'flex', justifyContent: 'center' }}>
+                <Medal size={40} />
+              </Box>
+              <Typography variant="h4" sx={{ fontWeight: 900, color: 'info.main' }}>
+                {stats.totalExercises}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {t('teacher.ejerciciosTotales')}
+              </Typography>
+            </Card>
+          </Grid>
+        </Grid>
       </Stack>
     </Box>
   );
