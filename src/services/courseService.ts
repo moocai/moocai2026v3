@@ -4,7 +4,7 @@ import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
 
 /* ------------------------------------------------------------------ */
-/* Configuració d'URL (Blindada)                                     */
+/* Configuració d'URL (Blindada)                                      */
 /* ------------------------------------------------------------------ */
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
@@ -24,7 +24,7 @@ apiClient.interceptors.request.use((config) => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Servei                                                            */
+/* Servei                                                             */
 /* ------------------------------------------------------------------ */
 
 const fullCourseCache = new Map<string, any>();
@@ -100,6 +100,7 @@ export const courseService = {
     return Array.isArray(data) ? data : (data.results || []);
   },
 
+  /** `POST` per enviar la solució del problema (codi o respostes de test) */
   async submitChallenge(courseSlug: string, topicSlug: string, problemSlug: string, data: { code?: string; answers?: string[]; language?: string }): Promise<any> {
     const { data: response } = await apiClient.post(
       `/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`,
