@@ -63,20 +63,34 @@ export default function ExamPage() {
       const topic = course?.content?.find((t: any) =>
         t.subTopics?.some((s: any) => s.problemSlug === challengeSlug)
       );
-      const topicSlug = topic?.id || '';
+      if (!topic) throw new Error(t('exam.topic_not_found', 'No s\'ha trobat el tema del problema'));
+      const topicSlug = topic.id;
       const res = await courseService.submitChallenge(courseId, topicSlug, challengeSlug, { answers: selectedAnswers });
       setResult(res);
       const subs = await courseService.getChallengeSubmissions(courseId, topicSlug, challengeSlug).catch(() => []);
       setSubmissions(Array.isArray(subs) ? subs : []);
+      // SenseEnrollment/en Anonymous el backend retorna { correct, choices } i no persisteix res
+      const passed = res?.correct === true;
       const saved = localStorage.getItem('currentStudent');
       const studentId = saved ? JSON.parse(saved).id : 'temp';
       const key = `mooc_global_progress_${studentId}`;
       const prog = JSON.parse(localStorage.getItem(key) || '{}');
-      prog[`${courseId}_${challengeSlug}`] = true;
+      if (passed) {
+        prog[`${courseId}_${challengeSlug}`] = true;
+      } else if (prog[`${courseId}_${challengeSlug}`] !== true) {
+        prog[`${courseId}_${challengeSlug}`] = 'attempted';
+      }
       localStorage.setItem(key, JSON.stringify(prog));
       window.dispatchEvent(new Event('lessonProgressUpdated'));
     } catch (err: any) {
-      setResult({ error: err.message || 'Error en enviar' });
+      const detail = err?.response?.data;
+      const message =
+        (typeof detail === 'string' ? detail : null) ||
+        (detail && typeof detail === 'object' ? Object.values(detail).flat().join(' ') : null) ||
+        err?.message ||
+        t('exam.error', 'Error en enviar');
+      console.error('Error en enviar la resposta:', err);
+      setResult({ error: message });
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +109,8 @@ export default function ExamPage() {
   );
 
   const latestSubmission = submissions?.[submissions.length - 1];
-  const grade = latestSubmission?.grade ?? latestSubmission?.score;
+  const grade = latestSubmission?.grade ?? latestSubmission?.score ??
+    (typeof result?.correct === 'boolean' ? (result.correct ? exam.score ?? 10 : 0) : undefined);
   const title = exam.title || exam.name || getText(exam.subtitle) || challengeSlug;
   const statement = exam.statement_ca || exam.statement || exam.description || getText(exam.text) || '';
   const examData = (window as any).EXAM_DATA?.[challengeSlug || ''];
@@ -283,26 +298,68 @@ export default function ExamPage() {
                 </Button>
               )}
             </Box>
-            <Button
-              variant="contained"
-              endIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <Send size={18} />}
-              onClick={handleSubmit}
-              disabled={!selectedAnswers.length || submitting || !!nextTest}
-              sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2 }}
-            >
-              {submitting ? t('exam.sending', 'Enviant...') : t('exam.submit', 'Enviar')}
-            </Button>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.5 }}>
+              <Button
+                variant="contained"
+                endIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <Send size={18} />}
+                onClick={handleSubmit}
+                disabled={!selectedAnswers.length || submitting || !!nextTest}
+                sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2 }}
+              >
+                {submitting ? t('exam.sending', 'Enviant...') : t('exam.submit', 'Enviar')}
+              </Button>
+              {nextTest && (
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>
+                  {t('exam.complete_previous', 'Resol les preguntes anteriors per poder enviar el test')}
+                </Typography>
+              )}
+            </Box>
           </Box>
         </Paper>
       </Box>
 
       {result && (
-        <Paper sx={{ p: 3, mb: 3, bgcolor: result.error ? alpha(theme.palette.error.main, 0.08) : alpha(theme.palette.success.main, 0.08), border: '1px solid', borderColor: result.error ? 'error.main' : 'success.main', borderRadius: 2 }}>
-          <Typography sx={{ fontWeight: 700, mb: 1, color: result.error ? 'error.main' : 'success.main' }}>
-            {result.error ? t('exam.error', 'Error') : t('exam.success', 'Enviat correctament')}
+        <Paper sx={{ p: 3, mb: 3, bgcolor: result.error || result.correct === false ? alpha(theme.palette.error.main, 0.08) : alpha(theme.palette.success.main, 0.08), border: '1px solid', borderColor: result.error || result.correct === false ? 'error.main' : 'success.main', borderRadius: 2 }}>
+          <Typography sx={{ fontWeight: 700, mb: 1, color: result.error || result.correct === false ? 'error.main' : 'success.main' }}>
+            {result.error
+              ? t('exam.error', 'Error')
+              : result.correct === true
+                ? t('exam.correct', 'Resposta correcta!')
+                : result.correct === false
+                  ? t('exam.incorrect', 'Resposta incorrecta')
+                  : t('exam.success', 'Enviat correctament')}
           </Typography>
           {result.error && <Typography color="error">{result.error}</Typography>}
           {result.feedback && <Typography color="text.secondary">{result.feedback}</Typography>}
+          {Array.isArray(result.choices) && result.choices.length > 0 && (
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              {result.choices.map((c: any) => {
+                const wrongPick = c.was_selected && !c.is_correct;
+                const goodPick = c.was_selected && c.is_correct;
+                return (
+                  <Box
+                    key={c.id}
+                    sx={{
+                      p: 1.5, borderRadius: 1, fontSize: '0.9rem',
+                      border: '1px solid',
+                      borderColor: wrongPick ? 'error.main' : goodPick ? 'success.main' : 'divider',
+                      bgcolor: wrongPick ? alpha(theme.palette.error.main, 0.06) : goodPick ? alpha(theme.palette.success.main, 0.06) : 'transparent',
+                    }}
+                  >
+                    <Box component="span" sx={{ mr: 1, fontWeight: 800 }}>
+                      {wrongPick ? '✕' : goodPick ? '✓' : '•'}
+                    </Box>
+                    {c.text || c.textHtml}
+                    {c.explanation && (
+                      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mt: 0.5 }}>
+                        {c.explanation}
+                      </Typography>
+                    )}
+                  </Box>
+                );
+              })}
+            </Stack>
+          )}
         </Paper>
       )}
 

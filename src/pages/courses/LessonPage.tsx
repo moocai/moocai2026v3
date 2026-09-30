@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, Trophy, RotateCcw, Lock, Sparkles, Code2, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, RotateCcw, Lock, Sparkles, Code2, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab } from '@mui/material';
@@ -98,6 +98,23 @@ function EditorDiagnosticsBadge({ markers }: { markers: any[] }) {
         </Box>
       )}
     </Box>
+  );
+}
+
+// === Botó de retorn al curs (CourseLessons) ===
+function BackToCourseButton({ label, onClick, fontSize = 11 }: { label: string; onClick: () => void; fontSize?: number }) {
+  return (
+    <Button
+      onClick={onClick}
+      startIcon={<ChevronLeft size={fontSize + 5} />}
+      sx={{
+        fontWeight: 700, textTransform: 'none', borderRadius: 1.5,
+        fontSize, color: 'text.secondary', minWidth: 0, px: 1,
+        '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+      }}
+    >
+      {label}
+    </Button>
   );
 }
 
@@ -207,29 +224,56 @@ export default function LessonPage() {
   };
 
   const currentProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+
+  // Els problemes de tipus "test" no es resolen amb codi: es respon amb `answers`
+  // a ExamPage. Si arribem aqui (URL directa o "seguent" des d'un exercici),
+  // redirigim per evitar un POST amb `code` que el backend rebutja amb 400.
+  useEffect(() => {
+    if (currentProblem?.type === 'test') {
+      navigate(`/courses/${courseId}/exam/${lessonId}`, { replace: true });
+    }
+  }, [currentProblem?.type, courseId, lessonId, navigate]);
+
+  const isCoding = (p: any) => p?.type !== 'test';
+
+  const problemPath = (courseId: string, problem: any): string | null => {
+    const slug = problem?.problemSlug || problem?.slug;
+    if (!slug) return null;
+    return problem.type === 'test'
+      ? `/courses/${courseId}/exam/${slug}`
+      : `/courses/${courseId}/${slug}`;
+  };
+
+  // "Anterior" retrocedeix a l'activitat de CODI anterior, saltant els tests
   const handlePrevious = () => {
     if (!course) return;
-      const allProblems = course.content?.flatMap((topic: any) => topic.subTopics || []) || [];
-      const currentIndex = allProblems.findIndex((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+      const codingProblems = (course.content?.flatMap((topic: any) => topic.subTopics || []) || []).filter(isCoding);
+      const currentIndex = codingProblems.findIndex((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
     if (currentIndex > 0) {
-      const prevProblem = allProblems[currentIndex - 1];
-      const prevSlug = prevProblem.problemSlug || prevProblem.slug;
-    if (prevSlug) {
-        navigate(`/courses/${course.id}/${prevSlug}`);
+      const prevPath = problemPath(course.id, codingProblems[currentIndex - 1]);
+    if (prevPath) {
+        navigate(prevPath);
         return;
       }
     }
     navigate(`/courses/${course.id}`);
   };
 
+  // Torna a la pàgina del curs (CourseLessons) deixant l'activitat
+  const handleBackToCourse = () => {
+    if (!courseId) return;
+    persistViewState();
+    navigate(`/courses/${courseId}`);
+  };
+
+  // "Següent temari" avança a la següent activitat de CODI, saltant els tests
   const handleNext = () => {
     if (!course || !currentProblem) return;
-    const allProblems = course.content?.flatMap((topic: any) => topic.subTopics || []) || [];
-    const currentIndex = allProblems.findIndex((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
-    if (currentIndex >= 0 && currentIndex < allProblems.length - 1) {
-      const nextProblem = allProblems[currentIndex + 1];
-      const nextSlug = nextProblem.problemSlug || nextProblem.slug;
-      if (nextSlug) {navigate(`/courses/${course.id}/${nextSlug}`); return;}
+    const codingProblems = (course.content?.flatMap((topic: any) => topic.subTopics || []) || []).filter(isCoding);
+    const currentIndex = codingProblems.findIndex((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+    if (currentIndex >= 0 && currentIndex < codingProblems.length - 1) {
+      const nextPath = problemPath(course.id, codingProblems[currentIndex + 1]);
+      if (nextPath) {navigate(nextPath); return;}
     }
 
     const topics = course.content || []; let currentTopicId = '';
@@ -270,7 +314,7 @@ export default function LessonPage() {
   }, []);
 
   const tabScale = Math.min(1.3, Math.max(0.6, col1Pct / 30));
-  const tabFontSize = Math.round(12 * tabScale * 9.5) / 10;
+  const tabFontSize = Math.round(13 * tabScale * 12) / 10;
   const tabIconSize = Math.max(8, Math.round(10 * tabScale));
 
   useEffect(() => {
@@ -376,6 +420,10 @@ export default function LessonPage() {
   };
 
   const handleRunTests = async () => {
+    if (currentProblem?.type === 'test') {
+      navigate(`/courses/${courseId}/exam/${lessonId}`, { replace: true });
+      return;
+    }
     setConsoleOutput(["[SISTEMA]: Executant..."]);
     setStatus('idle');
     try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, "📤 Enviat al servidor..."]);
@@ -398,7 +446,19 @@ export default function LessonPage() {
         localStorage.setItem(`mooc_submissions_${courseId}_${lessonId}`, JSON.stringify(submissions));
         setSubmissionsRefreshKey(k => k + 1);
       }
-    } catch (_) {}
+    } catch (err: any) {
+      const detail = err?.response?.data;
+      const message =
+        (typeof detail === 'string' ? detail : null) ||
+        (Array.isArray(detail) ? detail.map((d: any) => (typeof d === 'string' ? d : Object.values(d).flat().join(' '))).join(' ') : null) ||
+        (detail && typeof detail === 'object' ? Object.values(detail).flat().join(' ') : null) ||
+        err?.message ||
+        t('lesson.submit_error', 'Error en enviar la resposta');
+      console.error('Error en enviar la submissió:', err);
+      setConsoleOutput(p => [...p, `⚠️ ${message}`]);
+      setStatus('fail');
+      addNotification(message, 'error');
+    }
   };
 
   const handleResetCode = () => {
@@ -546,18 +606,18 @@ export default function LessonPage() {
   const globalProgress = allProblems.reduce((acc: number, sub: any) => acc + (userProgressData[`${courseId}_${sub.problemSlug || sub.slug}`] === true ? 1 : 0), 0);
   const progressPercent = allProblems.length ? (globalProgress / allProblems.length) * 100 : 0;
 
+  // "Anterior" es desactiva a la primera activitat de codi del curs
+  const codingProblems = allProblems.filter(isCoding);
+  const isFirstCoding = codingProblems.findIndex((s: any) => s.problemSlug === lessonId || s.slug === lessonId) <= 0;
+
   // MOBILE LAYOUT
   if (isMobile) {
     return (
       <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
         {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
-        <Box sx={{height: 48, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0, mt: 5}}></Box>
-        <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-scroller': { display: 'flex', justifyContent: 'center' }, '& .MuiTabs-flexContainer': { justifyContent: 'center', gap: 1 }, '& .MuiTab-root': { minHeight: 20, fontSize: 7.3, fontWeight: 900, minWidth: 0, px: 1, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
-          <Tab label={t('lesson.tab_statement', 'Enunciat')} />
-          <Tab label={t('lesson.tab_teacher_solution', 'Solució Profe')} icon={!unlocked ? <Lock size={8} /> : undefined} iconPosition="end" />
-          <Tab label={t('lesson.tab_other_solutions', 'Solucions Alumnes')} icon={!unlocked ? <Lock size={8} /> : undefined} iconPosition="end" />
-          <Tab label={t('lesson.tab_ai_help', 'Ajut IA')} icon={<Sparkles size={8} />} iconPosition="end" />
-        </Tabs>
+        <Box sx={{height: 48, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0, mt: 5}}>
+          <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
+        </Box>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
           <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0 }}>
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
@@ -574,7 +634,7 @@ export default function LessonPage() {
           {activeTab === 1 && unlocked && monaco && (
             <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: '#1e1e1e', p: 1.5 }}>
               <Typography sx={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', mb: 1, color: '#c084fc' }}>
-                {t('lesson.teacher_solution_title', 'Solució del professor')}
+                {t('lesson.teacher_solution_title', 'professor')}
               </Typography>
               {currentProblem?.teacherSolution ? (
                 <>
@@ -662,7 +722,7 @@ export default function LessonPage() {
         />
 
         <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
-          <IconButton onClick={handlePrevious} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1, p: 1 }}>
+          <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1, p: 1 }}>
             <ChevronLeft size={20}/>
           </IconButton>
           <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
@@ -686,19 +746,22 @@ export default function LessonPage() {
       <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0, mt: 10 }}>
         {/* COLUMNA 1: Enunciat / AI / Solucions */}
         <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 2, mb: 0.5, px: 1 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
-            <Tab label={t('lesson.tab_teacher_solution', 'Solució Profe')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
-            <Tab label={t('lesson.tab_other_solutions', 'Solucions Alumnes')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
-            <Tab label={t('lesson.tab_ai_help', 'Ajut IA')} icon={<Sparkles size={tabIconSize} />} iconPosition="end" />
+            <Tab label={t('lesson.tab_teacher_solution', 'Professor')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
+            <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
+            <Tab label={t('lesson.tab_ai_help', 'IA')} icon={<Sparkles size={tabIconSize} />} iconPosition="end" />
           </Tabs>
+
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider' }}>
+            <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={tabFontSize} />
+          </Box>
 
           <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, pb: isMdUp ? 14 : 10 }}>
             {activeTab === 0 && (
               <Box sx={{ p: 2 }}>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 900, mb: 3, mt: 3, color: mode === 'light' ? '#000' : 'inherit' }}>{getText(currentProblem?.subtitle)}</Typography>
-                <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: '3px solid', borderColor: alpha(theme.palette.primary.main, 0.5), mt: 5 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, textTransform: 'uppercase', mb: 0.5, color: mode === 'light' ? '#000' : 'inherit' }}>{t('lesson.objective')}</Typography>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 900, mb: 3, color: mode === 'light' ? '#000' : 'inherit' }}>{getText(currentProblem?.subtitle)}</Typography>
+                <Box sx={{ p: 1, bgcolor: alpha(theme.palette.primary.main, 0.05), mt: 5 }}>
                   <Typography sx={{ fontFamily: 'monospace', fontSize: '1rem', color: mode === 'light' ? '#000' : 'inherit' }}>{currentProblem?.text || ''}</Typography>
                 </Box>
               </Box>
@@ -747,7 +810,7 @@ export default function LessonPage() {
               unlocked ? (
                 <Box sx={{ p: 2 }}>
                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1.5, color: 'primary.main' }}>
-                    {t('lesson.other_solutions_title', 'Solucions estudiants')}
+                    {t('lesson.other_solutions_title', 'Estudiants')}
                   </Typography>
                   {loadingPeers ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>) 
                   : peerSolutions.length === 0 ? (
@@ -775,22 +838,16 @@ export default function LessonPage() {
             {activeTab === 3 && (
               <Box sx={{ p: 2 }}>
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 2, color: 'primary.main' }}>
-                  {t('lesson.tab_ai_help', 'Ajut IA')}
+                  {t('lesson.tab_ai_help', 'IA')}
                 </Typography>
                 <AiHelpPanel courseId={courseId!} lessonId={lessonId!} />
               </Box>
             )}
           </Box>
 
-          <Box sx={{ p: 2, bgcolor: alpha('#8400ff', 0.3), borderTop: '1px solid #8400ff', textAlign: 'center', position: 'absolute', bottom: 60, left: 0, right: 0, zIndex: 1 }}>
-            <Trophy size={20} color="#8400ff" style={{ display: 'block', margin: '0 auto 2px' }} />
-            <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, color: mode === 'light' ? '#000' : 'white' }}>{t('lesson.points_label')}</Typography>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900 }}>{globalProgress * 10}</Typography>
-          </Box>
-
           {/* Botons de navegació inferior esquerra */}
           <Box sx={{ height: 60, px: 4, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-            <Button onClick={handlePrevious} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: mode === 'light' ? '#000' : 'divider', color: 'text.primary' }}>
+            <Button onClick={handlePrevious} disabled={isFirstCoding} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: mode === 'light' ? '#000' : 'divider', color: 'text.primary' }}>
               {t('lesson.previous', 'Anterior')}
             </Button>
             <Button onClick={handleNext} variant="contained" size="small" endIcon={<ChevronRight size={16} />} sx={{ fontWeight: 700, fontSize: 13, bgcolor: 'primary.main', color: '#fff' }}>

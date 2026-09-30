@@ -2,11 +2,14 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab,
-  Menu, MenuItem, ListItemText, useMediaQuery, Divider
+  Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChevronDown, CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, Check } from 'lucide-react';
+import {
+  ChevronDown, CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck,
+  ChevronRight, Check, BookOpen, Code, ClipboardCheck, Folder
+} from 'lucide-react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +29,14 @@ const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
   assigned: { labelKey: 'courses.scope_assigned', fallback: 'Assignats' },
 };
 
+// Les 4 pestanyes principals (mateix ordre que els índexs de mainTab)
+const TAB_ITEMS = [
+  { icon: BookOpen, labelKey: 'lesson.tab_theory', fallback: 'Teoria' },
+  { icon: Code, labelKey: 'lesson.tab_exercises', fallback: 'Programació' },
+  { icon: ClipboardCheck, labelKey: 'lesson.tab_tests', fallback: 'Tests' },
+  { icon: Folder, labelKey: 'lesson.tab_files', fallback: 'Fitxers' },
+];
+
 function ScopeIcon({ scope }: { scope: ScopeType }) {
   switch (scope) {
     case 'public': return <Globe size={16} />;
@@ -41,7 +52,7 @@ export default function CourseLessons() {
   const theme = useTheme();
   const { mode } = useThemeMode();
   const isTallScreen = useMediaQuery('(min-height: 900px)');
-  
+
   const { data: course, isLoading: loading } = useCourse(courseId);
 
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
@@ -77,11 +88,26 @@ export default function CourseLessons() {
     const saved = localStorage.getItem(`mooc_tab_${courseId}`);
     return saved !== null ? JSON.parse(saved) : 0;
   });
-  
+
   const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => {
     const saved = localStorage.getItem(`mooc_expanded_${courseId}`);
     return saved !== null ? new Set(JSON.parse(saved)) : new Set();
   });
+
+  // Ordre en què s'han completat les lliçons de teoria (la darrera completada va al final)
+  const [doneOrder, setDoneOrder] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(`mooc_done_order_${courseId}`) || '[]');
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (courseId) {
+      localStorage.setItem(`mooc_done_order_${courseId}`, JSON.stringify(doneOrder));
+    }
+  }, [doneOrder, courseId]);
 
   const toggleLessonExpand = (id: string) => {
     setExpandedLessons(prev => {
@@ -163,6 +189,34 @@ export default function CourseLessons() {
     return () => el.removeEventListener('scroll', save);
   }, [courseId, course]);
 
+  // Menú vertical flotant: apareix quan la barra de pestanyes surt de la pantalla
+  const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
+  const [showRail, setShowRail] = useState(false);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    if (!tabsEl || !root) {
+      setShowRail(false);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // Només mostrem el menú quan les pestanyes han sortit per DALT de la pantalla
+        // (no quan encara són per sota de la vora inferior, abans de fer scroll).
+        const rootTop = entry.rootBounds?.top ?? 0;
+        setShowRail(!entry.isIntersecting && entry.boundingClientRect.top < rootTop);
+      },
+      { root, threshold: 0 }
+    );
+    observer.observe(tabsEl);
+    return () => observer.disconnect();
+  }, [tabsEl]);
+
+  const handleRailTabClick = (index: number) => {
+    setMainTab(index);
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const markLessonAsDone = (lessonId: string) => {
     const key = `${courseId}_theory_${lessonId}`;
     const newProgress = { ...progress, [key]: true };
@@ -171,6 +225,17 @@ export default function CourseLessons() {
     const sId = student ? JSON.parse(student).id : 'temp';
     localStorage.setItem(`mooc_global_progress_${sId}`, JSON.stringify(newProgress));
     window.dispatchEvent(new Event('lessonProgressUpdated'));
+
+    // La lliçó completada passa al final de la llista
+    setDoneOrder(prev => [...prev.filter(id => id !== lessonId), lessonId]);
+    // ...i es tanca automàticament
+    setExpandedLessons(prev => {
+      const next = new Set(prev);
+      next.delete(lessonId);
+      return next;
+    });
+    // Tornem a dalt perquè l'usuari vegi la següent lliçó pendent
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getLessonProgress = (lesson: any): number => {
@@ -315,6 +380,57 @@ export default function CourseLessons() {
   const contentCount = course.content?.length || 0;
   const isAllExpanded = expandedLessons.size === contentCount;
 
+  // Lliçons de teoria: primer les pendents (ordre original) i després les completades
+  // (segons l'ordre en què s'han completat; les que ja ho estaven abans mantenen l'ordre original).
+  const isTheoryDone = (lessonId: string) => progress[`${courseId}_theory_${lessonId}`] === true;
+  const allLessons: any[] = course.content || [];
+  const theoryLessons = [
+    ...allLessons.filter(l => !isTheoryDone(l.id)),
+    ...allLessons
+      .filter(l => isTheoryDone(l.id))
+      .sort((a, b) => doneOrder.indexOf(a.id) - doneOrder.indexOf(b.id)),
+  ];
+
+  // Barra de pestanyes: es renderitza dINS de cada box de contingut perquè
+  // l'usuari pugui canviar de pestanya sense tornar a dalt de la pàgina.
+  // El ref (setTabsEl) permet a l'IntersectionObserver saber quan surt de la pantalla.
+  const renderTabs = () => (
+    <Box ref={setTabsEl} sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+      <Tabs
+        value={mainTab}
+        onChange={(_, v) => setMainTab(v)}
+        sx={{
+          mb: 4, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider',
+          '& .MuiTabs-flexContainer': { justifyContent: 'center' },
+          '& .MuiTab-root': {
+            textTransform: 'none', fontWeight: 700, fontSize: '0.95rem',
+            minHeight: 0, py: 1.5, px: { xs: 3, md: 5 },
+            color: mode === 'light' ? '#000' : '#fff',
+          },
+          '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
+          '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: 3 },
+        }}
+      >
+        {TAB_ITEMS.map(({ labelKey, fallback }) => (
+          <Tab key={labelKey} label={t(labelKey, fallback)} />
+        ))}
+      </Tabs>
+    </Box>
+  );
+
+  // Botó Expandeix/Col·lapsa-ho tot: va DESPRÉS de la barra de pestanyes
+  const renderExpandAll = () => (
+    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+      <Button
+        disableRipple
+        onClick={handleToggleAll}
+        sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#149eca' }}
+      >
+        {isAllExpanded ? t('lesson.collapse_all', 'Col·lapsa-ho tot') : t('lesson.expand_all', 'Expandeix-ho tot')}
+      </Button>
+    </Box>
+  );
+
   return (
     <Box sx={{ position: 'fixed', top: 64, left: 0, right: 0, bottom: 0, bgcolor: 'background.default', overflow: 'hidden' }}>
       {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
@@ -323,7 +439,8 @@ export default function CourseLessons() {
           flex: '1 1 auto',
           minWidth: 0,
           maxWidth: { md: 'none' },
-          px: { xs: 3, md: 8 },
+          pl: { xs: 3, md: 8 },
+          pr: { xs: 7.5, md: 10 },
           py: 6,
           overflowY: 'auto',
           height: 'calc(100vh - 64px)',
@@ -375,7 +492,7 @@ export default function CourseLessons() {
                           setSubMenuAnchor(e.currentTarget);
                           setActiveSubMenuScope(option);
                         }}
-                        sx={{ 
+                        sx={{
                           fontWeight: 800, py: 1.25, display: 'flex', justifyContent: 'space-between',
                           bgcolor: isSelectedScope ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
                         }}
@@ -412,7 +529,7 @@ export default function CourseLessons() {
                 }}
               >
                 {activeSubMenuScope && filterByScope(
-                  activeSubMenuScope === 'public' ? publicCourses : assignedCourses, 
+                  activeSubMenuScope === 'public' ? publicCourses : assignedCourses,
                   activeSubMenuScope
                 ).map((c: any) => {
                   const isCurrentCourse = c.id === courseId;
@@ -427,12 +544,12 @@ export default function CourseLessons() {
                         '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) }
                       }}
                     >
-                      <ListItemText 
+                      <ListItemText
                         primary={
                           <Typography sx={{ fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {getText(c.title)}
                           </Typography>
-                        } 
+                        }
                       />
                     </MenuItem>
                   );
@@ -451,44 +568,11 @@ export default function CourseLessons() {
               {getText(course.description)}
             </Typography>
 
-            <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-              <Tabs
-                value={mainTab}
-                onChange={(_, v) => setMainTab(v)}
-                sx={{
-                  mb: 4, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider',
-                  '& .MuiTabs-flexContainer': { justifyContent: 'center' },
-                  '& .MuiTab-root': {
-                    textTransform: 'none', fontWeight: 700, fontSize: '0.95rem',
-                    minHeight: 0, py: 1.5, px: { xs: 3, md: 5 },
-                    color: mode === 'light' ? '#000' : '#fff',
-                  },
-                  '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
-                  '& .MuiTabs-indicator': { bgcolor: '#149eca', height: 3 },
-                }}
-              >
-                <Tab label={t('lesson.tab_theory', 'Teoria')} />
-                <Tab label={t('lesson.tab_exercises', 'Programació')} />
-                <Tab label={t('lesson.tab_tests', 'Tests')} />
-                <Tab label={t('lesson.tab_files', 'Fitxers')} />
-              </Tabs>
-            </Box>
-
-            {mainTab >= 0 && mainTab <= 2 && (
-              <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-                <Button
-                  disableRipple
-                  onClick={handleToggleAll}
-                  sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#149eca' }}
-                >
-                  {isAllExpanded ? t('lesson.collapse_all', 'Col·lapsa-ho tot') : t('lesson.expand_all', 'Expandeix-ho tot')}
-                </Button>
-              </Box>
-            )}
-
             {mainTab === 0 && (
               <Box sx={{ mb: 6 }}>
-                {(course.content || []).map((lesson: any) => {
+                {renderTabs()}
+                {renderExpandAll()}
+                {theoryLessons.map((lesson: any) => {
                   const isOpen = expandedLessons.has(lesson.id);
                   const isDone = progress[`${courseId}_theory_${lesson.id}`] === true;
                   return (
@@ -539,7 +623,7 @@ export default function CourseLessons() {
                           )}
 
                           {theoryMap[lesson.id] ? (
-                            <Box 
+                            <Box
                               sx={{ '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 1.8, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: 'divider', px: 2, py: 1, textAlign: 'left', color: 'text.secondary' }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } }}>
                               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {theoryMap[lesson.id]}
@@ -572,6 +656,8 @@ export default function CourseLessons() {
 
             {mainTab === 1 && (
               <Box sx={{ mb: 6 }}>
+                {renderTabs()}
+                {renderExpandAll()}
                 {getLessonsWithType('coding').length === 0 && (
                   <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
                     {t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.')}
@@ -624,6 +710,8 @@ export default function CourseLessons() {
 
             {mainTab === 2 && (
               <Box sx={{ mb: 6 }}>
+                {renderTabs()}
+                {renderExpandAll()}
                 {getLessonsWithType('test').length === 0 && (
                   <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
                     {t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.')}
@@ -676,6 +764,7 @@ export default function CourseLessons() {
 
             {mainTab === 3 && (
               <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary' }}>
+                {renderTabs()}
                 <FileText size={40} style={{ opacity: 0.5 }} />
                 <Typography sx={{ mt: 2, fontWeight: 600, fontSize: '0.95rem' }}>
                   {t('lesson.no_files', 'Encara no hi ha fitxers disponibles per aquest curs.')}
@@ -684,6 +773,56 @@ export default function CourseLessons() {
             )}
           </motion.div>
         </Box>
+      </Box>
+
+      {/* Menú vertical flotant: apareix quan les pestanyes de dalt surten de la pantalla */}
+      <Box
+        sx={{
+          position: 'absolute',
+          right: { xs: 6, md: 20 },
+          top: '50%',
+          zIndex: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 0.5,
+          p: 0.5,
+          borderRadius: 999,
+          bgcolor: alpha(theme.palette.background.paper, 0.85),
+          backdropFilter: 'blur(8px)',
+          border: '1px solid',
+          borderColor: 'divider',
+          boxShadow: 3,
+          transition: 'opacity 0.25s, transform 0.25s',
+          opacity: showRail ? 1 : 0,
+          transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)',
+          pointerEvents: showRail ? 'auto' : 'none',
+        }}
+      >
+        {TAB_ITEMS.map(({ icon: Icon, labelKey, fallback }, index) => {
+          const active = mainTab === index;
+          return (
+            <Tooltip key={labelKey} title={t(labelKey, fallback)} placement="left">
+              <Box
+                component="button"
+                type="button"
+                aria-label={t(labelKey, fallback)}
+                onClick={() => handleRailTabClick(index)}
+                sx={{
+                  width: { xs: 36, md: 44 },
+                  height: { xs: 36, md: 44 },
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: 'none', borderRadius: '50%', cursor: 'pointer',
+                  bgcolor: active ? '#8400ff' : 'transparent',
+                  color: active ? '#fff' : 'text.secondary',
+                  transition: 'background-color 0.2s, color 0.2s',
+                  '&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.12) },
+                }}
+              >
+                <Icon size={20} />
+              </Box>
+            </Tooltip>
+          );
+        })}
       </Box>
     </Box>
   );
