@@ -45,6 +45,7 @@ export default {
     coming_soon: "Próximamente",
     continue_studying: "Continúa estudiando",
     no_lessons: "Este curso aún no tiene lecciones.",
+    and_more: "+{{count}} más",
     no_attempted_lessons: "Aún no has hecho ningún ejercicio.",
     view_full_course: "Ver curso completo",
     no_courses: "No hay cursos disponibles.",
@@ -264,7 +265,8 @@ export default {
     your_challenge: "Tu reto",
     previous: "Anterior",
     next: "Siguiente",
-    go_to_activity: "Ir a la actividad",
+    go_to_activity: "Siguiente actividad",
+    back_to_course: "Volver a la actividad",
     back: "Volver",
     lessons: "Lecciones",
     objective: "Anunciado",
@@ -294,6 +296,8 @@ export default {
     tab_tests: "Tests",
     tab_exams: "Exámenes",
     tab_files: "Archivos",
+    tab_prev: "Pestaña anterior",
+    tab_next: "Pestaña siguiente",
     expand_all: "Expandir todo",
     collapse_all: "Colapsar todo"
   }

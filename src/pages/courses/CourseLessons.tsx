@@ -2,13 +2,13 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab,
-  Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip
+  Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ChevronDown, CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck,
-  ChevronRight, Check, BookOpen, Code, ClipboardCheck, Folder
+  ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder
 } from 'lucide-react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
@@ -52,6 +52,7 @@ export default function CourseLessons() {
   const theme = useTheme();
   const { mode } = useThemeMode();
   const isTallScreen = useMediaQuery('(min-height: 900px)');
+  const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   const { data: course, isLoading: loading } = useCourse(courseId);
 
@@ -59,7 +60,7 @@ export default function CourseLessons() {
   const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
 
-  const [scope, setScope] = useState<ScopeType>('public');
+  const [scope, setScope] = useState<ScopeType>('private');
   const [publicCourses, setPublicCourses] = useState<any[]>([]);
   const [assignedCourses, setAssignedCourses] = useState<any[]>([]);
 
@@ -189,9 +190,31 @@ export default function CourseLessons() {
     return () => el.removeEventListener('scroll', save);
   }, [courseId, course]);
 
-  // Menú vertical flotant: apareix quan la barra de pestanyes surt de la pantalla
   const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
   const [showRail, setShowRail] = useState(false);
+  const tabsListRef = useRef<HTMLDivElement | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const getTabsScroller = () =>
+    (tabsListRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null) ?? null;
+
+  useEffect(() => {
+    const scroller = getTabsScroller();
+    if (!scroller) return;
+    const update = () => {
+      setCanScrollLeft(scroller.scrollLeft > 1);
+      setCanScrollRight(scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1);
+    };
+    update();
+    scroller.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      scroller.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+    // Es reexecuta en canviar de secció perquè el <Tabs> es remunta.
+  }, [mainTab, isXs]);
 
   useEffect(() => {
     const root = scrollRef.current;
@@ -201,8 +224,6 @@ export default function CourseLessons() {
     }
     const observer = new IntersectionObserver(
       ([entry]) => {
-        // Només mostrem el menú quan les pestanyes han sortit per DALT de la pantalla
-        // (no quan encara són per sota de la vora inferior, abans de fer scroll).
         const rootTop = entry.rootBounds?.top ?? 0;
         setShowRail(!entry.isIntersecting && entry.boundingClientRect.top < rootTop);
       },
@@ -391,34 +412,85 @@ export default function CourseLessons() {
       .sort((a, b) => doneOrder.indexOf(a.id) - doneOrder.indexOf(b.id)),
   ];
 
-  // Barra de pestanyes: es renderitza dINS de cada box de contingut perquè
-  // l'usuari pugui canviar de pestanya sense tornar a dalt de la pàgina.
-  // El ref (setTabsEl) permet a l'IntersectionObserver saber quan surt de la pantalla.
-  const renderTabs = () => (
-    <Box ref={setTabsEl} sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
-      <Tabs
-        value={mainTab}
-        onChange={(_, v) => setMainTab(v)}
+  const scrollTabs = (dir: -1 | 1) => {
+    const scroller = getTabsScroller();
+    if (!scroller) return;
+    scroller.scrollBy({ left: dir * Math.max(160, scroller.clientWidth * 0.8), behavior: 'smooth' });
+  };
+
+  // Fletxes de desplaçament. Viuen com a germans de les pestanyes, no com a
+  // scrollButtons de MUI (que van superposats i es menjaven el text).
+  const navArrow = (dir: -1 | 1) => {
+    const disabled = dir === -1 ? !canScrollLeft : !canScrollRight;
+    const canScroll = !disabled;
+    return (
+      <IconButton
+        onClick={() => scrollTabs(dir)}
+        disabled={disabled}
+        aria-label={dir === -1 ? t('lesson.tab_prev', 'Pestanya anterior') : t('lesson.tab_next', 'Pestanya següent')}
         sx={{
-          mb: 4, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider',
-          '& .MuiTabs-flexContainer': { justifyContent: 'center' },
-          '& .MuiTab-root': {
-            textTransform: 'none', fontWeight: 700, fontSize: '0.95rem',
-            minHeight: 0, py: 1.5, px: { xs: 3, md: 5 },
-            color: mode === 'light' ? '#000' : '#fff',
-          },
-          '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
-          '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: 3 },
+          display: { xs: 'inline-flex', md: 'none' },
+          flexShrink: 0, width: 40, height: 40, p: 0,
+          borderRadius: 999,
+          color: canScroll ? '#8400ff' : alpha('#8400ff', 1),
+          bgcolor: canScroll ? 'transparent' : alpha('#8400ff', 1),
+          '&:hover': { bgcolor: canScroll ? 'transparent' : alpha('#fff', 0) },
+          '&.Mui-disabled': { color: alpha('#fff', 0) },
         }}
       >
-        {TAB_ITEMS.map(({ labelKey, fallback }) => (
-          <Tab key={labelKey} label={t(labelKey, fallback)} />
-        ))}
-      </Tabs>
-    </Box>
+        {dir === -1 ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
+      </IconButton>
+    );
+  };
+
+  const renderTabs = () => (
+    /* A xs la barra va de vora a vora: marges negatius que compensen el
+       pl:3 / pr:7.5 del contenidor de scroll (pr:7.5 reserva el rail).
+       Sense width:'100%' perquè un 100% fixe deixaria el marge dret. */
+    <Stack
+      direction="row"
+      spacing={0.5}
+      sx={{
+        alignItems: 'center',
+        ml: { xs: -3, md: 0 },
+        mr: { xs: -6, md: 0 },
+      }}
+    >
+      {navArrow(-1)}
+      <Box ref={setTabsEl} sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center'}}>
+        <Tabs
+          ref={tabsListRef}
+          value={mainTab}
+          onChange={(_, v) => setMainTab(v)}
+          variant={isXs ? 'scrollable' : 'standard'}
+          sx={{
+            mb: 4, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider',
+
+            '& .MuiTabs-list': {
+              justifyContent: { xs: 'flex-start' },
+            },
+            '& .MuiTab-root': {
+                textTransform: 'none', fontWeight: 900,
+                fontSize: { xs: '1.2rem', md: '0.95rem' },
+                minHeight: { xs: 60, md: 0 },          // més alçada a mòbil
+                minWidth: { xs: 50, md: 90 },           // MUI posa 90px per defecte i ocupa espai
+                py: { xs: 2, md: 1.5 },
+                px: { xs: 1.75, md: 5 }, 
+                color: mode === 'light' ? '#000' : '#fff',
+              },
+            '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
+            '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: { xs: 4, md: 3}},
+          }}
+        >
+          {TAB_ITEMS.map(({ labelKey, fallback }) => (
+            <Tab key={labelKey} label={t(labelKey, fallback)} />
+          ))}
+        </Tabs>
+      </Box>
+      {navArrow(1)}
+    </Stack>
   );
 
-  // Botó Expandeix/Col·lapsa-ho tot: va DESPRÉS de la barra de pestanyes
   const renderExpandAll = () => (
     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
       <Button
@@ -558,7 +630,7 @@ export default function CourseLessons() {
             </Box>
 
             <Typography variant="h2" sx={{
-              fontWeight: 900, fontSize: { xs: '2rem', md: '2.5rem' },
+              fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },
               letterSpacing: '0.03em', mt: 1, mb: 2, lineHeight: 1.1
             }}>
               {getText(course.title)}

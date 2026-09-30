@@ -1,165 +1,238 @@
-# 29/09/2026
+# 30/09/2026
 
-## Nova vista de configuració d'usuari (`src/pages/ProfilePage.tsx`)
+## Auditoria de l'endpoint de submissions i el 400 en enviar respostes
 
-### Rutes i accés
-- Nova ruta `/profile` registrada a `src/App.tsx` dins de `MainLayout`.
-- `src/components/UserAvatarMenu.tsx` deixa de ser un menú i es queda **només amb l'avatar**: en fer clic navega a `/profile`. Eliminats el `IconButton`, el `Menu` i el bloqueig de rol.
-- Botó "Torna al curs" a la capçalera que fa `navigate(-1)`.
-- Eliminada la card de **Rol** que hi havia abans; el logout també ja no es renderitza (i es neteja el handler i els imports morts).
+### El backend és correcte, el problema era el *body*
 
-### Layout (`LAYOUT` al capdamunt del fitxer)
-- Graella de **24 columnes** a ≥900px (cada columna = 0,5 de les 12 originals) per poder expressar fraccions. Abans era de 12; amb 12 no es podien posar decimals a `span` (CSS Grid rebutja `span 6.5`).
-- `gridTemplateColumns: { xs: '1fr', md: 'repeat(24, 1fr)' }` i les mides viuen totes a l'objecte `LAYOUT`:
-  - `preferences: '1 / span 13'` (54,2%), `organizations: '14 / span 11'` (45,8%) a la fila 1.
-  - `account: '1 / span 16'` i `avatar: '17 / span 8'` a la fila 2, amb `align: 'start'` i `max: 375` a l'avatar.
-- Helper `cardAt(entry)` tradueix una entrada de `LAYOUT` al `sx` de cada `Card` (`gridColumn`, `gridRow`, `alignSelf`, `maxWidth`).
-- Corregit un error de grid: l'avatar era `9 / span 6` sobre 12 columnes, cosa que creava columnes implícites 13 i 14 i feia desbordar la fila.
+Es va auditar `POST /api/v1/courses/{course_slug}/topics/{topic_slug}/problems/{problem_slug}/submissions/` contra el servidor real (`algorien.com`, el mateix objectiu que el proxy de `vite.config.ts`). **L'endpoint, la ruta i el servei no tenien cap error**:
 
-### Responsive i scroll
-- **Mòbil (<900px)**: les 4 cards col·lapsen a una sola columna i la pàgina **té scroll vertical**. Abans no hi havia scroll perquè `MainLayout` dona `flex: 1; overflow: hidden` al `Outlet`.
-  - Contenidor arrel: `overflowY: { xs: 'auto', md: 'hidden' }`.
-  - Contingut i grid: `flex: { xs: '0 0 auto', md: '1 1 auto' }` perquè a mòbil prenguin l'alçada natural i a desktop ocupin tota l'alçada.
-- A ≥900px es manté el disseny sense scroll vertical, amb el grid de dues files.
+| Comprovació | Codi | Contracte | |
+|---|---|---|---|
+| Path | `courseService.ts:105` | `/api/v1/courses/{c}/topics/{t}/problems/{p}/submissions/` | ✅ |
+| Slash final | sí | sí | ✅ |
+| `baseURL` | `${API_BASE_URL}/api/v1` (`:13`) | `/api/v1` | ✅ |
+| Content-Type | `application/json` (`:14`) | `application/json` | ✅ |
+| Auth | `Authorization: Token ${token}` (`:21`) | `www-authenticate: Token` | ✅ |
+| Body coding | `{code, language}` | `{"code": "..."}` | ✅ |
+| Body test | `{answers}` | `{"answers": [<choice_id>,...]}` | ✅ |
 
-### Estils visuals
-- `cardBase`: `p: 2.5`, `borderRadius: 12px`, `border: 1px solid`, sense ombra.
-- En **light**, cards, dividers i camps de text tenen el border **negre** (`BORDER = '#000'`). En dark, `divider`. En **fancy**, cards translúcides `rgba(20,20,20,0.72)` amb `backdropFilter: blur(10px)` i `ParticlesBackground` al fons.
+Comprovacions executades:
+- Problema `coding` (`variable-assignment`) amb `{"code":"x = 1\nprint(x)","language":"python"}` → `200 {"status":"accepted","submission_count":0}`. El camp extra `language` **no** molesta: sense ell també `200` (el backend l'ignora).
+- Problema `test` (`full-program`) amb `{"answers":[3131]}` → `200 {"correct":true,...}`. Amb string `["3131"]` també `200`, i fins i tot amb un id inexistent `[999999]` → `200 {"correct":false}`.
+- `Authorization: Token abc` → `401` amb `www-authenticate: Token`; `Authorization: Bearer abc` → `401` sense cap. Confirma que és DRF `TokenAuthentication`, igual que el que envia l'interceptor.
 
-### TextFields (`fieldSx`, compartit pels 7 camps)
-- **Sense línia inferior en cap estat** (reposició, hover ni focus). La causa era que `FilledInput` genera `&:hover:not(.Mui-disabled,.Mui-error)::before` (especificitat `0,4,1`) i `::before/::after` en focus; cal `'&&'` per pujar l'especificitat i guanyar.
-- En light el camp conserva **laterals i superiors negres però sense traç inferior** (`border` + `borderBottom: 'none'`); en dark/fancy va sense border.
-- Fons `action.hover` amb radi `10px`; en hover puja a `action.selected` (un to més clar, s'adapta al tema).
-- **Label** blanc (`#fff`) en dark i fancy, negre (`#000`) en light — també en focus, evitant el porpra per defecte. Els selectors del label són a nivell del `TextField` (`'& .MuiInputLabel-root'`), no dins de `.MuiInputBase-root`, perquè el `<label>` és **germà** de l'InputBase al DOM i el selector anterior no existia.
-- Label a `fontSize: '1rem'` (més gran que el 0,75rem de MUI per defecte).
-- Botons d'idioma (pills) amb border negre en light; en dark/fancy l'actiu manté `primary.main` i els inactius `divider`.
+**Conclusió:** l'única manera d'aconseguir un `400` és enviar un body **sense `answers`**, és a dir `{code}` contra un problema `type: "test"`. El backend mai retorna 400 si hi ha `answers`.
 
-### Card "Detalls del compte"
-- Els 3 camps de contrasenya en línia (`direction="row"`, col·lapsen a columna a xs) i el botó "Desa els canvis" just a sota, dins de la mateixa card.
-- Icones de `lucide-react` als camps: `UserRound` a l'esquerra del username, `Lock` a la **dreta** del username (opacitat 0,7), `KeyRound` i `ShieldCheck` a les contrasenyes.
-- El camp "Nom d'usuari" és de **només lectura** via `readOnly` a l'input (en lloc de `disabled`, que aplica `opacity: 0.6` i fons gris). Es crea `readonlyFieldSx` per si cal un tractament propi.
+### Causa arrel: `LessonPage` resolia problemes de test com si fossin de codi
 
-### Card "Organitzacions" → desplegable
-- Abans era una llista de cards; ara és un `TextField select` amb les opcions de `GET /api/v1/orgs/`.
-- Valor per defecte: la organització el nom de la qual conté "Violeta" (regex `/violeta/i`), i si no hi és, la primera de la llista. Si l'endpoint no torna res, es mostra la constant `DEFAULT_ORG` (`CIFO BCN La Violeta` / `Centre de formació`).
-- El valor seleccionat i cada opció mostren nom en negreta + subtítol, via `slotProps.select.renderValue` (en MUI v9 el `renderValue` ja no és una prop directa de `TextField`).
-- Es manté el badge "Membre" a la dreta. El subtjol surt de `org.type ?? org.subtitle`.
-- La interfície `Organization` accepta ara també `subtitle`.
-- **Avís:** la selecció encara no s'envia a cap endpoint; el `PATCH /users/me/settings/` no accepta organització, és només visual.
+`full-program` és `type: "test"`, però `LessonPage.handleRunTests` feia sempre `POST {code, language}`. S'hi arribava perquè el topic `warm-up-eadf` **barreja** 14 exercicis `coding` i 6 `test`, i `handleNext`/`handlePrevious` feien `flatMap` de tots els problemes sense mirar el `type`. A més el `catch (_) {}` de `handleRunTests` **amagava l'error**, de manera que a l'usuari no li sortia res i només veia el 400 a la consola.
 
-### Card "Avatar"
-- Avatar de 96px amb preview local (`FileReader.readAsDataURL`), botó "Tria un fitxer" (`outlined`) i nom del fitxer triat.
-- Es carrega l'avatar existent amb `GET /users/me/avatar/`; sense resposta es mostra la inicial del nom.
-- L'**upload només s'envia en desar** (`PATCH /users/me/avatar/` amb `FormData`, camp `avatar`), no en seleccionar el fitxer.
+### Correccions a `src/pages/courses/LessonPage.tsx`
+- **Redirecció** de problemes `type: 'test'` a `/courses/:courseId/exam/:lessonId` amb `replace: true`. Cobreix URL directa, "Anterior"/"Següent" i qualsevol altra entrada.
+- **L'error ja no s'amaga**: el `catch (_) {}` buit s'ha substituït per un que extreu el detall real del servidor (`err.response.data`, incloent-hi els arrays d'errors de DRF), el consola, el mostra a la consola de l'editor i llança una notificació.
+- `handleRunTests` fa `return` si el problema és de test (ja redirigit), en lloc de deixar que el POST falli.
 
-### Lògica i estat
-- `readStoredProfile()` llegeix `currentStudent` de `localStorage` i hidrata `firstName`, `lastName`, `email` i `username` (l'email si no hi ha `username`).
-- Validació al desar: si hi ha contrasenyes noves cal `current_password` i que els dos passwords coincideixin; els errors es mostren a `formError`.
-- `handleSubmit` fa `updateProfile` i després, si hi ha fitxer, `updateMyAvatar` (amb el seu propi `try/catch` perquè una pujada fallida no tingui per fallat el desat del perfil).
-- després de desar, es buiden els camps de contrasenya i fitxer, i es reseteja l'`input` de fitxer.
-- **Mirror a `localStorage`**: s'actualitza `currentStudent` amb les dades noves i es llança `window.dispatchEvent(new Event('auth-state-change'))` perquè el Header i la resta de l'app reflecteixin el nom nou.
-- `extractProfileErrors(error)` recorre recursivament la resposta de l'API i concatena els missatges.
+## Navegació d'activitats només de codi (`LessonPage.tsx`)
 
-### Servei nou `src/services/profileService.ts`
-- `BASE_URL` = `import.meta.env.VITE_API_URL || ''` + `/api/v1`, token via `Authorization: Bearer` des de `localStorage`.
-- Endpoints: `PATCH /users/me/settings/`, `GET /orgs/`, `GET /users/me/avatar/`, `PATCH /users/me/avatar/`.
-- `fetchOrganizations` accepta tant un array directe com `{ results: [...] }`.
-- `updateMyAvatar` envia `multipart/form-data` amb el camp `avatar`.
-- Exporta els tipus `Organization`, `ProfilePayload` i `ProfileUser`.
+Abans "Anterior" i "Següent temari" recorrien **tots** els problemes (codi + tests) i, en arribar a un test, `problemPath` el redirigia a `/exam/...`, sacsejant l'usuari fora del fluxe d'exercicis.
 
-### Traduccions
-- Bloc `profile.*` afegit a `src/i18n/ca.ts`, `es.ts` i `en.ts`.
-- Els canvis d'idioma criden `useI18n().setLanguage()`, que persisteix a `mooc-language` i és global a tota l'app.
-- Banderes com a SVG inline (`FlagIcon`): bandera catalana ratllada, espanyola bicolor i anglesa amb la creu de Sant Jordi.
+- `isCoding = (p) => p?.type !== 'test'` i `problemPath(courseId, problem)` (retorna `/exam/:slug` per tests i `/:slug` per codi).
+- `handlePrevious` i `handleNext` ara filtren amb `isCoding` i només avancen/retrocedeixen entre activitats de codi, travessant temes com abans. Si no hi ha més codi, `handleNext` surt del tema i torna al curs.
+- `isFirstCoding` (calculat sobre la llista filtrada) **desactiva el botó "Anterior"** quan l'usuari és a la primera activitat de codi, als dos botons (l'`IconButton` de mòbil i el `Button` de desktop). El `<= 0` cobreix el cas en què l'activitat no es troba a la llista (`findIndex` retorna `-1`).
+- Exemple real (`python-public-test` / `warm-up-eadf`): abans `variable-assignment` → "Següent" → `python` (test) ❌; ara → `addition-and-subtraction` (codi) ✅.
 
-### Monaco
-- `src/utils/monaco.ts`: `fontSize` de 13 a **18** i `lineHeight` a **24** per fer el codi més llegible.
+## Botó "Torna al curs" (`LessonPage.tsx`)
 
-## Detalls tècnics que van caldre corregir
+- Component reutilitzable `BackToCourseButton({ label, onClick, fontSize })` amb icona `ChevronLeft`.
+- `handleBackToCourse` fa `persistViewState()` (desa cursor i scroll de l'editor) i navega a `/courses/:courseId`. Fa servir la ruta del client, no `history.back()`, així que sempre torna a la llista de temari encara que l'usuari hagi arribat des d'un enllaç directe.
+- **Desktop**: just a sota de les `<Tabs>`, amb la mateixa línia `borderBottom`, mida `tabFontSize`.
+- **Mòbil**: dins de la franja de 48px on abans hi havia les tabs.
+- Nova clau i18n `lesson.back_to_course` als tres idiomes.
 
-- **Especificitat de `sx` amb MUI**: diverses vegades les regles es van veure aplicades al fitxer però no tenien efecte. Causes reals trobades:
-  - El `<label>` de `TextField` és germà de l'`InputBase` al DOM, no un fill → els selectors `& .MuiInputBase-root .MuiInputLabel-root` no existien.
-  - `FilledInput` aplica `:hover:not(...)::before` amb especificitat `0,4,1` → cal `'&&'` per superar-la.
-  - En MUI v9, `renderValue` ja no és prop directa de `TextField`; va dins de `slotProps.select`.
-  - `slotProps.select.MenuProps` no accepta `PaperProps` en aquesta versió.
-- **El fitxer `ProfilePage.tsx` s'ha sobreescrit diverses vegades** des de l'editor mentre s'editava (amb `renderValue` fora de `slotProps`). Cal llegir sempre el fitxe real abans d'editar, no assumir l'estat anterior de l'edit.
-- `span` decimal és **invàlid** a CSS Grid: `8 / span 7` sobre 12 columnes crea columnes implícites i desborda la fila. La solució va ser passar a 24 columnes.
-- `gridTemplateRows: { md: 'auto 1fr auto' }` conserva una tercera fila que ja no s'utilitza (el botó de desar es va moure dins de la card del compte). Candidata a neteja.
-- `readStoredProfile()` es recalcula en cada render; es podria embolicar amb `useMemo`.
-- Verificació: `npx tsc --noEmit` net i `npx vite build` correcte. El build només avisa de chunks >500 kB (Monaco), que és el comportament esperat.
+## Pestanyes de `LessonPage.tsx` a mòbil
 
-## Desplegable de cursos al dashboard de l'alumne (`src/pages/dashboards/StudentDashboard.tsx`)
+- **Eliminades les tabs del layout mòbil.** Abans hi havia un segon `<Tabs>` duplicat (font 7.3px) que només servia per commutar entre enunciat i solució del profe. Ara a mòbil es veu directament l'enunciat + l'editor.
+- **Desktop**: `ml: 2.5 * tabScale` a `.MuiTab-root` per tenir més separació entre pestanyes. `tabScale` va de 0.6 a 1.3 segons l'amplada de la columna 1, així que el gap escala sol (~12px → ~26px).
 
-### Objectiu
-Dins del box dels tabs de curs hi ha un **desplegable per triar quina llista de cursos es mostra**: público, privat o assignat. El curs seleccionat canvia com abans (`currentCourse`), i el contingut de tota la pàgina (targetes de resum, "Continua Estudiant", enllaç a les stats) es segueix mantenint igual.
+## Exam de test (`src/pages/courses/ExamPage.tsx`)
 
-### Els tres àmbits
-- `CourseScope = 'public' | 'private' | 'assigned'` exportat del fitxer, amb `SCOPES` (l'ordre del menú), `SCOPE_META` (labelKey + fallback per idioma) i `ScopeIcon` (icona de cada àmbit: `PublicIcon`, `LockIcon` = `LockOutlined`, `SchoolIcon`).
-- `filterByScope(courses, scope)` aplica el filtre:
-  - `public` → `isPublic !== false`
-  - `private` → `isPublic === false`
-  - `assigned` → **no filtra res**, és tota la llista que ha tornat el backend.
+### El botó "Enviar" no es podia prémer
+`disabled={!selectedAnswers.length || submitting || !!nextTest}` desactivava el botó a **totes** les preguntes excepte l'última del tema, perquè `nextTest` és el test següent del mateix tema. En `warm-up-eadf` hi ha 6 tests i només `full-program` era enviable. Es manté la restricció (és el fluxe seqüencial del test) però s'hi ha afegit un text explicatiu a sota del botó quan no és l'última pregunta, perquè el botó deshabilitat no sembli trencat.
 
-### Dues fonts de dades en lloc d'una
-Estats nous `assignedCourses` i `publicCourses` (es substitueix l'estat `allCourses`, que ja no existeix):
+### El resultat no es veia
+El backend retorna `{ correct, choices }`, però el panel llegia `result.feedback`, un camp que **no existeix** a la resposta: sempre mostrava "Enviat correctament" sense indicar si s'havia encertat.
+- El panel ara deriva de `result.correct` i renderitza la llista `choices` amb ✓/✕, `was_selected` i l'explicació de cada opció.
+- `result.feedback` es manté com a suport per si el backend l'afegís al response de codi.
 
-| Àmbit | Endpoint | Filtre |
+### Progrés i nota
+- `handleSubmit` marquesa `mooc_global_progress` com a `true` **sigui correcta o falsa** la resposta. Ara només posa `true` si `res.correct === true`, i `'attempted'` si s'ha contestat malament.
+- En cursos públics **sense matricula** el backend no persisteix res, de manera que `getChallengeSubmissions` tornava buit i la nota no apareixia mai. La nota fa fallback a `result.correct` (`exam.score` si és correcte, 0 si no).
+- Si no es troba el tema del problema es llança un error explícit en lloc de construir la URL amb `topicSlug` buit.
+- Els errors del servidor es mostren amb el detall real de `err.response.data` en lloc del genèric `err.message` ("Request failed with status code 400").
+
+## Pestanyes i rail flotant (`src/pages/courses/CourseLessons.tsx`)
+
+### `TAB_ITEMS` com a font única
+Les 4 pestanyes (Teoria / Programació / Tests / Fitxers) es declaren una sola veu a la constant de mòdul `TAB_ITEMS`, amb `{ icon, labelKey, fallback }` (`BookOpen`, `Code`, `ClipboardCheck`, `Folder` de `lucide-react`). El mateix array alimenta les pestanyes del box i els botons del rail, de manera que les icones i els textos no es poden desincronitzar. Abans eren quatre `<Tab label={t(...)} />` escrits a mà.
+
+### Barra dins de cada box
+Les pestanyes eren una barra **compartida** per damunt de tots els continguts. Ara cada secció porta la seva pròpia barra a dalt del seu box, perquè l'usuari canviï de secció sense tornar a dalt.
+
+- Extret `renderTabs()` com a helper local (`Box` + `Tabs`, `mb: 4`, indicador **`#8400ff`**). Els valors de mida del text i del farciment són diferents per rang i s'han ajustat després a la secció de pestanyes a mòbil.
+- El bloc compartit s'ha eliminat perquè no quedi barra duplicada.
+- `renderTabs()` s'insereix al inici dels 4 boxes: `mainTab === 0` (Teoria), `1` (Programació), `2` (Tests) i `3` (Fitxers).
+- `renderExpandAll()` ("Expandeix-ho tot" / "Col·lapsa-ho tot") també s'ha extret i es crida als boxes 0 (Teoria), 1 (Programació) i 2 (Tests), mantenint el mateix abast que abans (`mainTab <= 2`). El box 3 (Fitxers) no el crida: és un estat buit i el botó no hi té sentit.
+
+### Rail flotant vertical
+Quan l'usuari baixa per llegir la teoria, la barra de pestanyes queda amunt i no té com arribar-hi. Es fa servir el `ref` que ja hi ha (`setTabsEl`) amb un **`IntersectionObserver`** sobre el contenidor de scroll (`scrollRef`):
+
+- `showRail = !entry.isIntersecting && entry.boundingClientRect.top < rootTop`. La segona condició és essencial: només s'ha de mostrar el rail quan les pestanyes han sortit **per dalt**, no quan encara estan per sota de la vora inferior (el que passaria si el threshold no distingís de sentit).
+- `rootBounds?.top` dóna la vora del contenidor; el `?? 0` evita que l'observador pugui llançar si `rootBounds` arriba a `null` en certs navegadors.
+- El rail és una `p` flotant (pills) a la dreta (`right: { xs: 6, md: 20 }`, `top: 50%`) amb `borderRadius: 999`, `backdropFilter: 'blur(8px)'` i botons rodons de 36/44px. L'actiu es posa en `#8400ff`, la resta en `text.secondary`, cadascun amb `Tooltip` a l'esquerra.
+- Apareix i desapareix amb `opacity` + `transform: translate(24px, -50%)` i `pointerEvents: 'auto' | 'none'`, de manera que un rail invisible no atrapa el clic.
+- `handleRailTabClick(index)` fa `setMainTab(index)` **i** `scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })`: sense aquest scroll, canviar de secció des del rail deixava a l'usuari a la meitat del box nou.
+- El contenidor ha canviat el padding de `px` a `pl: { xs: 3, md: 8 }` + `pr: { xs: 7.5, md: 10 }` perquè el rail no es pugui sobreposar al text.
+
+### Reordenació de les lliçons de teoria
+`theoryLessons` deixa de ser `course.content` i es construeix cada render en dos blocs:
+1. Les lliçons **pendents**, en l'ordre original del curs.
+2. Les lliçons **completades**, ordenades segons l'ordre en què s'han acabat (`doneOrder`).
+
+L'ordre de finalització es desa a `localStorage` amb la clau `mooc_done_order_${courseId}` i es hidrata amb `JSON.parse` dins d'un `try/catch` (per si el valor està corrupte). `isTheoryDone(id)` llegint `progress[..._theory_<id>]` evita el `useMemo` perquè la llista és curta i el `useMemo` no compensa.
+
+`markLessonAsDone` fa tres coses addicionals a part de marcar el progrés: afegeix la lliçó al final de `doneOrder` (traient-la primer per no duplicar-la), **tanca la lliçó automàticament** i fa scroll suau a dalt, perquè l'usuari vegi la següent lliçó pendent.
+
+## Detalls tècnics i pendents
+
+- `ExamPage` continua determinant `isMultiChoice` amb `choices.filter(c => c.is_correct).length > 1`, és a dir **es filtra pel camp `is_correct` que el backend exposa al client**. Per la mateixa raó, `getFullCourseDetail` (`courseService.ts:167`) assigna `choices` amb `is_correct` inclòs, de manera que l'answer key dels tests viatja al navegador. Amb la resposta correcta a la vista, l'usuari pot veure quina és sense respondre. Cal tractar-ho al backend.
+- El backend retorna `is_correct` també dins de la resposta de l'POST (`{correct, choices: [{is_correct, was_selected}]}`), cosa que és funcional però torna a exposar la solució.
+- `submitChallenge` (`courseService.ts:103`) és **agnòstic al tipus de problema**: accepta `{code}` i `{answers}` i és cada pantalla qui decideix el body. Aquesta classe de bug (400 per body incorrecte) es pot repetir en qualsevol pantalla nova. Una opció seria que el servei validés el tipus contra el problema (amb cache) i llencés un error explícit.
+- `LessonPage` redirigeix els tests cap a `ExamPage`, però `ExamPage` no té el tractament equivalent: si s'hi entra amb un problema de codi, `choices` és `[]`, `exam.title` no existeix en el mapping de `getFullCourseDetail` (que l'anomena `subtitle`) i el POST s'envia amb `{answers: []}`, que el `handleSubmit` ni tan sols deixa enviar (`if (!selectedAnswers.length) return`).
+- A `CourseLessons.tsx`, `renderExpandAll()` es crida als boxes 0 (Teoria), 1 i 2, però **no** al 3 (Fitxers). A Teoria el text "Expandeix-ho tot" és una mica enganyós perquè `toggleLessonExpand` sí que funciona allà, però el vocabulari sembla pensat per a Programació/Tests. A Fitxers, en canvi, la box és un estat buit i no cal el botó.
+- El rail flotant és un element fix dins d'un `Box` amb `position: fixed` (l'arrel del component és `position: fixed; top: 64`), i el rail fa `position: absolute` respecte d'aquest. Per tant **no** es mou amb el scroll, que és el comportament buscat.
+- `npx tsc --noEmit` net. `npx vite build` correcte (només l'avís esperat de chunks >500 kB per Monaco).
+
+## Els dos boxes del resum, per temes i no per subtemes (`src/pages/dashboards/StudentDashboard.tsx`)
+
+### Què canvia
+Els boxes "Problemes codi" i "Exercicis test" del resum del curs es construïen amb `flatLessons.filter(...).slice(0, lessonsSliceLimit)`, és a dir una **llista plana d'activitats (subtemes) sense cap grup**. Ara cada fila és un **tema**, que és el que es volia veure.
+
+- `getTopicSummaries(course, matches, budget, progress)` fa una fila per tema amb `key`, `id`, `title`, `total` (subtemes del tipus demanat) i `done` (d'aquests, quants estan superats).
+- Descarta els temes amb `total === 0`: així el box de codi només ensenya temes que tenen exercicis i el de test, temes que tenen proves. Abans tots els subtemes de tots els temes es barrejaven al mateix box.
+- `budget` continua sent `lessonsSliceLimit` (5 o 7 segons l'alçada de pantalla) i `hidden` és el nombre de temes que no hi caben, per indicar-los amb `dashboard.and_more`.
+- Si el curs ve amb estructura plana (`course.content` sense temes), `getCourseTopics` sintetitza un únic tema sense títol; per això el `title` fa `getText(topic.title) || getText(course.title)`, perquè la fila no quedi sense etiqueta.
+- Cada fila mostra el recompte `fetes/total` del tema a més de la barra de progrés, perquè es llegeixi quant falta i no només si és tot o res.
+
+### Component compartit
+`TopicList` substitueix el codi duplicat dels dos boxes. Reb `topics`, `hidden`, `icon`, `onOpen` i `moreLabel`; per props hi arriba tot el que els diferencia, de manera que afegir un tercer tipus d'activitat és una línia.
+
+### Navegació
+`openTopic(tab, topicId)` escriu les mateixes claus de `localStorage` que llegeix `CourseLessons` (`mooc_tab_<slug>` i `mooc_expanded_<slug>`) i navega a `/courses/<slug>`. Clicar un tema obre el curs a la pestanya correcta (1 = Programació, 2 = Tests) **amb el tema ja desplegat**, en lloc d'anar a una pàgina nova. `openTopic(1, ...)` per al box de codi i `openTopic(2, ...)` per al de test.
+
+## Punts al costat de l'àvia del header (`src/components/Header.tsx`, `src/pages/courses/LessonPage.tsx`)
+
+- El box de punts vivia a `LessonPage` amb `position: absolute; bottom: 60`, superposat al panell d'activitat i només visible en aquella pantalla. S'ha eliminat i els punts s'han mogut al header, al costat de l'àvia, perquè es vegin a totes les pantalles.
+- **`usePoints()`** (nou hook al `Header`) fusiona `mooc_global_progress_<id>` i `mooc_shared_all_progress` amb la mateixa lògica que `getProgress` del dashboard, i retorna `Object.values(...).filter(v => v === true).length * POINTS_PER_LESSON` amb `POINTS_PER_LESSON = 10`.
+- Escolta `lessonProgressUpdated` i `auth-state-change`, de manera que el recompte s'actualitza en superar una activitat sense recarregar la pàgina.
+- **`PointsBadge`**: pastilla arrodonida (`borderRadius: 999`) amb copa de `lucide-react` i el número, amb `bgcolor: alpha('#8400ff', 0.15)` i `borderColor: alpha('#8400ff', 0.4)`. El `title` mostra "PUNTS: N".
+- Es renderitza a desktop just abans de `UserAvatarMenu` i al menú mòbil al costat del nom d'usuari. **Si no hi ha sessió no es mostra**, perquè 0 punts no té sentit sense alumne.
+- Import de `Trophy` a `LessonPage` esborat: ja no s'usa.
+
+**Canvi de comportament a tenir en compte:** els punts de `LessonPage` eren només del curs obert (`allProblems` del curs actual × 10). Al header són **globals**, totes les activitats superades de tots els cursos, perquè el header no sap de quin curs es tracta. Si es vol el total per curs, caldria que el header dediqués el `courseId` de la ruta.
+
+## `GET /users/me/settings/` al perfil (`src/services/profileService.ts`, `src/pages/ProfilePage.tsx`)
+
+### Auditoria
+Es va comprovar contra el servidor real que `GET /api/v1/users/me/settings/` existeix i està servit:
+
+```
+$ curl -i https://algorien.com/api/v1/users/me/settings/
+HTTP/1.1 401 Unauthorized
+www-authenticate: Token
+allow: GET, PATCH, HEAD, OPTIONS
+```
+
+| Comprovació | Codi | Contracte | |
+|---|---|---|---|
+| Path | `profileService.ts:6` | `/api/v1/users/me/settings/` | ✅ |
+| GET disponible | no s'usenava | `allow: GET, ...` | ❌ |
+| Auth | `Bearer` → `Token` | `www-authenticate: Token` | ❌ |
+| `username` | absent del tipus | present al 200 | ❌ |
+| `avatar_url` | absent del tipus | present al 200 | ❌ |
+
+### Els dos bugs que hi havia
+
+1. **El GET no s'executava mai.** `PROFILE_URL` només s'usava al `PATCH` de `updateProfile`. No hi havia cap `axios.get(PROFILE_URL)` en tot el repo, malgrat que el backend el serveix.
+2. **`authHeaders()` enviava `Bearer`** quan el servidor és DRF `TokenAuthentication`. `api.ts:21` i `courseService.ts:21` ja hi anaven bé amb `Token`; `profileService` era l'únic que es va quedar a `Bearer`, cosa que feia que el `PATCH` de "Desa els canvis" retornés `401` en silenci.
+
+### Consequència: tres camps del formulari eren deducits, no reals
+En no cridar el GET, `readStoredProfile()` hidratava tot des de `localStorage.currentStudent`, i el login (`StudentDashboard.handleLogin`) només hi desa `name` i `email` que venen del backend. Els altres dos camps quedaven buits i es deducien així:
+
+| Camp | Deduït de | Valor real |
 |---|---|---|
-| Público | `GET /public/courses/` | `isPublic !== false` |
-| Privats | `GET /courses/` | `isPublic === false` |
-| Assignats | `GET /courses/` | cap (el backend ja filtra per rol) |
+| Nom | `parts[0]` (1a paraula del `name`) | `first_name` |
+| Cognoms | `parts.slice(1).join(' ')` (la resta) | `last_name` |
+| Nom d'usuari | `email.split('@')[0]` | `username` |
 
-A `initData` els dos llistats es criden en `Promise.all` i cadascun rep els seus propis `getFullCourseDetail`. Cada crida té `catch` individual perquè un error en un no tombà l'altre.
+El camp "Nom d'usuari" és `readOnly` i el PATCH no l'accepta, de manera que un valor mal deduït era **irreparable** per l'usuari.
 
-### `courseService.ts`
-- `getAllCourses()` canvia de `GET /public/courses/` a **`GET /courses/`**.
-- Nova `getPublicCourses()` per a `GET /public/courses/`, amb la seva pròpia `publicCoursesCache`.
-- Extret `toCourses(data)` com a helper de mòdul per normalitzar el JSON (array directe o `{ results: [...] }`) a tipus `Course`; abans el mapping estava duplicat.
-- Les dues llistes comparteixen els mateixos camps: `isPublic` (`c.is_public !== false`), `active` (`c.active !== false`) i `professors` (array o `[]`).
-- `src/features/student/types.ts`: la interfície `Course` rep `isPublic?`, `active?` i `professors?`.
+### Corrections
+- `authHeaders()` passa a `Token ${token}`, alineat amb la resta de serveis.
+- **`fetchProfile()`** nou, `GET PROFILE_URL`, i `ProfileUser` completat amb `username` i `avatar_url`.
+- Estat **`username`** nou a `ProfilePage`; el `TextField` llegeix l'estat en lloc de `stored.username`, que era un valor fix que no es refrescava mai.
+- El GET és la **font de veritat** en muntar la pàgina: sobreescriu `firstName`, `lastName`, `email` i `username`. **`localStorage` queda de fallback**, de manera que si el GET falla el formulari no apareix buit.
+- **`avatar_url`** del GET es fa servir i, només si no hi és, cau a `GET /users/me/avatar/`. Abans sempre es cridava el segon endpoint.
+- **`mirrorProfileToStorage()`** copia els camps del GET dins de `currentStudent` i llança `auth-state-change`, perquè el nom del Header i el dashboard deixin de dependre del que va arriving del login.
 
-### Persistència de l'últim curs
-- Clau `mooc_dashboard_last_course` amb la forma `{ slug, scope }`. Helpers `readLastCourse()` i `writeLastCourse(slug, scope)`, tots dos amb `try/catch` (mode privat).
-- `persistSelection(course, scope)` i `pickScope(scope)` es criden des dels handlers (`onChange` dels tabs i `onClick` dels `MenuItem`), mai des d'un efecte.
-  - Motiu: un efecte de persistència hauria corregit el valor restaurat just abans de que l'efecte de restauració apliqués l'estat, perquè els dos s'executen en la mateixa passada i els `setState` són asíncrons.
-- Efecte de restauració amb `restoredRef` (un `useRef` com a guarda): un sol cop, quan `assignedCourses.length + publicCourses.length > 0`, reinstateix l'àmbit i busca l'índex del slug dins de la llista corresponent. Si el slug ja no existeix, degrada a l'índex 0.
-- Als `Tabs`, `value={visibleCourses.length ? courseTabIndex : false}` perquè no avisi en renderitzar una pestanya buida.
+**Avís:** no s'ha pogut provar el GET ni el PATCH amb un token real perquè no hi ha credencials a l'entorn. El que sí està confirmat és el `401` amb `www-authenticate: Token` i l'`allow: GET, PATCH`. Si el `PATCH` tornés a fallar, el `catch` mostra el detall real de `err.response.data` via `extractProfileErrors`, així que es veurà a la UI en lloc de fallar en silenci com abans.
 
-### Menú
-- `Button` amb `startIcon` (la icona de l'àmbit actiu), `endIcon` amb `ExpandMoreIcon` que gira 180° quan el menú és obert, i un badge amb el recompte de cursos de l'àmbit.
-- `Menu` generat amb `map` sobre `SCOPES`, de manera que afegir-hi un quart àmbit no obliga a tocar el JSX. Cada opció mostra el seu recompte.
-- Separador `Divider orientation="vertical"` entre el botó del filtre i els tabs.
-- Es manté el botó de reiniciar curs i el d'afegir curs al final del box.
+## Barra de pestanyes a mòbil: scroll horitzontal i fletxes (`src/pages/courses/CourseLessons.tsx`)
 
-### Traduccions
-`dashboard.public_courses`, `dashboard.private_courses` i `dashboard.assigned_courses` a `ca.ts`, `es.ts` i `en.ts`.
+### El problema
+A `xs` les 4 pestanyes (Teoria / Programació / Tests / Fitxers) no caben a cap mòbil. El rail flotant ja funcionava a mòbil perquè la icona no necessita espai per al text, i les pestanyes es quedaven sense cap sortida: no hi havia scroll, no hi havia fletxes, i el text era tallat pel `borderBottom`.
 
-## Auditoria dels endpoints del servidor per als "cursos assignats"
+### El canvi estructural
+`isXs = useMediaQuery(theme.breakpoints.down('sm'))` commuta només el que cal:
 
-Es va repassar un per un tots els endpoints del servidor per trobar quin retorna els cursos de l'usuari actual. **Cap apart de `GET /api/v1/courses/` serveix**, i el seu propi contract ho confirma: *"Professors see their own courses; students see active enrolled courses; staff see all."*
+- **`variant={isXs ? 'scrollable' : 'standard'}`** i **`scrollButtons` fora**. Es tria `scrollable` en lloc d'afegir un `overflowX: 'auto'` a mà perquè MUI posa la pestanya seleccionada dins de vista en canviar de tab. Sense això, arribant des del rail flotant es podia quedar seleccionada una pestanya fora de pantalla. A `md` es queda en `standard`, que és el comportament original.
+- **`justifyContent: { xs: 'flex-start' }`** a `.MuiTabs-list`. Centrar un contenidor flex que desborda **talla el costat esquerre i el deixa inalcançable** amb el scroll: es veu correctament, però la primera pestanya no s'hi pot arribar. Sense valor a `md` a propòsit, perquè el `center` que hi havia abans anava sobre una classe que no existeix (vegeu el bug de MUI 9 de més avall) i era codi mort; declarar-ho a `md` hauria centrat les pestanyes al desktop.
+- Totes les regles noves són a `xs` (`[theme.breakpoints.down('sm')]` o `display: { xs: ..., md: 'none' }`). **A `md` no hi ha cap declaració nova.**
 
-Descartats:
-- `GET /courses/{slug}/enrollment/` — "List enrolled students": retorna els **alumnes** d'un curs, no els cursos d'un alumne. Vista de professor.
-- `GET /courses/{slug}/students/`, `/students/overview/`, `/enrollment/available/`, `/topics/{t}/overview/` — tot angle de professor.
-- `POST /courses/{slug}/enrollment/` — "Add students to course": és escriptura, `user_ids` com a cos, professor only, i exigeix un `course_slug` de partida. No pot construir la llista.
-- `GET /orgs/{org_slug}/courses/` — cursos de l'organització, no de l'usuari.
-- `GET /users/me/settings/`, `/avatar/`, `/view-mode/` — cap camp de cursos.
-- `GET /notifications/` — notificacions.
+### Fletxes pròpies, no les de MUI
+Les fletxes són **germans** de les pestanyes dins d'un `Stack direction="row"`, no els `scrollButtons` del propi `<Tabs>`: els de MUI van superposats als extremits i, amb 4 pestanyes i `px`, es menjaven el text. El `Box` intermedi porta `flex: 1` + `minWidth: 0` (sense `minWidth: 0` un flex item no s'encolleix i els botons són expel·lits cap fora).
 
-Conclusió: per a un alumne, `/courses/` **ja és** la llista d'assignats, i el backend ja filtra. Per això "Assignats" no aplica cap filtre propi.
+- `scrollTabs(dir)` fa `scrollBy({ left: dir * max(160, clientWidth * 0.8), behavior: 'smooth' })` sobre l'element que fa scroll.
+- Les fletxes es **desactiven als extrems**: un `useEffect` escolta l'`scroll` i el `resize` del scroller i calcula `scrollLeft > 1` i `scrollLeft + clientWidth < scrollWidth - 1`. Sense això la fletxa esquerra no fa res quan ja s'és al principi, i la dreta no fa res al final. Es reexecuta en canviar de `mainTab` perquè el `<Tabs>` es remunta.
+- Activa: icona `#8400ff` sòlida sobre fons transparent, 40px de cercle i icona de 26px. Desactivada: mateix morat atrofellat, perquè es vegi que és un botó però que no hi ha res més a desplaçar. Un `opacity` global a tot el botó feia que l'estat actiu i el desactivat es veiexsen iguals.
+- `aria-label` amb les claus `lesson.tab_prev` / `lesson.tab_next`, afegides a `ca`, `es` i `en`.
 
-### Semàntica del solapament
-Un curs públic **també pot estar assignat**, i això és intencionat: els tres àmbits responen a preguntes diferents.
-- "Públics" = què hi ha disponible al catàleg.
-- "Assignats" = què té matriculat l'usuari (barreja de públics i privats).
-- "Privats" = el subconjut privat dels seus assignats, no els privats que existeixin al servidor sense tenir assignats.
+### El bug de classe que ho trencava tot
+Al principle les fletxes es veien sempre esblanides i **no desplaçaven res**. Era un sol problema, no dos. En `@mui/material` **9.4.0** (el del projecte) la classe de la fila de pestanyes ja **no** es diu `.MuiTabs-flexContainer` sinó `.MuiTabs-list`, i l'element amb `overflow-x: auto` és un altre:
 
-## Detalls tècnics i pendents del dashboard
+```
+.MuiTabs-root        ← on apunta el ref de <Tabs>
+  └ .MuiTabs-scroller  ← overflow-x: auto  (AQUEST fa scroll)
+      └ .MuiTabs-list  ← display: flex    (les pestanyes)
+```
 
-- `getAllCourses` el comparteixen 8 fitxers més (`Home.tsx`, `Hero.tsx`, `MainLayout.tsx`, `TeacherLeaderboard.tsx`, `pages/teacher/Dashboard.tsx`, `Courses.tsx`, `Exercises.tsx`, `ExerciseList.tsx`, `Test.tsx`). Tots ara rebran `/courses/` en lloc de `/public/courses/`, així que els **recomptes de cursos** d'Home i Hero passaran a ser "cursos matriculats" i no "cursos públics". Si cal conservar el recompte antic, fa falta un mètode separat.
-- Les dues caches són a nivell de mòdul (`allCoursesCache`, `publicCoursesCache`), així que el canvi d'endpoint no es veu fins que es rebuida la memòria. En desenvolupament n'hi ha prou amb recarregar.
-- `rankedStudentsByCourse` continua retornant `[]` buit, de manera que la targeta del leaderboard mostra sempre "Sense dades".
-- `getCourseProgress` i `getCoursePoints` llegeixen el progrés de `localStorage` directament en lloc d'utilitzar `dbProgress`, que és l'estat que es refresca amb l'API. Es queda desincronitzat després d'un canvi de curs.
-- La clau `dashboard.my_courses` a `ca.ts` / `es.ts` / `en.ts` **no s'utilitza enlloc**: és text mort.
-- Colors encara hardcodejades al fitxer: `#00685d` als borders de les 5 targetes, dels tabs i de "Continua studying"; `#00A896` al text dels tabs; `mode === 'dark' ? '#111827'` al fons de l'arrel. A `ProfilePage` el color corporatiu és el lila `#8400ff`.
-- Verificació: `npx tsc --noEmit` net i `npx vite build` correcte.
+El `querySelector('.MuiTabs-flexContainer')` tornava `null`, i això encadenava els dos simptomes: l'efecte feia `return` sense registrar res, `canScrollLeft`/`canScrollRight` es quedaven en `false`, les **dues fletxes quedaven sempre `disabled`** (d'aquí l'opacitat) i `scrollBy` rebia `null` (d'aquí que no mogués res). Els selectors CSS de `justifyContent` i d'ocultar la barra de scroll anaven sobre la mateixa classe morta. Confirmat llegint `node_modules/@mui/material/Tabs/Tabs.js`, no suposant-ho. Ara hi ha un `getTabsScroller()` com a únic punt on buscar l'element.
+
+De la regla que amaga la barra de scroll se n'ha retirat el codi propi: MUI ja la oculta sol amb `hideScrollbar` quan `scrollButtons` és `false`, així que era redundants.
+
+### Mida del menú i sense marges laterals
+- **Menú més gran a `xs`**: `fontSize: { xs: '1.2rem', md: '0.95rem' }`, `py: { xs: 2, md: 1.5 }`, `px: { xs: 1.75, md: 5 }`, `minHeight: { xs: 60, md: 0 }`, `minWidth: { xs: 50, md: 90 }` i `MuiTabs-indicator` `height: { xs: 4, md: 3 }`. S'ha reduït el `px` de 3 a 1.75 i el `minWidth` de 90 a 50 perquè amb el text a 1.2rem les pestanyes desborden molt més i es veuen massa separades; el `minWidth: 90` que posa MUI per defecte era el que consumia espai.
+- **Sense marges laterals**: el marge no venia de la barra sinó del contenidor de scroll, `pl: { xs: 3, md: 8 }` i `pr: { xs: 7.5, md: 10 }` (aquest darrer reserva l'espai del rail). Es compensen amb `ml: { xs: -3, md: 0 }` i `mr` negatiu a `xs`. Cal **treure el `width: '100%'`** de la barra: amb un ample fixa el marge negatiu només desplaça l'element i no l'eixampleix, i la barra començaria a x=0 però acabaria 84px abans de la vora dreta. Sense `width`, i sent un contenidor flex de nivell de bloc, el marge negatiu l'estira fins a les dues vores.
+- El rail **no es xoca** amb res: apareix quan la barra ja ha sortit de pantalla (`showRail` ve de `!isIntersecting && top < rootTop`), de manera que quan el rail és visible la barra no ho és. La reserva de `pr: 7.5` continua sent necessària per al contingut de les llistes, que sí que passa per sota el rail; només la barra queda a vora a vora.
+
+## Detalls tècnics i pendents (tancament del dia)
+
+- Els punts del header són **globals**, no per curs (vegeu la secció de punts). És una decisió presa perquè el header no coneix el curs actiu; si es vol el total per curs, cal passar-li el `courseId` de la ruta.
+- `getTopicSummaries` fa `getText(topic.title) || getText(course.title)`, un aplec per als cursos amb estructura plana on `getCourseTopics` sintetitza un tema sense títol.
+- `openTopic` escriu a `localStorage` i en captur errors amb `try/catch` per no trencar la navegació en mode privat.
+- L'organització de `ProfilePage` **no s'envia a cap endpoint**: el `PATCH /users/me/settings/` no accepta organització, continua sent només visual.
+- `App.tsx:6` importa `LessonTopic` des d'un directori anomenat literal `${courseId}/${lesson.id}`, fruit d'una interpolació de path accidental. Funciona perquè el nom del fitxer hi coincideix, però és un path esborrany; es va proposar moure'l a `pages/courses/LessonTopic.tsx` i es va deixar com estava.
+- La barra de pestanyes de `CourseLessons` queda **a vora a vora a `xs` per l'esquerra però no del tot per la dreta**: el pare té `pr: { xs: 7.5 }` (60px) i la barra compensa amb `mr: { xs: -6 }` (48px), així que queden **12px de marge residual a la dreta**. Amb `-7.5` seria del tot a vora a vora. S'ha deixat en 12px perquè deixa aire entre la fletxa dreta i la vora de la pantalla.
+- `fontWeight: 900` a `.MuiTab-root` de `CourseLessons` **s'aplica també a `md`**. És un canvi que aplica a tots els rangs i pot alterar el desktop; si l'objectiu era només móbil, hauria de ser `fontWeight: { xs: 900, md: 700 }`.
+- La mida del menú a `xs` (`1.2rem`, `px: 1.75`, `minWidth: 50`) s'ha ajustat a cegues, sense poder obrir el navegador per veure'l. Amb 4 pestanyes que desborden hi ha més scroll del que hi havia i les fletxes tenen més feina; el primer lloc on tocar si sembla excessiu és el `fontSize`, no el `px`.
+- La cerca de l'element amb scroll depèn de la classe interna `.MuiTabs-scroller` de MUI. Si algun dia s'actualitza la versió de `@mui/material` cal reverificar els noms (`Tabs.js`, slots `root` / `scroller` / `list`); el `getTabsScroller()` és l'únic punt a revisar.
+- Verificació final del dia: `npx tsc --noEmit` net i `npx vite build` correcte (només l'avís de chunks >500 kB de Monaco).

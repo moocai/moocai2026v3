@@ -2,14 +2,71 @@ import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider} from '@mui/material';
+import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha} from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
+import { Trophy } from 'lucide-react';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
 const logo = '/img/logo.webp';
+
+/** Cada activitat superada val 10 punts. */
+const POINTS_PER_LESSON = 10;
+
+/**
+ * Punts globals de l'alumne, llegits de `mooc_global_progress_<id>` i
+ * `mooc_shared_all_progress` (mateixa fusió que fa el dashboard). S'escolta
+ * `lessonProgressUpdated` perquè els punts s'actualitzin en superar una
+ * activitat, sense haver de recarregar la pàgina.
+ */
+function usePoints() {
+  const [points, setPoints] = useState(0);
+
+  useEffect(() => {
+    const read = () => {
+      const saved = localStorage.getItem('currentStudent');
+      if (!saved) { setPoints(0); return; }
+      let id: string;
+      try { id = String(JSON.parse(saved).id ?? ''); } catch { setPoints(0); return; }
+      if (!id) { setPoints(0); return; }
+      const perStudent = JSON.parse(localStorage.getItem(`mooc_global_progress_${id}`) || '{}');
+      const shared = JSON.parse(localStorage.getItem('mooc_shared_all_progress') || '{}');
+      const merged = { ...(shared[id] || {}), ...perStudent };
+      setPoints(Object.values(merged).filter((v) => v === true).length * POINTS_PER_LESSON);
+    };
+    read();
+    window.addEventListener('lessonProgressUpdated', read);
+    window.addEventListener('auth-state-change', read);
+    return () => {
+      window.removeEventListener('lessonProgressUpdated', read);
+      window.removeEventListener('auth-state-change', read);
+    };
+  }, []);
+
+  return points;
+}
+
+/** Pastilla de punts, pensada per anar al costat de l'àvia. */
+function PointsBadge({ points }: { points: number }) {
+  const { t } = useTranslation();
+  return (
+    <Box
+      title={`${t('lesson.points_label')}: ${points}`}
+      sx={{
+        display: 'flex', alignItems: 'center', gap: 0.5,
+        px: 1, height: 32, borderRadius: 999, flexShrink: 0,
+        bgcolor: alpha('#8400ff', 0.15), border: '1px solid', borderColor: alpha('#8400ff', 0.4),
+      }}
+    >
+      <Trophy size={16} color="#8400ff" />
+      <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }}>
+        {points}
+      </Typography>
+    </Box>
+  );
+}
 
 export function Header() {
   const { t } = useTranslation();
@@ -18,6 +75,7 @@ export function Header() {
   const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
   const [studentName, setStudentName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const points = usePoints();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -137,6 +195,7 @@ export function Header() {
 
             <ThemeToggleButton />
             {!studentName && <LanguageSwitcher />}
+            {studentName && <PointsBadge points={points} />}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
             {isLoggedIn && (
@@ -177,9 +236,12 @@ export function Header() {
                   </Button>
                 )}
                 {isLoggedIn && (
-                  <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'text.secondary' }}>
-                    {studentName}
-                  </Typography>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                    <PointsBadge points={points} />
+                    <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: 'text.secondary' }}>
+                      {studentName}
+                    </Typography>
+                  </Stack>
                 )}
               </Box>
 

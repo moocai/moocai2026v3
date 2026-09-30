@@ -45,6 +45,7 @@ export default {
     coming_soon: "Coming Soon",
     continue_studying: "Continue Studying",
     no_lessons: "This course has no lessons yet.",
+    and_more: "+{{count}} more",
     no_attempted_lessons: "You haven't attempted any exercises yet.",
     view_full_course: "View Full Course",
     no_courses: "No courses available.",
@@ -260,7 +261,8 @@ export default {
     your_challenge: "Your challenge",
     previous: "Previous",
     next: "Next",
-    go_to_activity: "Go to activity",
+    go_to_activity: "Next activity",
+    back_to_course: "Back activity",
     back: "Back",
     lessons: "Lessons",
     objective: "Announced",
@@ -290,6 +292,8 @@ export default {
     tab_tests: "Tests",
     tab_exams: "Exams",
     tab_files: "Files",
+    tab_prev: "Previous tab",
+    tab_next: "Next tab",
     expand_all: "Expand all",
     collapse_all: "Collapse all"
   }

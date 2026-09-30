@@ -23,16 +23,32 @@ export interface ProfilePayload {
   new_password2?: string | null;
 }
 
+/** Resposta de `GET /users/me/settings/` i del `PATCH` corresponent. */
 export interface ProfileUser {
+  username?: string;
   first_name?: string;
   last_name?: string;
-  name?: string;
   email?: string;
+  /** L'URL de l'avatar ve al GET; el PATCH no el documenta. */
+  avatar_url?: string;
+  /** El PATCH el pot retornar tot i que el GET no el documenta. */
+  name?: string;
 }
 
 function authHeaders() {
   const token = localStorage.getItem('token');
-  return token ? { Authorization: `Bearer ${token}` } : undefined;
+  // El backend és DRF amb TokenAuthentication (`www-authenticate: Token`).
+  return token ? { Authorization: `Token ${token}` } : undefined;
+}
+
+/**
+ * Llegeix el perfil autenticat. Es_prefereix a `localStorage`, que només
+ * desa el que va arriving del login i deixa camps com `username` o
+ * `first_name` buits.
+ */
+export async function fetchProfile(): Promise<ProfileUser> {
+  const { data } = await axios.get<ProfileUser>(PROFILE_URL, { headers: authHeaders() });
+  return data;
 }
 
 export async function updateProfile(payload: ProfilePayload): Promise<ProfileUser> {

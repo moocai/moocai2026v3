@@ -11,8 +11,8 @@ import { useThemeMode } from '../hooks/useTheme';
 import { useNotifications } from '../contexts/NotificationContext';
 import ParticlesBackground from '../components/ParticlesBackground';
 import {
-  updateProfile, extractProfileErrors, fetchOrganizations, fetchMyAvatar, updateMyAvatar,
-  type Organization,
+  updateProfile, extractProfileErrors, fetchOrganizations, fetchMyAvatar, updateMyAvatar, fetchProfile,
+  type Organization, type ProfileUser,
 } from '../services/profileService';
 
 const languages = [
@@ -106,6 +106,29 @@ function readStoredProfile() {
   }
 }
 
+/**
+ * Copia els camps que retorna `GET /users/me/settings/` dins de
+ * `currentStudent` perquè el Header i el dashboard no es quedin amb la
+ * informació parcial del login.
+ */
+function mirrorProfileToStorage(data: ProfileUser) {
+  try {
+    const raw = localStorage.getItem('currentStudent');
+    if (!raw) return;
+    const student = JSON.parse(raw);
+    const name = [data.first_name, data.last_name].filter(Boolean).join(' ');
+    localStorage.setItem('currentStudent', JSON.stringify({
+      ...student,
+      first_name: data.first_name ?? student.first_name,
+      last_name: data.last_name ?? student.last_name,
+      username: data.username ?? student.username,
+      email: data.email ?? student.email,
+      name: student.name || name,
+    }));
+    window.dispatchEvent(new Event('auth-state-change'));
+  } catch { /* mode privat */ }
+}
+
 export default function ProfilePage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -170,6 +193,8 @@ export default function ProfilePage() {
   const [firstName, setFirstName] = useState(stored.firstName);
   const [lastName, setLastName] = useState(stored.lastName);
   const [email, setEmail] = useState(stored.email);
+  /** Només de lectura: el backend el torna al GET, no s'accepta al PATCH. */
+  const [username, setUsername] = useState(stored.username);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword1, setNewPassword1] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
@@ -195,9 +220,30 @@ export default function ProfilePage() {
         }
       })
       .catch(() => { /* el backend pot no exposar orgs, es manté la demo */ });
-    fetchMyAvatar()
-      .then((url) => { if (active && url) setAvatarUrl(url); })
-      .catch(() => { /* sense avatar, es mostra la inicial */ });
+
+    // `avatar_url` ve al GET del perfil; si no hi és, cau al endpoint dedicat.
+    const loadAvatarIfMissing = async (fromProfile: string | undefined) => {
+      if (fromProfile) { if (active) setAvatarUrl(fromProfile); return; }
+      try {
+        const url = await fetchMyAvatar();
+        if (active && url) setAvatarUrl(url);
+      } catch { /* sense avatar, es mostra la inicial */ }
+    };
+
+    // El backend és la font de veritat dels camps; `localStorage` queda de
+    // fallback perquè el formuli no quedi bui si el GET falla.
+    fetchProfile()
+      .then((data) => {
+        if (!active) return;
+        if (data.first_name) setFirstName(data.first_name);
+        if (data.last_name) setLastName(data.last_name);
+        if (data.email) setEmail(data.email);
+        if (data.username) setUsername(data.username);
+        mirrorProfileToStorage(data);
+        return loadAvatarIfMissing(data.avatar_url);
+      })
+      .catch(() => { if (active) return loadAvatarIfMissing(undefined); });
+
     return () => { active = false; };
   }, []);
 
@@ -388,7 +434,7 @@ export default function ProfilePage() {
                 size="small"
                 label={t('profile.username', "Nom d'usuari")}
                 variant="filled"
-                value={stored.username}
+                value={username}
                 disabled
                 slotProps={{
                   input: {

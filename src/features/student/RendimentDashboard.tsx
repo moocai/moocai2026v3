@@ -269,6 +269,17 @@ export default function RendimentDashboard() {
       color: 'text.primary', py: { xs: 2, md: 4 },
     }}>
       <Container maxWidth={false} disableGutters sx={{ px: { xs: 2, md: 8 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-start' }}>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(-1)}
+            sx={{ textTransform: 'none', color: 'white' }}
+          >
+            Tornar al dashboard
+          </Button>
+        </Box>
+
           <Box sx={{
           display: 'grid', gap: 5,
           gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
@@ -288,17 +299,6 @@ export default function RendimentDashboard() {
             accent="#34d399"
             delayStart={150}
           />
-        </Box>
-
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Button
-            variant="outlined"
-            startIcon={<ArrowBackIcon />}
-            onClick={() => navigate(-1)}
-            sx={{ textTransform: 'none', color: 'white' }}
-          >
-            Tornar al dashboard
-          </Button>
         </Box>
       </Container>
     </Box>

@@ -262,6 +262,36 @@ export default function StudentDashboard() {
     return topics.flatMap(topic => (topic.lessons || []).map(lesson => ({ ...lesson, topicTitle: topic.title })));
   };
 
+  /**
+   * Llista els TEMES d'un curs que tenen almenys una activitat del tipus demanat
+   * (codi o test), amb el recompte fet/total per poder pintar la barra de progrés.
+   * No es mostren les activitats (subtemes), només el tema.
+   * `budget` limita quants temes es mostren perquè la card (molt estreta) no creixi
+   * sense límit, i `hidden` és el nombre de temes que no hi caben.
+   */
+  const getTopicSummaries = (
+    course: Course,
+    matches: (l: any) => boolean,
+    budget: number,
+    progress: Record<string, boolean>,
+  ) => {
+    const all: TopicSummary[] = getCourseTopics(course)
+      .map((topic, i) => {
+        const lessons = (topic.lessons || []).filter(matches);
+        const done = lessons.filter((l: any) => progress[`${course.id}_${l.id}`] === true).length;
+        return {
+          key: String(topic.id ?? `topic-${i}`),
+          id: topic.id != null ? String(topic.id) : '',
+          // Si el curs no té temes (estructura plana), fem servir el títol del curs.
+          title: getText(topic.title) || getText(course.title),
+          total: lessons.length,
+          done,
+        };
+      })
+      .filter((topic) => topic.total > 0);
+    return { topics: all.slice(0, budget), hidden: Math.max(0, all.length - budget) };
+  };
+
   const rankedStudentsByCourse = useMemo(() => {
     return [] as Student[];
   }, []);
@@ -332,10 +362,33 @@ export default function StudentDashboard() {
   const currentProgress = currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
   const progressData = selectedStudent ? getProgress(selectedStudent.id) : {};
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
+  /** Els dos boxes del resum: només temes, amb el progrés de les seves activitats. */
+  const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData) : null;
+  const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData) : null;
   const top3Ranking = rankedStudentsByCourse.slice(0, 3);
 
   const handleStatsClick = () => {
     navigate(`/courses/${currentCourse?.slug}/stats`);
+  };
+
+  /**
+   * Obre la pàgina del curs a la pestanya que toca (1 = Programació, 2 = Tests)
+   * amb el tema clicat ja desplegat. Fa servir les mateixes claus de localStorage
+   * que llegeix CourseLessons.
+   */
+  const openTopic = (tab: number, topicId: string) => {
+    if (!currentCourse?.slug) return;
+    try {
+      localStorage.setItem(`mooc_tab_${currentCourse.slug}`, JSON.stringify(tab));
+      if (topicId) {
+        const key = `mooc_expanded_${currentCourse.slug}`;
+        const expanded: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+        if (!expanded.includes(topicId)) {
+          localStorage.setItem(key, JSON.stringify([...expanded, topicId]));
+        }
+      }
+    } catch { /* mode privat */ }
+    navigate(`/courses/${currentCourse.slug}`);
   };
 
   return (
@@ -457,29 +510,20 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Topics del curs */}
+                      {/* Problemes de codi: només temes */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.code_problems')} compact={!isMdUp}>
-                          <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
-                            {flatLessons.filter(isCodeLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
-                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`] === true);
-                              return (
-                                <Stack
-                                  key={lesson.id || i}
-                                  direction="row" spacing={1}
-                                  sx={{ alignItems: 'center', width: '100%', cursor: 'pointer', transition: 'color 0.15s', '&:hover': { '& .MuiTypography-root': { color: '#8400ff' } } }}
-                                  onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}`)}
-                                >
-                                  <LaptopMacIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
-                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
-                                  <LinearProgress variant="determinate" value={done ? 100 : 0} sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }} />
-                                </Stack>
-                              );
-                            })}
-                            {flatLessons.filter(isCodeLesson).length === 0 && (
-                              <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
-                            )}
-                          </Stack>
+                          {codeTopics && codeTopics.topics.length > 0 ? (
+                            <TopicList
+                              topics={codeTopics.topics}
+                              hidden={codeTopics.hidden}
+                              icon={LaptopMacIcon}
+                              onOpen={(topicId) => openTopic(1, topicId)}
+                              moreLabel={t('dashboard.and_more', { count: codeTopics.hidden })}
+                            />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
+                          )}
                           <Typography
                             variant="caption"
                             onClick={handleStatsClick}
@@ -490,29 +534,20 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Subtopics del temari */}
+                      {/* Exercicis de test: només temes */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.test_exercises')} compact={!isMdUp}>
-                          <Stack spacing={{ xs: 1.5, xl: 2.5 }} sx={{ width: '100%', mt: 1 }}>
-                            {flatLessons.filter(isTestLesson).slice(0, lessonsSliceLimit).map((lesson: any, i: number) => {
-                              const done = !!(selectedStudent && progressData[`${currentCourse.id}_${lesson.id}`] === true);
-                              return (
-                                <Stack
-                                  key={lesson.id || i}
-                                  direction="row" spacing={1}
-                                  sx={{ alignItems: 'center', width: '100%', cursor: 'pointer', transition: 'color 0.15s', '&:hover': { '& .MuiTypography-root': { color: '#8400ff' } } }}
-                                  onClick={() => navigate(`/courses/${currentCourse.slug}/exam/${lesson.id}`)}
-                                >
-                                  <MenuBookIcon sx={{ color: 'text.secondary', fontSize: 16 }} />
-                                  <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{getText(lesson.title)}</Typography>
-                                  <LinearProgress variant="determinate" value={done ? 100 : 0} sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }} />
-                                </Stack>
-                              );
-                            })}
-                            {flatLessons.filter(isTestLesson).length === 0 && (
-                              <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
-                            )}
-                          </Stack>
+                          {testTopics && testTopics.topics.length > 0 ? (
+                            <TopicList
+                              topics={testTopics.topics}
+                              hidden={testTopics.hidden}
+                              icon={MenuBookIcon}
+                              onOpen={(topicId) => openTopic(2, topicId)}
+                              moreLabel={t('dashboard.and_more', { count: testTopics.hidden })}
+                            />
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
+                          )}
                           <Typography
                             variant="caption"
                             onClick={handleStatsClick}
@@ -629,6 +664,51 @@ export default function StudentDashboard() {
         </Box>
       </Container>
     </Box>
+  );
+}
+
+/** Un tema amb el recompte d'activitats fetes/totals, tal com el retorna `getTopicSummaries`. */
+type TopicSummary = { key: string; id: string; title: string; total: number; done: number };
+
+/**
+ * Llista només de temes (sense les activitats de dins) amb una barra de progrés
+ * per tema. Serveix per als dos boxes del resum (problemes de codi i exercicis
+ * de test): només canvien la icona i l'acció en fer clic, que arriben per props.
+ */
+function TopicList({ topics, hidden, icon: Icon, onOpen, moreLabel }: {
+  topics: TopicSummary[];
+  hidden: number;
+  icon: typeof LaptopMacIcon;
+  onOpen: (topicId: string) => void;
+  moreLabel: string;
+}) {
+  return (
+    <Stack spacing={{ xs: 1, xl: 1.5 }} sx={{ width: '100%', mt: 1 }}>
+      {topics.map((topic) => (
+        <Stack
+          key={topic.key}
+          direction="row" spacing={1}
+          sx={{ alignItems: 'center', width: '100%', cursor: 'pointer', transition: 'color 0.15s', '&:hover': { '& .MuiTypography-root': { color: '#8400ff' } } }}
+          onClick={() => onOpen(topic.id)}
+        >
+          <Icon sx={{ color: 'text.secondary', fontSize: 16 }} />
+          <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{topic.title}</Typography>
+          <LinearProgress
+            variant="determinate"
+            value={topic.total > 0 ? Math.round((topic.done / topic.total) * 100) : 0}
+            sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }}
+          />
+        </Stack>
+      ))}
+      {hidden > 0 && (
+        <Typography
+          variant="caption"
+          sx={{ display: 'block', width: '100%', textAlign: 'left', color: 'text.secondary', fontSize: { xs: '0.7rem', xl: '0.75rem' } }}
+        >
+          {moreLabel}
+        </Typography>
+      )}
+    </Stack>
   );
 }
 
