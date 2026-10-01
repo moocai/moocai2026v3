@@ -45,13 +45,57 @@ Riesgo de no hacerlo ahora: cuando llegue la API tendremos que reescribir igual,
 
 Estat actual: **React Query ja está implementat al projecte.**
 
-Fitxers on s'utilitza:
+**Última revisió: 1 d'octubre de 2026.**
+
+### Configuració global — `src/main.tsx`
+
+```ts
+new QueryClient({
+  staleTime: 5 * 60 * 1000,      // 5 min
+  gcTime: 30 * 60 * 1000,       // 30 min
+  retry: 1,
+  refetchOnWindowFocus: false,
+})
+```
+
+`QueryClientProvider` és el wrapper **superior** de tota l'app (per damunt de `BrowserRouter`).
+
+### Ús real al codi
 
 | Fitxer | Ús |
 |---|---|
-| `src/main.tsx` | Creació del `QueryClient` amb configuració global (`staleTime: 5min`, `gcTime: 30min`, `retry: 1`) i `QueryClientProvider` wrapper |
-| `src/hooks/useCourse.ts` | `useQuery` per obtenir detall complet d'un curs (`queryKey: ['course', courseId]`), funció `prefetchCourse` amb `prefetchQuery` |
-| `src/components/CourseCard.tsx` | `useQueryClient` per fer prefetch dels cursos al fer `mouseenter` a la Card |
+| `src/main.tsx` | `QueryClient` + `QueryClientProvider` (defaults globals) |
+| `src/hooks/useCourse.ts` | `useCourse(courseId)` → `useQuery` amb `queryKey: ['course', courseId]`; `prefetchCourse()` → `prefetchQuery`. Amb `staleTime: 30min`, `gcTime: 60min`, `retry: 1`, `enabled: !!courseId && courseId !== 'undefined'` |
+| `src/components/CourseCard.tsx` | `useQueryClient()` + `prefetchCourse()` a l'`onMouseEnter` de la Card |
+| `src/pages/courses/CourseLessons.tsx` | `useCourse(courseId)` — substitueix el `useState`+`useEffect` original |
+| `src/pages/courses/LessonPage.tsx` | `useCourse(courseId)` — idem |
+| `src/pages/courses/ExamPage.tsx` | `useCourse(courseId)` — idem |
 
-No s'utilitzen `useMutation`, `invalidateQueries` ni `setQueryData` en cap altre lloc del projecte.
+`useCourse` resol els ids de curs clonat (`clone-<timestamp>`) a l'slug original via `localCourseService.getById().originalSlug` abans de cridar el servei.
+
+### No s'utilitza
+- `useMutation`, `invalidateQueries` i `setQueryData` **no apareixen enlloc** del projecte.
+- `useSuspenseQuery`, `useInfiniteQuery` i els *devtools* tampoc.
+
+### Bypass de React Query — `src/layouts/MainLayout.tsx`
+
+El layout fa prefetch **fora de React Query**:
+
+```ts
+useEffect(() => {
+  getAllCourses().then(courses => {
+    courses.forEach(course => courseService.getFullCourseDetail(course.slug!));
+  });
+}, []);
+```
+
+Això omple la **cache en memòria de `courseService`** (`fullCourseCache`), no la de React Query. Conseqüència: la primera visita a un curs encara retorna `isLoading` de React Query malgrat que el servei ja té la dada; l'avantatge real és que `getFullCourseDetail` no torna a petar la API. Per tenir una cache única caldria `queryClient.prefetchQuery` en lloc de la crida directa al servei.
+
+### Cache duplicada
+Hi ha **dues caches** de curs que no es sincronitzen:
+
+1. Cache de React Query (`queryKey: ['course', id]`), amb `staleTime` de 30 min.
+2. Cache manual de `courseService`: `fullCourseCache` (Map per slug), `allCoursesCache` i `publicCoursesCache`.
+
+Per això `courseService.clearCache(slug?)` **no invalida** res a React Query, i `clearCache()` sense slug tampoc neteja `publicCoursesCache`.
 

@@ -1,96 +1,147 @@
 # API Reference — MOOC React 2026
+**Última actualització: 1 d'octubre de 2026**
 
 Aquest document recull **totes les APIs REST** que consumeix l'aplicació frontend. El projecte **no té backend propi**; es connecta a una API externa allotjada a `https://algorien.com`.
+
 ---
 
-## 1. Autenticació
+## 0. Convencions generals
 
-Base URL: `https://algorien.com/api` (proxy Vite: `/api`)
+- **Base URL:** `https://algorien.com/api/v1` (tots els serveis hi apunten).
+- **Variable d'entorn:** `import.meta.env.VITE_API_URL || ''`. ⚠️ No hi ha cap fitxer `.env`, així que el valor és sempre `''` i totes les URLs surten **relatives** (`/api/v1/...`).
+- **Proxy dev:** `/api` → `https://algorien.com` (`vite.config.ts`, `changeOrigin: true`).
+- **Redirect prod:** `/api/*` → `https://algorien.com/api/:splat` (`netlify.toml`, 200).
+- **Autenticació:** DRF **TokenAuthentication**. Header `Authorization: Token {token}`. El token es desa a `localStorage.token`.
+  - ⚠️ **No totes les crides l'envien.** Cada servei el construeix pel seu compte:
+    - `courseService`, `api.ts`, `profileService` → **sí** (`Token`).
+    - `authService` (login/logout) i `register` → **no** (axios pla sense interceptor).
+- **Timeouts** (valors reals al codi):
 
-Headers: `Content-Type: application/json`
+  | Servei | Timeout |
+  |--------|---------|
+  | `api.ts` (`inviteUser`) | **3000 ms** |
+  | `courseService.ts` | **10000 ms** |
+  | `authService`, `register`, `profileService` | sense timeout (axios per defecte) |
 
-| Mètode | Endpoint | Descripció | Autenticació |
-|--------|----------|------------|-------------|
-| POST | `/api/users/auth/login/` | Inici de sessió (email + codi). Retorna token i dades d'usuari. | No |
-| POST | `/api/users/auth/logout/` | Tancament de sessió al backend. | Token |
-| GET | `/api/users/me/settings/` | Obté dades de l'usuari actual. Fallback a localStorage si API no disponible. | Token |
+---
 
+## 1. Autenticació i usuaris
+
+| Mètode | Endpoint | Descripció | Auth | Servei |
+|--------|----------|------------|------|--------|
+| POST | `/users/auth/login/` | Login. Body JSON `{ username, password }`. Desa `token`. | No | `authService.login` |
+| POST | `/users/auth/logout/` | Tanca sessió al servidor. Sense body. | **No** ⚠️ (no envia token) | `authService.logout` |
+| GET | `/users/register/` | Dades prèvies al registre (organitzacions, avatar per defecte). | No | `register.loadRegistrationData` |
+| POST | `/users/register/` | Crea compte. Body **FormData**: `first_name`, `last_name`, `email`, `username`, `password1`, `password2`, `organization?`, `default_avatar?`, `avatar?`. Desa `token` si el retorn en porta. | No | `register.registerUser` |
+| GET | `/users/me/settings/` | Perfil de l'usuari autenticat. | Token | `profileService.fetchProfile` |
+| PATCH | `/users/me/settings/` | Actualitza perfil. Body JSON `{ first_name, last_name, email, current_password?, new_password1?, new_password2? }`. `username` no és editable. | Token | `profileService.updateProfile` |
+| GET | `/orgs/` | Llista d'organitzacions. Accepta array o `{ results }`. | Token | `profileService.fetchOrganizations` |
+| GET | `/users/me/avatar/` | Avatar de l'usuari (string o `{ avatar }`). | Token | `profileService.fetchMyAvatar` |
+| PATCH | `/users/me/avatar/` | Puja avatar. Body **FormData** `avatar`. | Token | `profileService.updateMyAvatar` |
+| POST | `/users/invite/` | Convida un usuari per correu. Body JSON `{ email }`. | Token | `api.inviteUser` |
+
+---
 
 ## 2. Cursos
 
-Base URL: `https://algorien.com/api/v1`
-
-Headers: `Authorization: Token {token}` (afegit automàticament per un interceptor d'axios)
-
-Timeout: 10s
+Tots amb `Authorization: Token {token}` i `Content-Type: application/json` (excepte on s'indiqui).
 
 | Mètode | Endpoint | Descripció |
 |--------|----------|------------|
-| GET | `/api/v1/public/courses/` | Llistat públic de tots els cursos disponibles |
-| GET | `/api/v1/courses/{slug}/` | Obté detalls d'un curs per slug |
-| GET | `/api/v1/courses/{slug}/topics/` | Obté els temes/lliçons d'un curs |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | Obté els problemes d'un tema concret |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | Obté detalls d'un problema concret |
-| POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia una resposta (coding: `{"code":"..."}`, test: `{"answers":["id",...]}`) |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Obté submissions d'un problema |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | Obté notes d'un problema |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | Obté submissions d'altres alumnes |
+| GET | `/courses/` | Cursos visibles segons el rol (professor → seus; alumne → matriculats; staff → tots). |
+| GET | `/public/courses/` | Tots els cursos públics (no requereix autenticació al backend). |
+| GET | `/courses/{slug}/` | Detall d'un curs per slug. |
+| GET | `/courses/{slug}/topics/` | Temes d'un curs. |
+| GET | `/courses/{slug}/topics/{topic}/` | Detall d'un tema (teoria localitzada segons `i18n.language`). |
+| GET | `/courses/{slug}/topics/{topic}/problems/` | Problemes d'un tema. |
+| GET | `/courses/{slug}/topics/{topic}/problems/{problem}/` | Detall d'un problema. |
+| POST | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia resposta. Body JSON: coding `{ code, language? }`, test `{ answers: [id, …] }`. |
+| GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Submissions pròpies del problema. |
+| GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | Notes del problema. |
+| GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | Submissions d'altres alumnes. Retorna `[]` si falla. |
+| GET | `/courses/{slug}/students/overview/` | Resum d'alumnes del curs (punts per al rànquing). |
+
+### Composicions (no són endpoints)
+- `getFullCourseDetail(slug)`: fa `GET /courses/{slug}/` + `GET /courses/{slug}/topics/` i, per cada tema, `GET .../problems/` (2 + T peticions). Cacheja el resultat en memòria.
+- Camps normalitzats a `toCourses()`: `id/slug ← slug`, `title ← name`, `isPublic ← is_public !== false`, `active ← active !== false`.
+- Camps del detall extrets a `getFullCourseDetail`: `system_solution.code`, `statement_ca || statementHtml`, `precode`, `choices`, `score`, `difficulty`.
 
 ---
 
-## 3. Serveis Mock (localStorage)
+## 3. `api.ts` — híbrid (localStorage + 1 crida HTTP)
 
-Definits a `src/services/api.ts`. No fan peticions HTTP; només llegeixen i escriuen a `localStorage`.
+Definit a `src/services/api.ts`. La majoria de mètodes **no fan HTTP**; només `inviteUser`.
 
-| "Mètode" | Descripció | Claus localStorage |
-|----------|------------|-------------------|
-| `getStudentProgress(studentId)` | Retorna el progrés global d'un estudiant | `mooc_global_progress` |
-| `postProgress({studentId, courseId, lessonId, status})` | Desa progrés d'una lliçó i dispara esdeveniment `lessonProgressUpdated` | `mooc_global_progress` |
-| `resetCourse(studentId, courseId)` | Reinicia progrés, codi, submissions i última sessió d'un curs | `mooc_global_progress`, `code_*`, `mooc_submissions_*`, `mooc_last_session` |
+| Mètode | Transport | Descripció | Claus localStorage |
+|--------|-----------|------------|-------------------|
+| `getStudentProgress(studentId)` | localStorage | Llegeix el progrés global. | `mooc_global_progress_{studentId}` |
+| `postProgress({studentId, courseId, lessonId, status})` | localStorage | Desa el progrés i dispara `lessonProgressUpdated` (a `window` i `document`). | `mooc_global_progress_{studentId}` |
+| `resetCourse(studentId, courseId)` | localStorage | Esborra progrés, codi (`code_*`) i submissions (`mooc_submissions_*`) del curs, i `mooc_last_session` si era d'aquell curs. | varies |
+| `inviteUser(email)` | **POST** `/users/invite/` | Única crida HTTP real del fitxer. | — |
 
 ---
 
-## 4. Altres APIs i Llibreries
+## 4. Cursos locals — `localCourseService.ts` (sense HTTP)
+
+Tot es guarda a la clau `mooc_local_courses`:
+`getAll()`, `getById(id)`, `save(course)`, `remove(id)`, `cloneFrom(sourceSlug)`.
+Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldre a l'slug original.
+
+---
+
+## 5. Altres APIs i llibreries
 
 | API / Llibreria | Ús |
-|----------------|-----|
-| **@tanstack/react-query** | Cache i prefetching de dades de curs |
-| **react-router-dom** | Routing SPA (navegació client-side) |
+|-----------------|-----|
+| **@tanstack/react-query** | Cache i prefetch del detall de curs |
+| **react-router-dom** | Routing SPA (v7) |
 | **i18next + react-i18next** | Internacionalització (CA, ES, EN) |
-| **axios** | Client HTTP per a les peticions REST |
-| **localStorage API** | Persistència offline: progrés, codi, punts, usuaris, tema, idioma, submissions, última sessió |
-| **Canvas API** | Fons interactiu de partícules (ParticlesBackground) |
-| **window.dispatchEvent** | Comunicació entre components (events custom) |
+| **axios** | Client HTTP |
+| **localStorage API** | Persistència de sessió, progrés, codi, submissions, tema, idioma, cursos locals |
+| **Canvas API** | Fons de partícules (`ParticlesBackground`) |
+| **window.dispatchEvent** | Bus d'esdeveniments (`lessonProgressUpdated`, `auth-state-change`, `studentsUpdated`, `teacher-course-changed`, …) |
 | **canvas-confetti** | Animació en completar lliçons |
+| **Monaco** | Editor i worker de TypeScript per al preview en viu |
+| **react-markdown + remark-gfm** | Render de la teoria |
 
 ---
 
-## 5. Resum d'Endpoints REST
+## 6. Resum d'endpoints REST
 
-| # | Mètode | Endpoint | Testejat? |
-|---|--------|----------|-----------|
-| 1 | POST | `/api/users/auth/login/` | ❌ No |
-| 2 | POST | `/api/users/auth/logout/` | ❌ No |
-| 3 | GET | `/api/users/me/settings/` | ❌ No |
-| 4 | GET | `/api/v1/public/courses/` | ✅ Sí |
-| 5 | GET | `/api/v1/courses/{slug}/` | ✅ Sí|
-| 6 | GET | `/api/v1/courses/{slug}/topics/` | ✅ Sí|
-| 7 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | ✅ Sí|
-| 8 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | ✅ Sí|
-| 9 | POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | ✅ Sí|
-| 10 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | ❌ No |
-| 11 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | ❌ No |
-| 12 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | ❌ No |
+| # | Mètode | Endpoint | Servei | Testejat? |
+|---|--------|----------|--------|-----------|
+| 1 | POST | `/api/v1/users/auth/login/` | authService | ✅ |
+| 2 | POST | `/api/v1/users/auth/logout/` | authService | ✅ |
+| 3 | GET | `/api/v1/users/register/` | register | ✅ |
+| 4 | POST | `/api/v1/users/register/` | register | ✅ |
+| 5 | GET | `/api/v1/users/me/settings/` | profileService | ❌ |
+| 6 | PATCH | `/api/v1/users/me/settings/` | profileService | ❌ |
+| 7 | GET | `/api/v1/orgs/` | profileService | ❌ |
+| 8 | GET | `/api/v1/users/me/avatar/` | profileService | ❌ |
+| 9 | PATCH | `/api/v1/users/me/avatar/` | profileService | ❌ |
+| 10 | POST | `/api/v1/users/invite/` | api | ✅ |
+| 11 | GET | `/api/v1/courses/` | courseService | ✅ |
+| 12 | GET | `/api/v1/public/courses/` | courseService | ✅ |
+| 13 | GET | `/api/v1/courses/{slug}/` | courseService | ✅ |
+| 14 | GET | `/api/v1/courses/{slug}/topics/` | courseService | ✅ |
+| 15 | GET | `/api/v1/courses/{slug}/topics/{topic}/` | courseService | ✅ |
+| 16 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | courseService | ✅ |
+| 17 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | courseService | ✅ |
+| 18 | POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | courseService | ✅ |
+| 19 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | courseService | ✅ |
+| 20 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | courseService | ✅ |
+| 21 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | courseService | ✅ |
+| 22 | GET | `/api/v1/courses/{slug}/students/overview/` | courseService | ✅ |
 
-**Estat dels tests:** El projecte no té cap infraestructura de testing ni cap fitxer de test. Tots els endpoints estan sense testejar.
+**Estat dels tests:** el projecte **no té cap infraestructura de test ni cap fitxer de test**. La columna «Testejat?» reflecteix l'ús observat en manual/dev, no tests automatitzats.
 
 ---
 
-## 6. Notes Tècniques
+## 7. Notes tècniques
 
-- **Proxy Vite:** La configuració de Vite proxyja `/api` → `https://algorien.com` amb `changeOrigin: true`. En producció, cal configurar el reverse proxy adequadament.
-- **Autenticació:** El token s'obté del login i es guarda a `localStorage` amb clau `token`. L'interceptor d'axios l'afegeix automàticament a totes les peticions.
-- **submitChallenge:** El body s'envia com a JSON (`Content-Type: application/json`). Per coding: `{"code":"..."}`, per test: `{"answers":["choice_id",...]}`. Anteriorment s'enviava com a CSV via FormData.
-- **Fallback local:** `getMe()` té fallback a `localStorage` (`currentStudent`). La resta d'endpoints **no tenen fallback** i fallen si l'API no està disponible.
-- **Funció deprecated:** `submitSubmission()` és un wrapper de `submitChallenge()` marcat com a `@deprecated`.
-- **Cursos públics:** Usuaris no autenticats poden enviar submissions. El codi s'executa i es retorna resultat, però no es persisteix (submission_count = 0).
+- **submitChallenge:** body **JSON** (`Content-Type: application/json`). Coding → `{ code, language? }`; test → `{ answers: [choice_id, …] }`. Anteriorment s'enviava com a CSV via FormData.
+- **`submitSubmission()`** és un wrapper `@deprecated` de `submitChallenge()`.
+- **Fallbacks:** `getPeerSubmissions` retorna `[]` en cas d'error. La resta d'endpoints **no tenen fallback** i llencen l'error (les peticions de perfil es capturen i mostren amb `extractProfileErrors`).
+- **Cursos públics:** usuaris no autenticats poden enviar submissions; el codi s'executa però no es persisteix (submission_count = 0).
+- **`clearCache(slug?)`** neteja `fullCourseCache` i `allCoursesCache` quan no rep slug, però **mai no neteja `publicCoursesCache`** ⚠️.
+- **Login de l'aplicació:** tot i que existeix `AuthContext`, el flux real és `StudentDashboard.handleLogin` → `authService.login()` directament.

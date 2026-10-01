@@ -2,7 +2,9 @@
 
 ## Resum
 
-Migració completa del projecte a patrons React 19. S'han eliminat anti-patrons heredats de React 17/18 i redundàncies, sense alterar l'estil visual ni la lògica de negoci. **Build: 0 errors. Última actualització: 16 de juny de 2026.**
+Migració completa del projecte a patrons React 19. S'han eliminat anti-patrons heredats de React 17/18 i redundàncies, sense alterar l'estil visual ni la lògica de negoci. **Build: 0 errors.**
+
+> ⚠️ **Revisió de l'1 d'octubre de 2026.** Aquest document és l'auditoria de juny; les seccions marcades amb «Correcció» i la darrera secció recullen l'estat real actual (alguns fets de juny han quedat invertits).
 
 ---
 
@@ -63,6 +65,7 @@ Migració completa del projecte a patrons React 19. S'han eliminat anti-patrons 
 
 ### 12. `src/i18n.ts` (arrel) — eliminat
 - Duplicat de `src/i18n/index.ts` eliminat. `main.tsx` ara importa `./i18n` que resol a `src/i18n/index.ts`.
+- ⚠️ **Correcció (1/10/2026):** aquest canvi es va revertir. Avui **existeixen tots dos**: `src/i18n.ts` (arrel, **actiu** — l'importa `I18nContext` i `courseService`) i `src/i18n/index.ts` (**mort**, sense importadors). Amb `moduleResolution: bundler`, `import './i18n'` resol al fitxer arrel, no al directori.
 
 ### 13. `NotificationContext` integrat a LessonPage + StudentDashboard
 - Toast notifications en desar progrés (LessonPage) i en login/logout/create/delete/reset (StudentDashboard).
@@ -166,7 +169,7 @@ Migració completa del projecte a patrons React 19. S'han eliminat anti-patrons 
 
 ---
 
-## Arxius buits detectats (pendents d'implementar)
+## Arxius buits detectats (juny 2026)
 
 ```
 src/hooks/useTeacherData.ts
@@ -185,6 +188,18 @@ src/components/ui/ProgressBar.tsx
 src/components/ui/SearchInput.tsx
 src/services/teacherService.ts
 ```
+
+### ⚠️ Correcció (1/10/2026) — només en queda 1 de buit
+
+Tots aquests fitxers **ja estan implementats** excepte un:
+
+```
+src/services/teacherService.ts  # 0 bytes, sense importadors
+```
+
+(`src/hooks/useTeacherData.ts` també era buit, però s'ha esborrat.)
+
+La secció de professorat està **completa** (`layouts/TeacherLayout.tsx`, 9 components a `features/teacher/`, 9 pàgines a `pages/teacher/`). La sospita que `main.tsx` no muntava `AuthProvider`/`I18nProvider` ja no aplica: tots dos són a la cadena de providers (vegeu `project.md` §4).
 
 ---
 
@@ -210,10 +225,10 @@ src/services/teacherService.ts
 |--------|-------|
 | `package.json` | ✅ `react@^19.2.7`, `@types/react@^19.2.16` |
 | `tsconfig.json` | ✅ `"jsx": "react-jsx"` |
-| `vite.config.ts` | ✅ `babel-plugin-react-compiler` amb `target: "19"` |
+| `vite.config.ts` | ⚠️ **NO** configura cap plugin de Babel ni el React Compiler; només `react()` |
 | `@tanstack/react-query` | ✅ `^5.101.0` |
 | `@vitejs/plugin-react` | ✅ `^5.2.0` (upgraded from `^4.3.0`) |
-| `index.html` | ✅ HTML genèric |
+| `index.html` | ⚠️ `lang="es"`, carrega `/data.js` |
 
 ---
 
@@ -224,8 +239,36 @@ src/services/teacherService.ts
 "react-dom": "^19.2.7"          → 19.2.7
 "@types/react": "^19.2.16"      → 19.2.16
 "@types/react-dom": "^19.2.3"   → 19.2.3
-"react-router-dom": "^6.30.3"   → 6.30.4
+"react-router-dom": "^7.18.4"   → 7.18.4
 "@tanstack/react-query": "^5.101.0" → 5.101.0
 ```
 
 **Override**: `"react-is": "19.0.0"` (per compatibilitat MUI v9)
+
+---
+
+## Revisió de l'estat actual (1 d'octubre de 2026)
+
+Tot el que hi ha a dalt és l'auditoria de juny. Aquest apartat recull el **punct actual**.
+
+### Dependències que han canviat
+- `react-router-dom`: **v6.30.3 → v7.18.4**. No calen els *future flags* de v6.
+- **Nous**: `@monaco-editor/react ^4.7.0`, `monaco-editor ^0.57.0`, `lucide-react ^0.577.0`.
+
+### Dependències declarades però **inactives**
+- **`babel-plugin-react-compiler ^1.0.0`** és a `dependencies` però **no es configura enlloc**: `vite.config.ts` fa servir `@vitejs/plugin-react` sense cap opció de Babel i no hi ha cap fitxer `.babelrc`/`babel.config`. **El projecte no compila amb el React Compiler.** (A la taula de configuració de juny es donava per fet; no ho és.)
+- **Tailwind i derivats** (`tailwindcss`, `postcss`, `autoprefixer`, `class-variance-authority`, `tailwind-merge`, `tailwindcss-animate`, `tw-animate-css`) i **`clsx`**: declarats, però **no hi ha `tailwind.config.*` ni `postcss.config.*`** i no es fa servir cap classe de Tailwind. Són dependències mortes.
+
+### Deute tècnic detectat llegint el codi
+| Problema | Detall |
+|----------|--------|
+| `useAuth()` no s'usa | L'`AuthProvider` és muntat a `main.tsx` però cap component consumeix `useAuth()`. El flux real és `authService.login()` des de `StudentDashboard`. |
+| `AuthContext.login` no actualitza `user` | Per tant `isAuthenticated` no s'activa mai per aquesta via. |
+| Fitxer buit | `services/teacherService.ts` (0 bytes, sense importadors). `hooks/useTeacherData.ts` era buit però ja s'ha esborrat. |
+| Fitxers orfes | `src/App.css`, `src/i18n/index.ts`, `src/utils/utils.ts`, `src/utils/validators.ts` i 6 components de `features/student/`. |
+| Duplicació de config i18n | `src/i18n.ts` (actiu) i `src/i18n/index.ts` (mort). |
+| Dues claus d'idioma | `LanguageDetector` usa `i18nextLng`; `I18nContext` usa `mooc-language`. `LanguageSwitcher` crida `i18n.changeLanguage` directament i no actualitza `mooc-language`. |
+| Duplicació de tipus | `Course`/`Lesson`/`Student` definits a la vegada a `types/index.ts` i `features/student/types.ts` amb formes diferents (`title: string` vs `title: any`), més còpies locals a `useCourse.ts` i `components/CourseCard.tsx`. |
+
+### Estat de la migració React 19
+La migració es considera **tancada i estable**: `tsc --noEmit` passa sense errors i es mantenen els patrons modernitzats (hook `use()` als contextos, imports tipats directes, sense `React.FC`/`forwardRef`/`propTypes`/`defaultProps`, `jsx: react-jsx`, `StrictMode` a `main.tsx`).

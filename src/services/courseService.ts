@@ -12,7 +12,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 3000,
+  timeout: 10000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -133,6 +133,12 @@ export const courseService = {
     } catch {
       return [];
     }
+  },
+
+  /** `GET /api/v1/courses/{course_slug}/students/overview/` — resum d'alumnes (punts del rànquing). */
+  async getStudentsOverview(courseSlug: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/students/overview/`);
+    return Array.isArray(data) ? data : (data.results || []);
   },
 
   /** @deprecated Use submitChallenge instead */

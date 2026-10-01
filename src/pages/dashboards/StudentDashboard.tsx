@@ -1,21 +1,7 @@
 import {useState, useEffect, useMemo, useCallback, useRef, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText,} from '@mui/material';
-import Grid from '@mui/material/Grid';
-import PublicIcon from '@mui/icons-material/Public';
-import LockIcon from '@mui/icons-material/LockOutlined';
-import SchoolIcon from '@mui/icons-material/School';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import MenuBookIcon from '@mui/icons-material/MenuBook';
-import LaptopMacIcon from '@mui/icons-material/LaptopMac';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import WhatshotIcon from '@mui/icons-material/Whatshot';
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
-import AccessTimeIcon from '@mui/icons-material/AccessTime';
-import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
-import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import CodeIcon from '@mui/icons-material/Code';
-import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
+import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, AccessTime as AccessTimeIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -70,6 +56,35 @@ function writeLastCourse(slug: string | undefined, scope: string) {
   try { localStorage.setItem(LAST_COURSE_KEY, JSON.stringify({ slug, scope })); } catch { /* mode privat */ }
 }
 
+/** Una fila del leaderboard. */
+type RankedStudent = { id: string; name: string; points: number };
+
+/**
+ * Converteix la resposta de `GET /courses/{slug}/students/overview/` en files
+ * del leaderboard, ordenades de més a menys punts.
+ * Si la teva API fa servir altres noms de camp, ajusta NOMÉS les llistes de
+ * claus d'aquesta funció.
+ */
+function toRanking(data: any[]): RankedStudent[] {
+  const firstNumber = (row: any, keys: string[]): number => {
+    for (const k of keys) {
+      const value = Number(row?.[k]);
+      if (row?.[k] != null && !Number.isNaN(value)) return value;
+    }
+    return 0;
+  };
+  return data
+    .map((row, i) => {
+      const user = row?.user ?? row;
+      return {
+        id: String(user?.id ?? user?.user_id ?? user?.username ?? i),
+        name: String(user?.username ?? user?.name ?? user?.full_name ?? user?.first_name ?? '?'),
+        points: firstNumber(row, ['points', 'score', 'total_points', 'total_score', 'stars', 'grade']),
+      };
+    })
+    .sort((a, b) => b.points - a.points);
+}
+
 export default function StudentDashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
@@ -91,6 +106,8 @@ export default function StudentDashboard() {
   /** Quina de les tres llistes mostrem als tabs. */
   const [scope, setScope] = useState<CourseScope>('public');
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
+  /** Classificació del curs seleccionat (`students/overview/`). */
+  const [ranking, setRanking] = useState<RankedStudent[]>([]);
   /** Evita restaurar dues vegades el darrer curs. */
   const restoredRef = useRef(false);
 
@@ -246,13 +263,6 @@ export default function StudentDashboard() {
     return Math.max(1, Math.round((done / totalLessons) * 100));
   };
 
-  const getCoursePoints = (course: Course, studentId: string): number => {
-    const topics = getCourseTopics(course);
-    const studentData = getProgress(studentId);
-    const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter(l => studentData[`${course.id}_${l.id}`] === true).length || 0), 0) || 0;
-    return done * 10;
-  };
-
   const TEST_TYPE_VALUES = ['test', 'quiz', 'exam', 'multiple_choice'];
   const isTestLesson = (lesson: any) =>
     TEST_TYPE_VALUES.includes(String(lesson?.type || '').toLowerCase()) ||
@@ -294,10 +304,6 @@ export default function StudentDashboard() {
     return { topics: all.slice(0, budget), hidden: Math.max(0, all.length - budget) };
   };
 
-  const rankedStudentsByCourse = useMemo(() => {
-    return [] as Student[];
-  }, []);
-
   /** Llistes base segons l'àmbit triat. 'public' ve del catàleg, la resta de `/courses/`. */
   const scopeSource = scope === 'public' ? publicCourses : assignedCourses;
 
@@ -334,6 +340,25 @@ export default function StudentDashboard() {
     const idx = list.findIndex((c) => c.slug === saved.slug);
     if (idx >= 0) setCourseTabIndex(idx);
   }, [assignedCourses, publicCourses]);
+
+  // Carrega la classificació del curs seleccionat cada cop que canvia de curs.
+  const currentSlug = visibleCourses[courseTabIndex]?.slug;
+  const selectedStudentId = selectedStudent?.id;
+  useEffect(() => {
+    if (!currentSlug || !selectedStudentId) {
+      setRanking([]);
+      return;
+    }
+    let cancelled = false;
+    courseService.getStudentsOverview(currentSlug)
+      .then((rows) => {
+        // Temporal: mira la consola per veure els noms reals dels camps; després treu-ho.
+        console.debug('[ranking] students/overview', rows);
+        if (!cancelled) setRanking(toRanking(rows));
+      })
+      .catch(() => { if (!cancelled) setRanking([]); });
+    return () => { cancelled = true; };
+  }, [currentSlug, selectedStudentId]);
 
   const stats = useMemo(() => {
     const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
@@ -374,7 +399,7 @@ export default function StudentDashboard() {
   /** Els dos boxes del resum: només temes, amb el progrés de les seves activitats. */
   const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData) : null;
   const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData) : null;
-  const top3Ranking = rankedStudentsByCourse.slice(0, 3);
+  const top3Ranking = ranking.slice(0, 3);
 
   const handleStatsClick = () => {
     navigate(`/courses/${currentCourse?.slug}/stats`);
@@ -575,10 +600,10 @@ export default function StudentDashboard() {
                               <Stack key={s.id} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                                 <Avatar sx={{
                                   width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
-                                  bgcolor: s.id === selectedStudent?.id ? 'primary.main' : 'action.disabledBackground',
+                                  bgcolor: (s.id === selectedStudent?.id || s.name === selectedStudent?.name) ? 'primary.main' : 'action.disabledBackground',
                                 }}>{s.name.charAt(0).toUpperCase()}</Avatar>
                                 <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontSize: { xs: '0.8rem', md: '0.875rem' } }} noWrap>{s.name}</Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>{getCoursePoints(currentCourse, s.id)}</Typography>
+                                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>{s.points}</Typography>
                               </Stack>
                             ))}
                             {top3Ranking.length === 0 && (
@@ -597,24 +622,9 @@ export default function StudentDashboard() {
                             sx={{ flex: 1, py: { xs: 2, md: 1 }, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
                           >
                             {/* 1. Ratxa */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WhatshotIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                                {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
-                              </Typography>
-                            </Box>
                             <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'none' } }} />
-                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
 
-                            {/* 2. Taxa d'èxit */}
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                                {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.successRate}%</Box>
-                              </Typography>
-                            </Box>
-                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
-
+                       
                             {/* 4. Problemes de programació correctes */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
@@ -704,14 +714,9 @@ export default function StudentDashboard() {
   );
 }
 
-/** Un tema amb el recompte d'activitats fetes/totals, tal com el retorna `getTopicSummaries`. */
 type TopicSummary = { key: string; id: string; title: string; total: number; done: number };
 
-/**
- * Llista només de temes (sense les activitats de dins) amb una barra de progrés
- * per tema. Serveix per als dos boxes del resum (problemes de codi i exercicis
- * de test): només canvien la icona i l'acció en fer clic, que arriben per props.
- */
+
 function TopicList({ topics, hidden, icon: Icon, onOpen, moreLabel }: {
   topics: TopicSummary[];
   hidden: number;

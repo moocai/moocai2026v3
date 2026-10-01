@@ -1,583 +1,514 @@
 # MOOC React 2026
-**Última actualització: 19 de juny de 2026**
+**Última actualització: 1 d'octubre de 2026**
+
+> Aquest document descriu **l'estat real del codi** a la data indicada. Les seccions marcades amb ⚠️ recullen deute tècnic o discrepàncies detectades llegint el codi, no suposicions.
 
 ## 1. Descripció del Projecte
 
-**MOOC React 2026** (`mooc-2026-vite`) és una plataforma d'aprenentatge online (MOOC) moderna i multiidioma construïda amb React 19. Permet als estudiants navegar per cursos, veure contingut teòric, resoldre reptes de programació en un editor de codi interactiu, seguir el seu progrés (persistit a localStorage) i consultar un rànquing. Es connecta a una API backend (`algorien.com`) per al contingut dels cursos, però utilitza `localStorage` per a la persistència del progrés. La secció de professorat està esbossada però no implementada.
+**MOOC React 2026** (`mooc-2026-vite`) és una plataforma d'aprenentatge online (MOOC) multiidioma construïda amb React 19 i Vite 6. Té dues cares ben diferenciades:
+
+- **Alumne**: navega cursos, llegeix teoria, resol reptes de programació i tests en un editor **Monaco** integrat (amb render en viu de React), segueix el seu progrés i consulta un rànquing.
+- **Professor**: disposa d'un layout propi (`/teacher`) amb tauler, editor d'exercicis, llistat d'exercicis i tests, generador de cursos locals, invitacions i classificació.
+
+La persistència del progrés és **local (`localStorage`)**; el contingut ve d'una API externa allotjada a `https://algorien.com` (no hi ha backend propi al repositori). Hi ha **dos fluxos d'autenticació en paral·lel** que cal no confondre (vegeu §8 i §15).
 
 ---
 
 ## 2. Tecnologies i Dependències
 
+Versions reals de `package.json`:
+
 | Categoria | Llibreria | Versió | Ús |
 |-----------|-----------|--------|-----|
-| **Framework** | React | ^19.2.7 | Components i hooks |
+| **Framework** | React / react-dom | ^19.2.7 | Components i hooks |
 | **Build** | Vite | ^6.0.0 | Dev server i bundling |
-| **UI** | @mui/material | ^9.0.0 | Components Material Design + CssBaseline |
-| **Estils** | @emotion/react, @emotion/styled | ^11.14.0 / ^11.14.1 | CSS-in-JS |
-| **Icons** | @mui/icons-material + lucide-react | ^9.0.0 / ^0.577.0 | Icones |
-| **Routing** | react-router-dom | ^6.30.3 | Navegació SPA (v7 future flags) |
-| **Cache/Query** | @tanstack/react-query | ^5.101.0 | Cache de dades de curs i prefetching |
-| **Animacions** | framer-motion + @react-spring/web | ^12.38.0 / ^10.1.0 | Animacions declaratives |
-| **Internacionalització** | i18next + react-i18next + i18next-browser-languagedetector | ^26.0.6 / ^17.0.4 / ^8.2.1 | Multiidioma (CA, ES, EN) |
-| **HTTP** | axios | ^1.15.0 | Peticions a API REST |
-| **Confetti** | canvas-confetti | ^1.9.2 | Animació en completar lliçons |
-| **React Compiler** | babel-plugin-react-compiler | ^1.0.0 | Optimització React 19 |
-| **Markdown** | react-markdown + remark-gfm | ^10.1.0 / ^4.0.1 | Renderitzat Markdown |
-| **Util** | clsx, class-variance-authority, tailwind-merge, tailwindcss-animate, tw-animate-css | ^2.1.1 / ^0.7.1 / ^3.5.0 / ^1.0.7 / ^1.4.0 | Classes condicionals |
+| **Router** | react-router-dom | **^7.18.4** | Navegació SPA (v7; **ja no** fa servir future flags v6) |
+| **UI** | @mui/material · @mui/icons-material | ^9.0.0 | Components Material Design + icones |
+| **Estils** | @emotion/react · @emotion/styled | ^11.14.0 / ^11.14.1 | CSS-in-JS |
+| **Icons alt.** | lucide-react | ^0.577.0 | Icones (Home, professor, lesson, etc.) |
+| **Cache/Query** | @tanstack/react-query | ^5.101.0 | Cache de cursos i prefetching |
+| **Editor** | **@monaco-editor/react · monaco-editor** | **^4.7.0 / ^0.57.0** | Editor VS Code (LessonPage, ExerciseEditor) |
+| **Animacions** | framer-motion · @react-spring/web | ^12.38.0 / ^10.1.0 | Animacions (Header) i toastos |
+| **i18n** | i18next · react-i18next · i18next-browser-languagedetector | ^26.0.6 / ^17.0.4 / ^8.2.1 | Multiidioma (CA, ES, EN) |
+| **HTTP** | axios | ^1.15.0 | Peticions REST |
+| **Confetti** | canvas-confetti | ^1.9.2 | Animació en completar |
+| **Markdown** | react-markdown · remark-gfm | ^10.1.0 / ^4.0.1 | Render de teoria |
 | **Tipus** | TypeScript | ^5.5.0 | Tipat estàtic |
-| **Dev** | @vitejs/plugin-react, postcss, autoprefixer, tailwindcss, @types/node, @types/canvas-confetti | ^5.2.0 / ^8.4.0 / ^10.4.0 / ^3.4.0 / ^25.6.0 / ^1.6.0 | Configuració build |
+| **Dev** | @vitejs/plugin-react · @types/node · @types/react(-dom) · postcss · autoprefixer · tailwindcss | ^5.2.0 / ^25.6.0 / ^19.2.16 / ^19.2.3 / ^8.4.0 / ^10.4.0 / ^3.4.0 | Configuració build |
+
+### ⚠️ Dependències declarades però NO utilitzades
+- **`babel-plugin-react-compiler`**: és a `dependencies` però **no està configurat enlloc**. `vite.config.ts` només fa servir `@vitejs/plugin-react` amb `react()` i sense opcions de Babel. El projecte **no** compila amb el React Compiler.
+- **Tailwind i derivats** (`tailwindcss`, `postcss`, `autoprefixer`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tailwindcss-animate`, `tw-animate-css`): declarats, però **no hi ha `tailwind.config.*` ni `postcss.config.*`** i no s'usa cap classe de Tailwind a `src/`. Són dependències mortes.
+- **`clsx`** i **`tailwind-merge`** tampoc no s'importen enlloc.
+
+### Override
+```json
+"overrides": { "react-is": "19.0.0" }
+```
+(Necessari per compatibilitat de MUI v9 amb React 19.)
 
 ---
 
-## 3. Estructura Completa del Projecte
+## 3. Estructura Real del Projecte
 
 ```
-mooc-2026-vite/
-├── index.html                        # HTML entry point
-├── package.json                      # Dependències i scripts (dev, build, preview)
-├── vite.config.ts                    # Vite config: @ alias, proxy /api → algorien.com, polling
-├── tsconfig.json                     # TypeScript strict, @/* path alias, JSX react-jsx
-├── vite-env.d.ts                     # Vite client types
+moocai2026/
+├── index.html                        # lang="es", carrega /data.js, /src/main.tsx
+├── package.json                      # scripts: dev / build (tsc -b && vite build) / preview
+├── vite.config.ts                    # alias @→./src, proxy /api→algorien.com, port 5173, polling
+├── tsconfig.json                     # strict + noUnusedLocals + noUnusedParameters, jsx react-jsx
+├── netlify.toml                      # build→dist, redirect /api/*→algorien.com, SPA fallback
 │
-├── dist/                             # Producció build output
-│
-├── docs/
-│   ├── project.md                    # Documentació del projecte
-│   ├── react19.md                    # Audit migració React 19
-│   ├── ReactQuery.md                 # Anàlisi React Query
-│   ├── spring3.md                    # Proposta Sprint 3
-│   └── apis.md                       # API Reference
+├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3)
 │
 ├── public/
-│   ├── img/                          # Logo, favicon, SVGs dels cursos
-│   ├── _redirects                    # SPA redirect per Netlify
-│   └── robots.txt                    # SEO
+│   ├── data.js                       # Fixture global antic (window.EXAM_DATA), 569 B
+│   └── img/                          # logo.webp, favicon.png, Python.svg, React.svg, SB.svg, ml.svg
 │
 └── src/
-    ├── main.tsx                      # Punt d'entrada (providers stack)
-    ├── App.tsx                       # Router (Routes + MainLayout wrapper)
-    ├── App.css                       # (No importat - legacy)
-    ├── index.css                     # Scrollbar styling
-    ├── i18n.ts                       # Configuració i18next (importat per I18nContext)
-    ├── env.d.ts                     # Declaracions tipus fitxers estàtics
+    ├── main.tsx                      # Punt d'entrada (stack de providers, §4)
+    ├── App.tsx                       # Router (17 rutes, §5)
+    ├── index.css                     # Scrollbar (var --scrollbar-thumb: #8400ff)
+    ├── App.css                       # ⚠️ ORFE — boilerplate del starter Vite, no s'importa
+    ├── env.d.ts                      # Declaracions d'assets (*.css, *.svg, *?worker)
+    ├── i18n.ts                       # ✅ Config i18next ACTIVA (fallback 'ca')
     │
-    ├── components/                   # Components reutilitzables
-    │   ├── Header.tsx                # Nav sticky amb menú mòbil overlay
-    │   ├── Hero.tsx                  # Hero landing: typewriter + stats + particles
-    │   ├── Footer.tsx                # Multi-columna
-    │   ├── CourseCard.tsx            # Targeta curs amb hover prefetch
-    │   ├── ParticlesBackground.tsx   # Fons interactiu Canvas (partícules + connexió)
-    │   ├── ThemeToggleButton.tsx     # Toggle light/dark/fancy
-    │   ├── LanguageSwitcher.tsx      # CA/ES/EN
+    ├── i18n/                         # Recursos de traducció
+    │   ├── ca.ts, es.ts, en.ts       # 11 seccions cadascun
+    │   └── index.ts                  # ⚠️ MORT — duplicat exacte de src/i18n.ts, sense importadors
+    │
+    ├── components/
+    │   ├── Header.tsx                # AppBar sticky + usePoints + role switcher + menú mòbil
+    │   ├── Hero.tsx                  # Landing: typewriter + stats (default export)
+    │   ├── Footer.tsx                # Només s'usa a Home (no a MainLayout)
+    │   ├── CourseCard.tsx            # Card de curs (Home) amb prefetch on hover
+    │   ├── ParticlesBackground.tsx   # Canvas de partícules (default export, prop opacityMultiplier)
+    │   ├── ThemeToggleButton.tsx     # light/dark/fancy
+    │   ├── LanguageSwitcher.tsx      # CA/ES/EN (crida i18n directament, bypassa I18nContext)
+    │   ├── UserAvatarMenu.tsx        # ⚠️ Nom enganyós: és només un Avatar, sense menú
+    │   ├── ConsolePanel.tsx          # Consola d'output (usada per ExerciseEditor)
+    │   ├── ReactLivePreview.tsx      # Preview React en viu (transpila TSX amb el worker de Monaco)
     │   └── ui/
-    │       ├── Card.tsx              # Wrapper MUI Card (blur, hover effects)
-    │       ├── badge.tsx             # Badge standard/outline (MUI Chip)
-    │       ├── NotificationHub.tsx   # Toast UI: useTransition, useSpring, Alert MUI
-    │       ├── ProgressBar.tsx       # (BUIT)
-    │       └── SearchInput.tsx       # (BUIT)
+    │       ├── Card.tsx              # Card/CardHeader/CardTitle/CardDescription/CardContent
+    │       ├── badge.tsx             # Badge (no usat) + BadgeEstado (StudentTable)
+    │       ├── NotificationHub.tsx   # Pila de toastos (react-spring)
+    │       ├── ProgressBar.tsx       # Barra 8px (StudentTable)
+    │       └── SearchInput.tsx       # TextField de cerca (StudentFilters)
     │
     ├── contexts/
-    │   ├── AuthContext.tsx           # Autenticació (login/logout/token/user)
-    │   ├── ThemeContext.tsx          # 3 modes: light/dark/fancy (+ ParticlesBackground)
-    │   ├── I18nContext.tsx           # Idioma (CA/ES/EN, localStorage)
-    │   └── NotificationContext.tsx   # Toast notifications (2s auto-dismiss)
+    │   ├── AuthContext.tsx           # ⚠️ Provider muntat, però useAuth() no es consumeix enlloc
+    │   ├── ThemeContext.tsx          # 3 modes + ParticlesBackground
+    │   ├── I18nContext.tsx           # idioma (clau mooc-language)
+    │   └── NotificationContext.tsx   # toastos (2s)
     │
     ├── data/
-    │   ├── courses.ts                # Image mappings: python-public-test, React, springboot, MachineLearning
-    │   └── students.ts              # 3 estudiants predefinits (Marc/1, Jordi/2, Miquel/3)
+    │   └── courses.ts                # Mapa imatge de curs (només 2 entrades: python-public-test, python-test)
     │
     ├── features/
     │   ├── student/
-    │   │   ├── types.ts              # Student, Lesson, Topic, Course interfaces
-    │   │   ├── Login.tsx             # Login + create/delete user (role toggle)
-    │   │   ├── StudentCard.tsx       # Targeta login per PIN + delete flow
-    │   │   ├── StudentProfileCard.tsx # Avatar, nom, punts, logout
-    │   │   ├── CourseCard.tsx        # Card dashboard expansible
-    │   │   ├── CourseExpandedContent.tsx # Tabs syllabus/activities + lliçons
-    │   │   ├── CourseIcon.tsx        # Icona Lucide dinàmica per curs
-    │   │   ├── ProgressOverview.tsx  # LinearProgress per curs
-    │   │   ├── RankingCard.tsx       # Rànquing amb Tabs per curs
-    │   │   └── ScrollIndicator.tsx   # Indicador scroll mòbil
-    │   │
-    │   └── teacher/                  # (TOT BUIT)
-    │       ├── ChatWidget.tsx, CourseForm.tsx, ExerciseEditor.tsx
-    │       ├── StatsCards.tsx, StudentFilters.tsx, StudentTable.tsx
+    │   │   ├── types.ts              # Student, Lesson, Topic, Course (shape propi)
+    │   │   ├── Login.tsx             # Login + registre + "forgot" (UI), consumeix register API
+    │   │   ├── RendimentDashboard.tsx# /courses/:courseId/stats (gràfics de barres)
+    │   │   ├── CourseCard.tsx        # 
+    │   │   ├── CourseExpandedContent.tsx # 
+    │   │   ├── CourseIcon.tsx        # 
+    │   │   ├── ProgressOverview.tsx  # 
+    │   │   ├── RankingCard.tsx       # 
+    │   │   ├── ScrollIndicator.tsx   # 
+    │   │   ├── StudentCard.tsx       # 
+    │   │   └── StudentProfileCard.tsx# 
+    │   └── teacher/
+    │       ├── Sidebar.tsx           # Menú lateral col·lapsable (+ popover)
+    │       ├── ChatWidget.tsx        # Xat mock (contacts = [] → sempre buit)
+    │       ├── CodePreview.tsx       # Executa código amb new Function + ReactLivePreview
+    │       ├── CourseForm.tsx        # Form de curs (etiquetas en castellà hardcoded)
+    │       ├── ExerciseEditor.tsx    # Editor d'exercicis (Monaco + intèrpret Python)
+    │       ├── StatsCards.tsx        # Grid de targetes d'estadística
+    │       ├── StudentFilters.tsx    # Filtres (només UI, el pare no els aplica)
+    │       ├── StudentTable.tsx      # Taula d'alumnes
+    │       └── TeacherLeaderboard.tsx# Classificació del professor
     │
     ├── hooks/
-    │   ├── useCourse.ts              # TanStack Query: useCourse + prefetchCourse
-    │   ├── useI18n.ts                # Re-exporta I18nProvider + useI18n
-    │   ├── useTheme.ts              # Re-exporta ThemeProvider + useThemeMode
-    │   └── useTeacherData.ts         # (BUIT)
-    │
-    ├── i18n/
-    │   ├── index.ts                  # Config i18next duplicada (no importada)
-    │   ├── ca.ts                     # Català (auth, dashboard, home, hero, footer, course, common, lesson, notifications)
-    │   ├── es.ts                     # Castellà
-    │   └── en.ts                     # Anglès
+    │   ├── useCourse.ts              # React Query: useCourse + prefetchCourse
+    │   ├── useI18n.ts                # Re-export d'I18nContext
+    │   └── useTheme.ts               # Re-export de ThemeContext
     │
     ├── layouts/
-    │   ├── MainLayout.tsx            # Flex column: 100dvh, Header + Outlet (flex:1, overflow:hidden)
-    │   └── TeacherLayout.tsx         # (BUIT)
+    │   ├── MainLayout.tsx            # Header + Outlet + prefetch de cursos
+    │   └── TeacherLayout.tsx         # Sidebar + header + ChatWidget + Outlet
     │
     ├── pages/
-    │   ├── Home.tsx                  # Landing: Hero, cursos (API), features animades
+    │   ├── Home.tsx
+    │   ├── ProfilePage.tsx           # /profile i /teacher/profile
     │   ├── courses/
-    │   │   ├── CourseLessons.tsx     # 3 columnes: syllabus accordion + contingut + "On this page"
-    │   │   ├── LessonPage.tsx        # Editor codi interactiu (run tests, console, confetti)
-    │   │   └── ${courseId}/
-    │   │       └── ${lesson.id}/
-    │   │           └── LessonTopic.tsx # Vista teòrica + sidebar + challenge
+    │   │   ├── CourseLessons.tsx     # Tabs Teoria/Programació/Tests/Fitxers + rail flotant
+    │   │   ├── LessonPage.tsx        # Monaco + Solució Profe + preview React + panell IA
+    │   │   ├── ExamPage.tsx          # /courses/:courseId/exam/:challengeSlug
+    │   │   ├── AiHelpPanel.tsx       # Revisió IA via fetch directe
+    │   │   └── ${courseId}/${lesson.id}/LessonTopic.tsx  # ⚠️ Path literal amb ${...}
     │   ├── dashboards/
-    │   │   └── StudentDashboard.tsx   # Login, perfil, progrés, cursos, rànquing
-    │   └── teacher/                   # (TOT BUIT)
-    │       ├── Courses.tsx, Dashboard.tsx, Exercises.tsx, Students.tsx
+    │   │   └── StudentDashboard.tsx  # Login, resum, 5 cards, classificació
+    │   └── teacher/
+    │       ├── TeacherIndex.tsx      # Shim → <TeacherDashboard/>
+    │       ├── Dashboard.tsx         # ⚠️ Export NOMENAT TeacherDashboard
+    │       ├── Students.tsx          # ⚠️ Llista buida hardcoded
+    │       ├── Courses.tsx           # Cursos locals + API
+    │       ├── Exercises.tsx         # ⚠️ Sempre usa cursos[0]
+    │       ├── ExerciseList.tsx      # ⚠️ Sempre usa cursos[0]
+    │       ├── Test.tsx              # ⚠️ Sempre usa cursos[0]; dangerouslySetInnerHTML
+    │       ├── Hackathon.tsx         # ⚠️ Placeholder estàtic
+    │       └── InviteStudents.tsx    # POST /users/invite/
     │
     ├── services/
-    │   ├── api.ts                    # Gestió progrés localStorage (mock API)
-    │   ├── authService.ts            # Auth API calls (login/logout/getMe)
-    │   ├── courseService.ts          # Course CRUD amb axios (getAllCourses, getFullCourseDetail, submitSubmission)
-    │   └── teacherService.ts         # (BUIT)
+    │   ├── api.ts                    # HÍBRID: localStorage (progrés) + POST /users/invite/ · timeout 3000
+    │   ├── authService.ts            # login/logout/register/getToken (sense timeout)
+    │   ├── courseService.ts          # Cursos + submissions + overview · timeout 10000
+    │   ├── localCourseService.ts     # Cursos locals (mooc_local_courses), sense HTTP
+    │   ├── profileService.ts         # Perfil, avatars, orgs (sense timeout)
+    │   ├── register.ts               # GET+POST /users/register/ (FormData)
+    │   └── teacherService.ts         # ⚠️ BUID (0 bytes), importat enlloc
     │
     ├── theme/
-    │   └── theme.ts                  # getTheme(mode): primary #8400ff, secondary #ec4899
+    │   └── theme.ts                  # getTheme(mode) → primary #8400ff, secondary #ec4899
     │
     ├── types/
-    │   └── index.ts                  # Interfícies globals (Course, Lesson, Student, etc.)
+    │   └── index.ts                  # 18 interfícies/tipus globals (molts duplicats, §10)
     │
     └── utils/
-        ├── formatters.ts             # getLocalizedText, formatProgressPercent, calculatePoints, makeProgressKey
-        ├── utils.ts                  # sx() per composar estils MUI
-        └── validators.ts             # validatePin, isValidPin, isValidEmail, validateCodeSolution
+        ├── formatters.ts             # getLocalizedText, formatearFecha/Nota, calcularColorProgreso...
+        ├── utils.ts                  # sx() — ⚠️ ORFE
+        ├── validators.ts             # 5 validadors — ⚠️ ORFE (ningú els importa)
+        ├── monaco.ts                 # Loader, temes, opcions TS, autocompletat Python
+        └── monacoCore.ts             # Entry propi de Monaco (editor.api + contribucions + Python/TS)
 ```
 
+**Fitxer mort (0 bytes):** `src/services/teacherService.ts`. *(`src/hooks/useTeacherData.ts` també era buit, però s'ha esborrat.)*
+**Fitxers orfes (no importats):** `src/App.css`, `src/i18n/index.ts`, `src/utils/utils.ts`, `src/utils/validators.ts`, i les 6 peces de `features/student/` marcades ⚠️.
+
 ---
 
-## 4. Provider Stack (main.tsx)
+## 4. Provider Stack (`src/main.tsx`)
 
 ```
-QueryClientProvider
-  └── BrowserRouter (v7_startTransition, v7_relativeSplatPath)
-      └── StyledEngineProvider (injectFirst)
-          └── ThemeProvider (ThemeContext)
-              └── I18nProvider (I18nContext)
-                  └── AuthProvider (AuthContext)
-                      └── NotificationProvider (NotificationContext)
-                          └── App (Routes)
+StrictMode
+  └── QueryClientProvider            (staleTime 5min, gcTime 30min, retry 1, refetchOnWindowFocus false)
+      └── BrowserRouter
+          └── StyledEngineProvider (injectFirst)
+              └── ThemeProvider   (ThemeContext)
+                  └── I18nProvider (I18nContext)
+                      └── AuthProvider (AuthContext)
+                          └── NotificationProvider (NotificationContext)
+                              └── App (Routes)
 ```
 
-- **React Query**: staleTime 5min, gcTime 30min, retry 1, refetchOnWindowFocus false
-- **Theme**: 3 modes (light, dark, fancy) — fancy afegeix `ParticlesBackground`
-- **I18n**: CA (fallback), ES, EN, amb LanguageDetector automàtic
-- **Auth**: Inicialitza des de localStorage, valida token via API al mount
+- `main.tsx` importa `./index.css`. **No** importa i18n directament: ho fa `I18nContext` via `import i18n from '../i18n'` → resol a **`src/i18n.ts`** (el fitxer guanya sobre el directori amb `moduleResolution: bundler`).
+- `AuthProvider` està muntat però el seu hook `useAuth()` **no es consumeix enlloc**. `NotificationProvider` renderitza `NotificationHub` globalment.
 
 ---
 
-## 5. Rutes (App.tsx)
+## 5. Rutes (`src/App.tsx`) — 17 rutes
 
-| Path | Componente | Layout | Descripció |
-|------|-----------|--------|------------|
-| `/` | `Home` | Cap | Landing page (hero, cursos, features) |
-| `/courses/:courseId` | `CourseLessons` | MainLayout | 3-columnes: syllabus, contingut, anchors |
-| `/courses/:courseId/:lessonId` | `LessonPage` | MainLayout | Editor codi interactiu |
-| `/courses/:courseId/:lessonId/topic` | `LessonTopic` | MainLayout | Vista teòrica lliçó |
-| `/dashboards/student` | `StudentDashboard` | MainLayout | Panell complet d'estudiant |
+| # | Path | Component | Layout |
+|---|------|-----------|--------|
+| 1 | `/` | `Home` | (cap) |
+| 2 | `/courses/:courseId` | `CourseLessons` | `MainLayout` |
+| 3 | `/courses/:courseId/:lessonId` | `LessonPage` | `MainLayout` |
+| 4 | `/courses/:courseId/:lessonId/topic` | `LessonTopic` | `MainLayout` |
+| 5 | `/courses/:courseId/exam/:challengeSlug` | `ExamPage` | `MainLayout` |
+| 6 | `/courses/:courseId/stats` | `RendimentDashboard` | `MainLayout` |
+| 7 | `/dashboards/student` | `StudentDashboard` | `MainLayout` |
+| 8 | `/profile` | `ProfilePage` | `MainLayout` |
+| 9 | `/teacher` | `TeacherIndex` (→ `TeacherDashboard`) | `TeacherLayout` |
+| 10 | `/teacher/students` | `Students` | `TeacherLayout` |
+| 11 | `/teacher/courses` | `Courses` | `TeacherLayout` |
+| 12 | `/teacher/exercises` | `Exercises` | `TeacherLayout` |
+| 13 | `/teacher/exercises/list` | `ExerciseList` | `TeacherLayout` |
+| 14 | `/teacher/test` | `Test` | `TeacherLayout` |
+| 15 | `/teacher/hackathon` | `Hackathon` | `TeacherLayout` |
+| 16 | `/teacher/invite` | `InviteStudents` | `TeacherLayout` |
+| 17 | `/teacher/profile` | `ProfilePage` | `TeacherLayout` |
 
----
+⚠️ **No hi ha cap guarda de ruta** a `/teacher`: qualsevol pot navegar-hi. L'únic senyal de rol és `localStorage.mooc_role`, que escriu el commutador de rol del `Header`.
 
-## 6. Components per Fitxer
+⚠️ La ruta 4 s'importa des d'un directori amb nom literal ``${courseId}/${lesson.id}`` (`App.tsx:6`), fruit d'una interpolació enganxada per error. Funciona perquè el nom del fitxer hi coincideix.
 
-### Components Reutilitzables (`src/components/`)
-
-| Fitxer | Exportacions | Funcions clau |
-|--------|-------------|---------------|
-| `Header.tsx` | `Header` | scrollToDynamic, handleLogout, checkAuth, menú mòbil overlay amb AnimatePresence. Botó "My Progress": bgcolor `action.hover` en dark, `alpha(primary, 0.08)` en light. AppBar bgcolor per mode: fancy → `black`, dark → `#1f2937`, light → `white` (via `useThemeMode`) |
-| `Hero.tsx` | (default) | Typewriter animat (4 paraules), stats dinàmiques (recompte estudiants via localStorage + event studentsUpdated), scroll chevrons |
-| `Footer.tsx` | `Footer` | FooterLink intern, any dinàmic, 4 columnes (logo, explore, community, connect) |
-| `CourseCard.tsx` | `CourseCard` | handleEnroll, getLocalizedText, disabled overlay "PROPERAMENT", motion animations, hover prefetch |
-| `ParticlesBackground.tsx` | (default) | Classe Particle (draw/update), connect, detecció dark/light mode. Accepta prop `opacityMultiplier` (default 1) que escala l'opacitat de partícules i línies. `{ alpha: true }` al context 2D |
-| `ThemeToggleButton.tsx` | `ThemeToggleButton` | Alterna modes light → dark → fancy (Sun/Moon/Sparkles icons) |
-| `LanguageSwitcher.tsx` | `LanguageSwitcher` | Canvia idioma via i18n.changeLanguage |
-
-### Components UI (`src/components/ui/`)
-
-| Fitxer | Exportacions | Descripció |
-|--------|-------------|------------|
-| `Card.tsx` | `Card`, `CardHeader`, `CardTitle`, `CardDescription`, `CardContent` | MUI wrappers amb blur, border, hover |
-| `badge.tsx` | `Badge` (standard/outline) | Basat en MUI Chip |
-| `NotificationHub.tsx` | `NotificationHub` | Toast UI: useTransition/useSpring, MUI Alert, tancament manual i auto (2s) |
-| `ProgressBar.tsx` | — | (BUIT) |
-| `SearchInput.tsx` | — | (BUIT) |
-
-### Contexts (`src/contexts/`)
-
-| Fitxer | Provider | Hook | Funcions | Estat |
-|--------|----------|------|----------|-------|
-| `AuthContext.tsx` | `AuthProvider` | `useAuth()` | `login(credentials)`, `logout()` | `user`, `token`, `isAuthenticated`, `loading` |
-| `ThemeContext.tsx` | `ThemeProvider` | `useThemeMode()` | `toggleTheme()`, `setMode(mode)` | `mode` (light / dark / fancy) |
-| `I18nContext.tsx` | `I18nProvider` | `useI18n()` | `setLanguage(lang)` | `language` (ca / es / en) |
-| `NotificationContext.tsx` | `NotificationProvider` | `useNotifications()` | `addNotification(msg, severity)` | `toasts` (array intern) |
-
-**Notes:**
-- Tots els contextos usen `use(Context)` de React 19 (en lloc de `useContext`)
-- ThemeContext renderitza `ParticlesBackground` en mode fancy. En mode fancy, també sobreescriu `document.body.style.backgroundColor = 'transparent'` per evitar que CssBaseline el tapin
-- I18nContext importa `i18n` des de `src/i18n.ts`
-- Tots persisteixen a localStorage: `mooc-theme-mode`, `mooc-language`, `token`, `currentStudent`
-
-### Features Student (`src/features/student/`)
-
-| Fitxer | Exportacions | Descripció |
-|--------|-------------|------------|
-| `types.ts` | `Student`, `Lesson`, `Topic`, `Course` | Interfícies del mòdul student |
-| `Login.tsx` | `Login` | Role toggle (student/teacher), create-user, grid StudentCards (rep students com a prop) |
-| `StudentCard.tsx` | `StudentCard` | Login per PIN, delete confirmation amb animació error shake |
-| `StudentProfileCard.tsx` | `StudentProfileCard` | Avatar + nom + punts + logout, LinearProgress loading bar. bgcolor: dark → `#1f2937`, light → `white` |
-| `CourseCard.tsx` | `CourseCard` | Card dashboard expansible amb disabled overlay. bgcolor: dark → `#1f2937`, light → `white` |
-| `CourseExpandedContent.tsx` | `CourseExpandedContent` | Tabs syllabus/activities, llista lliçons amb icones (BookOpen, CheckCircle, PlayCircle) |
-| `CourseIcon.tsx` | `CourseIcon` | Icona Lucide (Terminal, Globe, Cpu, Layers, Database, Code2) per nom de curs |
-| `ProgressOverview.tsx` | `ProgressOverview` | Barres LinearProgress per curs amb percentatge. bgcolor: dark → `#1f2937`, light → `white` |
-| `RankingCard.tsx` | `RankingCard` | Tabs per curs, llistat ordenat per progrés, usuari actiu destacat, Trophy icons. bgcolor: dark → `#1f2937`, light → `white` |
-| `ScrollIndicator.tsx` | `ScrollIndicator` | 3 chevrons animats (només mòbil) — **no importat actualment** |
-
-### Features Teacher (`src/features/teacher/`)
-
-TOTS ELS FITXERS estan BUITS: `ChatWidget.tsx`, `CourseForm.tsx`, `ExerciseEditor.tsx`, `StatsCards.tsx`, `StudentFilters.tsx`, `StudentTable.tsx`
+### Layouts
+- **`MainLayout`**: `Header` + `Outlet` dins `height: 100dvh; overflow: hidden`. En muntar fa prefetch de `getAllCourses()` i `getFullCourseDetail()` de cada curs. **No** renderitza `Footer`.
+- **`TeacherLayout`**: `Sidebar` col·lapsable (64/256px) + header de 64px amb logo i `ThemeToggleButton` + `<ChatWidget />` global. Sense dades pròpies.
 
 ---
 
-## 7. Pàgines
+## 6. Pàgines principals
 
-### Home (`src/pages/Home.tsx`)
-- Carrega cursos via `courseService.getAllCourses()` amb loading/error
-- 6 feature cards animades (containerVariants + cardVariants amb stagger i direccional)
-- Visibility change listener
+### `CourseLessons` (`/courses/:courseId`)
+Tabs `Teoria | Programació | Tests | Fitxers` (font única `TAB_ITEMS`) amb barra pròpia dins cada box, rail flotant vertical quan la barra surt de pantalla, selector d'àmbit (públic/privat/assignats) i targetes. Usa `useCourse` (React Query). No fa servir Monaco.
 
-### CourseLessons (`src/pages/courses/CourseLessons.tsx`)
-- Layout 3 columnes: syllabus accordion (motion slide-in seqüencial) + contingut (breadcrumb, course info, subTopics amb code examples react-markdown) + "On this page" anchor links
-- Drawer mòbil per syllabus
-- Escolta event `lessonProgressUpdated` per refrescar progrés
-- `?lessonId=` query param per obrir lliçó directament
-- Scrollbar estilitzada al sidebar
+### `LessonPage` (`/courses/:courseId/:lessonId`)
+La pàgina central. Editor **Monaco** amb:
+- **Multi-model** per llenguatge: fitxers `python.py` i `React.tsx` (`file:///lesson/<curs>/<lliço>/...`), tabs de fitxer.
+- **Solució Profe**: pestanya bloquejada fins que l'alumne supera l'exercici; llavors es mostra un **`DiffEditor`** entre `teacherSolution` i el codi de l'alumne (colze a colze a desktop, unificat a mòbil).
+- **Preview React en viu** (`ReactLivePreview`): transpila el TSX amb el worker de TypeScript de Monaco (`getEmitOutput`) i el renderitza amb `createRoot`.
+- Tabs `Enunciat | Professor | Alumnes | IA`; `AiHelpPanel` per revisió IA.
+- `ConsolePanel`, badge de diagnòstics (`onValidate`), confetti, autoguardat i `mooc_last_session`.
 
-### LessonPage (`src/pages/courses/LessonPage.tsx`)
-- **Editor de codi interactiu** amb:
-  - `textarea` amb estil monospace (Fira Code)
-  - Auto-save cada 10s si l'usuari està escrivint
-  - Botó "Run" que envia codi a la API via `courseService.submitChallenge()` (com a fitxer CSV `multipart/form-data`)
-  - Finestra de consola popup reutilitzable (`consoleWindowRef`) per Python
-  - Resultat modal en passar (mostra "ALTRES ESTUDIANTS")
-  - Fail: inline console panel a sota de l'editor
-  - Confetti (`canvas-confetti`) en completar
-  - +10 punts per lliçó completada (persistit a localStorage `points_{userId}`)
-- **Layout**: Desktop = 3 columnes (enunciat 20%, editor 40-80%, consola 40%); Mobile = stack vertical
-- **Python**: consola popup externa + inline fail panel (no consola columna 3)
-- **No Python**: consola com a columna 3
-- `mooc_last_session` guarda última sessió activa
-- Notificacions toast via `NotificationContext`
+Endpoints: `submitChallenge`, `getPeerSubmissions`, `getChallenge`, i `api.postProgress`.
 
-### LessonTopic (`src/pages/courses/${courseId}/${lesson.id}/LessonTopic.tsx`)
-- Sidebar llista lliçons (filtrada a l'actual)
-- Explicació teòrica amb react-markdown
-- Challenge box
-- Exercise instructions
-- Navegació prev/next/go-to-activity
+### `ExamPage` (`/courses/:courseId/exam/:challengeSlug`)
+Tests de resposta única o múltiple (`RadioGroup`/`FormGroup`). Carrega via `useCourse` o `getChallenge`, llegeix submissions prèvies i envia amb `submitChallenge({ answers })`. El panell de resultat deriva de `result.correct` i de la llista `choices`.
 
-### StudentDashboard (`src/pages/dashboards/StudentDashboard.tsx`)
-- Login/create-user flow (Login component)
-- Profile card (StudentProfileCard)
-- Progress overview (ProgressOverview)
-- Course grid expansible (CourseCard)
-- Ranking per tabs (RankingCard)
-- Integra dades API + progress sync local
-- Dispara `studentsUpdated` event en crear/eliminar usuaris (per sincronitzar Hero)
-- Passa `students` com a prop a `Login`
-- Layout: `height: 100%` dins del flex container de MainLayout, sense scroll vertical/horitzontal
-- **Colors per mode dark**: fons `#111827`, cards amb `#1f2937` (via nested MuiThemeProvider que sobreescriu `background.paper`)
-- **Mode fancy**: fons transparent + `<ParticlesBackground opacityMultiplier={0.4} />`
-- Eliminat `ScrollIndicator` (no s'usava)
+### `RendimentDashboard` (`/courses/:courseId/stats`)
+Dos gràfics de barres (codi / test) per tema, amb línia discontínua "Mitjana". **Totes les dades vénen de `localStorage`** via `getFullCourseDetail` (només el catàleg). ⚠️ La "mitjana" és **fabricada** amb `Math.random()` (`RendimentDashboard.tsx:217,228`), no ve de cap endpoint de notes.
+
+### `StudentDashboard` (`/dashboards/student`)
+Login (component `Login`), resum del curs en 5 targetes (progrés general, problemes de codi per tema, tests per tema, classificació top-3, més estadístiques) i "Continua estudiant". La classificació es carrega de `getStudentsOverview` i es mapeja amb `toRanking`.
+
+### `ProfilePage` (`/profile`, `/teacher/profile`)
+4 targetes: preferències d'idioma, organitzacions, detalls del compte (amb canvi de contrasenya) i avatar. Usa `profileService`. El camp `username` és de només lectura (el `PATCH` no l'accepta). ⚠️ L'organització seleccionada és visual: no s'envia enlloc.
+
+### Teacher
+- **Dashboard**: selector de curs (desbloqueja la resta), accions ràpides i `TeacherLeaderboard`.
+- **Exercises / ExerciseList / Test**: ⚠️ totes tres fixen `cursos[0].slug!` i ignoren el curs seleccionat a `teacher_selected_course`.
+- **Exercises → ExerciseEditor**: editor Monaco + `CodePreview` (React, executa amb `new Function`) o placeholder (Python). Intèrpret de Python propi per a `for/while/if/print` i builtins bàsics. Desa a `teacher_exercise_${id}`.
+- **Courses**: cursos locals (`localCourseService`) + API; permet clonar i esborrar. ⚠️ "Crear curs" descarta el formulari (`onSubmit = () => setOpen(false)`).
+- **Test**: renderitza HTML de l'API amb `dangerouslySetInnerHTML` i permet revelar la resposta correcta.
+- **Students**: ⚠️ array buit hardcoded, zero crides de servei.
+- **Hackathon**: ⚠️ placeholder estàtic.
+
+---
+
+## 7. Hooks
+
+| Hook | Descripció |
+|------|------------|
+| `useCourse(courseId)` | React Query. `queryKey: ['course', id]`, `staleTime: 30min`, `gcTime: 60min`, `retry: 1`, `enabled` si `courseId` és vàlid. Resol ids `clone-*` a l'slug original via `localCourseService`. |
+| `prefetchCourse(queryClient, courseId)` | `prefetchQuery` del detall de curs (hover a `CourseCard`). |
+| `useTheme()` | Re-export de `{ ThemeProvider, useThemeMode }`. |
+| `useI18n()` | Re-export de `{ I18nProvider, useI18n }`. |
+
+(`useTeacherData` va existir com a fitxer buit a `src/hooks/`; s'ha esborrat.)
 
 ---
 
 ## 8. Serveis
 
-### `api.ts` — Mock localStorage API
-| Mètode | Descripció |
-|--------|------------|
-| `getStudentProgress(studentId)` | Retorna tot el progrés (`mooc_global_progress`) |
-| `postProgress({studentId, courseId, lessonId, status})` | Desa progrés + event `lessonProgressUpdated` |
-| `resetCourse(studentId, courseId)` | Reinicia progrés + codi + submissions + last_session d'un curs |
+### `api.ts` — **híbrid** (localStorage + 1 crida HTTP)
+Client axios `baseURL: ${VITE_API_URL}/api/v1`, `Authorization: Token <token>`, **`timeout: 3000`**.
 
-### `authService.ts` — Auth API
-| Mètode | Endpoint | Fallback local |
-|--------|----------|---------------|
-| `login({email, code})` | POST `/api/users/auth/login/` | No (error si API no disponible) |
-| `logout()` | POST `/api/users/auth/logout/` | Sempre neteja localStorage |
-| `getMe()` | GET `/api/users/me/settings/` | Sí (llegeix `currentStudent`) |
-| `getCurrentUser()` | — | Sí (només localStorage) |
+| Mètode | Transport | Detall |
+|--------|-----------|--------|
+| `getStudentProgress(studentId)` | localStorage | Llegeix ``mooc_global_progress_${studentId}`` |
+| `postProgress({studentId, courseId, lessonId, status})` | localStorage | Escriu `${courseId}_${lessonId}` i dispara `lessonProgressUpdated` (window + document) |
+| `resetCourse(studentId, courseId)` | localStorage | Esborra progrés, `code_*` i `mooc_submissions_*` del curs |
+| `inviteUser(email)` | **POST** `/users/invite/` | Body `{ email }` |
 
-### `courseService.ts` — Course API
-Base URL: `VITE_API_URL` env var o `https://algorien.com/api/v1`
-- Interceptor: afegeix `Authorization: Token {token}` automàtic
-- Timeout: 10s
-- `submitChallenge` envia el codi com a `File` (`submission.csv`) dins un `FormData` amb clau `file` (`Content-Type: multipart/form-data` gestionat automàticament per axios)
+### `authService.ts` — login real de l'alumne
+Sense `axios.create` → **sense timeout**, sense interceptor (per tant el `logout` no envia token).
+- `login(username, password)` → **POST** `/users/auth/login/` (JSON `{ username, password }`); desa `token`.
+- `logout()` → POST `/users/auth/logout/` (sense body); neteja `token` i `currentStudent`.
+- `register(payload)` → delega a `register.ts`.
+- `getToken()`.
+
+### `courseService.ts` — contingut de cursos
+Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache`, `allCoursesCache`, `publicCoursesCache`).
 
 | Mètode | Endpoint |
 |--------|----------|
-| `getAllCourses()` | GET `/public/courses/` |
+| `getAllCourses()` | GET `/courses/` (sensible al rol) |
+| `getPublicCourses()` | GET `/public/courses/` |
 | `getCourseBySlug(slug)` | GET `/courses/{slug}/` |
 | `getCourseTopics(slug)` | GET `/courses/{slug}/topics/` |
-| `getTopicProblems(courseSlug, topicSlug)` | GET `.../{courseSlug}/topics/{topicSlug}/problems/` |
-| `submitChallenge(courseSlug, challengeSlug, code)` | POST `.../challenges/{challengeSlug}/submissions/` (envia `code` com a `File` via `FormData` amb clau `file`) |
-| `submitSubmission(courseSlug, challengeSlug, code)` | **Deprecated** — delega a `submitChallenge` |
-| `getFullCourseDetail(slug)` | Agrega course + topics + problems en una sola crida |
+| `getTopicBySlug(c, t)` | GET `/courses/{c}/topics/{t}/` |
+| `getTopicProblems(c, t)` | GET `/courses/{c}/topics/{t}/problems/` |
+| `submitChallenge(c, t, p, body)` | POST `/courses/{c}/topics/{t}/problems/{p}/submissions/` |
+| `getChallenge(c, t, p)` | GET `.../problems/{p}/` |
+| `getChallengeSubmissions(c, t, p)` | GET `.../submissions/` |
+| `getChallengeGrades(c, t, p)` | GET `.../submissions/grades/` |
+| `getPeerSubmissions(c, t, p)` | GET `.../submissions/peers/` (torna `[]` si falla) |
+| `getStudentsOverview(c)` | GET `/courses/{c}/students/overview/` |
+| `getFullCourseDetail(slug)` | Composa curs + temes + problemes (2 + T crides) |
+| `clearCache(slug?)` | ⚠️ no neteja `publicCoursesCache` |
+
+### `localCourseService.ts` — cursos locals (sense HTTP)
+Clau `mooc_local_courses`: `getAll`, `getById`, `save`, `remove`, `cloneFrom`.
+
+### `profileService.ts` — perfil (sense timeout)
+`fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `fetchMyAvatar()` GET `/users/me/avatar/` · `updateMyAvatar(file)` **PATCH** (FormData `avatar`) · `extractProfileErrors()`.
+
+### `register.ts` — alta d'usuari
+`loadRegistrationData()` GET `/users/register/` (sense auth) · `registerUser(payload)` **POST** `/users/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.
+
+### `teacherService.ts` — ⚠️ buit (0 bytes)
 
 ---
 
-## 9. Hooks
+## 9. Autenticació i rols — dos fluxos en paral·lel
 
-| Hook | Descripció |
-|------|------------|
-| `useCourse(courseId)` | React Query: `['course', courseId]`, staleTime 30min, gcTime 60min, enabled si courseId vàlid |
-| `prefetchCourse(queryClient, courseId)` | Prefetch de dades de curs (per hover a CourseCard) |
-| `useTheme()` | Re-exporta `{ ThemeProvider, useThemeMode }` |
-| `useI18n()` | Re-exporta `{ I18nProvider, useI18n }` |
-| `useTeacherData()` | (BUIT) |
+1. **`AuthContext`** (`AuthProvider` + `useAuth()`): llegeix `currentStudent` i `token` de localStorage; exposa `login`/`logout`. ⚠️ `useAuth()` **no es consumeix enlloc** i `AuthContext.login` no omple `user`, de manera que `isAuthenticated` no s'activa mai per aquesta via.
+2. **Flux real**: `StudentDashboard.handleLogin` crida `authService.login()` directament i desa `currentStudent` a localStorage. El `Header` llegeix `token`/`currentStudent` de localStorage directament.
+
+La navegació a `/teacher` es fa des del commutador de rol del `Header` (`mooc_role`). **No hi ha validació real del token** en engegar.
 
 ---
 
-## 10. Utilitats
+## 10. Tipus (⚠️ duplicats)
 
-### `formatters.ts`
-| Funció | Descripció |
-|--------|------------|
-| `getLocalizedText(field, lang)` | Resol text multiidioma (objecte {ca, es, en} o string) |
-| `getBaseLanguage(locale, fallback)` | Extreu 'ca'/'es'/'en' d'un locale |
-| `formatProgressPercent(done, total)` | Percentatge arrodonit |
-| `calculatePoints(completed)` | `completed * 10` |
-| `padNumber(num, length)` | Padding numèric |
-| `formatTimestamp(timestamp, locale)` | Data localitzada |
-| `makeProgressKey(courseId, lessonId)` | `"{courseId}_{lessonId}"` |
+`src/types/index.ts` (18 exports) i `src/features/student/types.ts` (4) defineixen els mateixos conceptes amb formes diferents:
 
-### `validators.ts`
-| Funció | Descripció |
-|--------|------------|
-| `validatePin(student, pin)` | Compara `student.code === pin` |
-| `validateRequiredFields(fields)` | Tots els camps no buits |
-| `isValidPin(pin)` | Regex `^\d{4}$` |
-| `isValidEmail(email)` | Regex bàsic d'email |
-| `validateCodeSolution(userInput, expected)` | Substring matching (whitespace-normalitzat) |
+| Concepte | `types/index.ts` | `features/student/types.ts` | Local a hooks/components |
+|---|---|---|---|
+| `Course` | `title: string` + camps obligatoris | `title: any`, `isPublic/active/professors` | `useCourse.ts` i `components/CourseCard.tsx` en tenen versions pròpies |
+| `Lesson` | `title: string` | `title: any` | `useCourse.ts` |
+| `Student` | `id: string \| number` | `id: string` | — |
 
-### `utils.ts`
-- `sx(...styles)`: Composa múltiples objectes `sx` de MUI
+Els tipus **professor** són en castellà (`Curso`, `Estudiante`, `Ejercicio`, `Equipo`, `Hackathon`, `MensajeChat`, `ContactoChat`). Hi ha **dos `Organization`** diferents (`register.ts` i `profileService.ts`).
+
+`courseService.toCourses()` retorna `types.Course` però hi assigna `isPublic/active/professors`, que **no existeixen** en aquesta interfície (sí a la de `features/student`).
 
 ---
 
-## 11. Flux de Dades
+## 11. Utilitats
 
-### Fonts de Dades
-1. **`src/data/`** — Image mappings (`courses.ts`)
-2. **API REST** — `https://algorien.com` (proxy Vite `/api`). `courseService.ts` amb axios (token aut o timeout 10s)
-3. **localStorage** — 9+ claus:
-   - `mooc_global_progress`: `{courseId_lessonId: true}`
-   - `code_{userId}_{courseId}_{lessonId}`: Codi guardat
-   - `points_{userId}`: Punts acumulats (10 per lliçó)
-   - `currentStudent`: Estudiant sessió activa
-   - `mooc_submissions_{courseId}_{lessonId}`: Submissions
-   - `mooc_last_session`: Última sessió `{courseId, lessonId, courseTitle, lessonTitle, timestamp}`
-   - `mooc-theme-mode`: Tema (light/dark/fancy)
-   - `mooc-language`: Idioma (ca/es/en)
-   - `token`: Token API
+### `formatters.ts` (10 exports)
+`getLocalizedText`, `getBaseLanguage`, `formatProgressPercent`, `calculatePoints`, `padNumber`, `formatTimestamp`, `makeProgressKey`, `formatearFecha`, `formatearNota`, `calcularColorProgreso`.
+⚠️ Només `getLocalizedText`, `formatearFecha`, `formatearNota` i `calcularColorProgreso` s'usen. Els altres 6 són morts.
 
-### Flux Progrés (LessonPage)
-```
-handleRunTests()
-  ├── Obre/focusa consola popup (isPythonCourse)
-  ├── Envia codi a API via courseService.submitChallenge() (com a fitxer CSV dins FormData)
-  ├── Si result.status === 'correct' || result.passed === true:
-  │     ├── confetti()
-  │     ├── handleSaveProgress(true) → +10 punts
-  │     └── showResultModal(true)
-  ├── Si fail: status = 'fail', mostra console inline
-  └── useEffect sincronitza consoleOutput a la finestra popup
+### `validators.ts` i `utils.ts`
+⚠️ **Orfes**: ningú no els importa. `sx()` i els 5 validadors no s'executen enlloc.
 
-handleSaveProgress(isAutoSaveOnPass)
-  ├── Desa codi a localStorage
-  ├── Marca lliçó completada a mooc_global_progress
-  ├── Desa mooc_last_session
-  ├── Suma 10 punts a points_{userId}
-  ├── api.postProgress() → localStorage + dispatch lessonProgressUpdated
-  └── addNotification(progress_saved)
-```
-
-### Flux Autenticació
-```
-AuthContext.init()
-  ├── Llegeix token + currentStudent de localStorage
-  ├── Si token: valida via authService.getMe()
-  └── Si error: neteja localStorage, user=null
-
-StudentDashboard / Login (login local per PIN)
-  ├── handleLogin(student, pin): comprova student.code === pin
-  └── Desa a localStorage (currentStudent), dispatch 'auth-state-change'
-```
+### `monaco.ts` i `monacoCore.ts`
+Carregador local (sense CDN), temes `mooc-light/dark/fancy`, opcions d'editor (`fontSize: 18`, `lineHeight: 24`), setup de TypeScript/JSX i provider d'autocompletat de Python. Vegeu `docs/monaco.md`.
 
 ---
 
-## 12. Configuració del Build
+## 12. Tema (`src/theme/theme.ts`)
+
+`getTheme(mode)` retorna un `Theme` MUI. No exporta cap objecte de paleta.
+
+| | light | dark | fancy |
+|---|---|---|---|
+| `palette.mode` | light | dark | **dark** |
+| `primary.main` | `#8400ff` | `#9f5fff` | `#8400ff` |
+| `secondary.main` | `#ec4899` | `#ec4899` | `#ec4899` |
+| `background.default` | `white` | `#111827` | `#141414` |
+| `background.paper` | `white` | `#1f2937` | `#141414` |
+
+`shape.borderRadius: 12` (MuiCard l'apuja a 16), font `Inter, Roboto, Helvetica, Arial, sans-serif` (no es carrega cap webfont). Mode fancy = dark + `ParticlesBackground` + `body` transparent.
+
+⚠️ El color de marca `#8400ff` està **hardcoded a ~25 fitxers** i no sempre coincideix amb `primary.main` del mode actiu (en dark és `#9f5fff`). Fora del tema també apareix `#00685d` (StudentDashboard) i `#0a0e17` (RendimentDashboard).
+
+---
+
+## 13. Internacionalització
+
+- **3 idiomes**: `ca` (fallback), `es`, `en`.
+- **11 seccions** a cada fitxer: `auth`, `dashboard`, `home`, `hero`, `footer`, `course`, `common`, `profile`, `notifications`, `teacher`, `lesson`.
+- Config activa: **`src/i18n.ts`** (importada per `I18nContext` i `courseService`). `src/i18n/index.ts` és un duplicat mort.
+- `LanguageDetector` desa a la clau `i18nextLng`, mentre que `I18nContext` usa `mooc-language` → **dues claus per a l'idioma**. A més, `LanguageSwitcher` crida `i18n.changeLanguage` directament i no passa per `I18nContext`, així que no actualitza `mooc-language`.
+
+### Defectes de traducció coneguts
+- `Footer.tsx:46` crida `t('Accedir')` (clau literal sense prefix); no existeix → es mostra "Accedir".
+- `ca.ts` diu "Contrassenya (10 digits)" però `isValidPin` exigeix 4.
+- Diversos textos de professor estan hardcoded en castellà (`CourseForm`, `ChatWidget`, alertes d'`InviteStudents`).
+- `StudentDashboard` usa `<...>` amb valor per defecte en català (`t('dashboard.code_correct', 'Problemes de programació')`) per a claus que no existeixen als fitxers d'idioma.
+
+---
+
+## 14. Configuració del Build
 
 ```bash
-npm install          # Instal·lar dependències
-npm run dev          # Executar desenvolupament (http://localhost:5173)
-npm run build        # Producció (tsc -b && vite build)
-npm run preview      # Previsualitzar build
+npm install
+npm run dev        # http://localhost:5173
+npm run build      # tsc -b && vite build
+npm run preview
 ```
 
-### Vite Config
+### Vite (`vite.config.ts`)
 | Opció | Valor |
 |-------|-------|
-| Path alias | `@` → `./src` |
+| Alias | `@` → `./src` |
 | Proxy | `/api` → `https://algorien.com` (changeOrigin) |
-| Server port | `5173` |
-| watch.usePolling | `true` |
-| Build sourcemap | `true` |
-| build.cssCodeSplit | `true` |
-| build.reportCompressedSize | `true` |
-| optimizeDeps.include | @mui/material, @mui/material/styles, @emotion/react, @emotion/styled, framer-motion |
+| Port | `5173`, `watch.usePolling: true` |
+| Build | `sourcemap: true`, `reportCompressedSize: true`, `cssCodeSplit: true` |
+| optimizeDeps.include | `@mui/material`, `@mui/material/styles`, `@emotion/react`, `@emotion/styled`, `framer-motion` |
 
-### TypeScript Config
-- Target: ES2020, Module: ESNext
-- Strict mode
-- Path alias: `@/*` → `./src/*`
-- JSX: react-jsx
+### TypeScript (`tsconfig.json`)
+`target ES2020`, `module ESNext`, `moduleResolution: bundler`, `strict`, **`noUnusedLocals`**, **`noUnusedParameters`**, `noFallthroughCasesInSwitch`, `jsx: react-jsx`, `noEmit`, `paths { "@/*": ["./src/*"] }`, `types: ["node"]`, `include: ["src"]`.
 
----
+### Desplegament (`netlify.toml`)
+`command: npm run build` → `publish: dist`, `NODE_OPTIONS=--max_old_space_size=4096`; redirect `/api/*` → `https://algorien.com/api/:splat` (200) i fallback SPA `/*` → `/index.html`.
 
-## 13. Tema (theme.ts)
-
-| Propietat | Valor |
-|-----------|-------|
-| Colors primaris | `#8400ff` (porpra) |
-| Colors secundaris | `#ec4899` (rosa) |
-| Fons dark/fancy | `#141414` |
-| Fons light | `white` |
-| Font | Inter, Roboto, Helvetica, Arial, sans-serif |
-| Border radius | 12 (buttons), 16 (cards) |
-| textTransform | 'none' (MuiButton) |
-
-3 modes: `light`, `dark`, `fancy` (fancy = dark + ParticlesBackground + text colors #e4e4e4). En mode fancy, ThemeContext sobreescriu `document.body.style.backgroundColor = 'transparent'` per evitar que CssBaseline tapin les partícules. StudentDashboard usa un MuiThemeProvider niu que sobreescriu `background.paper` a `#1f2937` en mode dark.
+### Variables d'entorn
+⚠️ **No hi ha cap fitxer `.env`** al repositori. Per tant `import.meta.env.VITE_API_URL` és sempre `undefined` → `|| ''` → totes les URLs de servei són **relatives** (`/api/v1/...`), que en dev passen pel proxy de Vite i en producció pel redirect de Netlify.
 
 ---
 
-## 14. Traduccions
+## 15. Flux de Dades
 
-| Fitxer | Línies | Seccions |
-|--------|--------|----------|
-| `ca.ts` | 132 | auth, dashboard, home, hero, footer, course, common, lesson (syllabus, run, debug, objective, challenge, points, etc.), **notifications (9 claus)** |
-| `es.ts` | 138 | Mateixes seccions |
-| `en.ts` | 134 | Mateixes seccions |
+### Fonts
+1. **API REST** `https://algorien.com/api/v1` (via proxy/redirect).
+2. **localStorage** (claus principals, agrupades):
+   - Sessió: `token`, `currentStudent`, `mooc_role`.
+   - Progrés: `mooc_global_progress_${id}` (mapa `${courseId}_${lessonId}`), `mooc_shared_all_progress`.
+   - Codi i submissions: `code_${userId}_${courseId}_${lessonId}` (+ `_view`), `mooc_submissions_${courseId}_${lessonId}`.
+   - Sessió/UX: `mooc_last_session`, `mooc_dashboard_last_course`, `mooc_tab_${slug}`, `mooc_expanded_${slug}`, `mooc_done_order_${slug}`, `mooc_streak_${id}`.
+   - Config: `mooc-theme-mode`, `mooc-language` (+ `i18nextLng`).
+   - Professor: `mooc_local_courses`, `mooc_local_students`, `mooc_deleted_ids`, `teacher_selected_course(_name)`, `teacher_selected_topic`, `teacher_selected_exercise`, `teacher_submenu`, `teacher_exercise_${id}`.
+3. **`src/data/courses.ts`** — mapa d'imatges (només 2 entrades).
 
-### Notificacions (9 claus multiidioma)
-- `progress_saved`, `progress_error`, `account_created`, `user_deleted`, `incorrect_pin`, `welcome`, `session_closed`, `course_reset`, `course_reset_error`
-- Interpolació i18next: `{{name}}`, `{{role}}`
+### Esdeveniments com a bus d'estat
+`lessonProgressUpdated` (progrés), `auth-state-change` (sessió/perfil), `studentsUpdated` (Hero), `teacher-course-changed` (Sidebar), i els natius `storage` i `visibilitychange`. ⚠️ `Header` encara dispara un `authChange` llegat que ningú escolta.
 
 ---
 
-## 15. Estat Actual del Projecte
+## 16. Estat Actual del Projecte
 
 ### ✅ Implementat
-- Landing page completa (Hero typewriter + stats dinàmiques + course grid + features + footer)
-- 3-column lesson browser (syllabus accordion animat + contingut Markdown + "On this page" anchors, drawer mòbil)
-- Editor de codi interactiu (LessonPage): run tests, console popup, confetti, auto-save, submissions, +10 punts
-- Vista teòrica (LessonTopic): sidebar, explicació Markdown, challenge, navegació prev/next
-- StudentDashboard complet: login PIN, create/delete students, perfil, progrés, cursos expansibles, rànquing
-- Multiidioma (CA, ES, EN) amb i18next + browser detector
-- 3 modes de tema (light, dark, fancy) amb localStorage
-- Toast notifications amb react-spring
-- ParticlesBackground en mode fancy
-- API integration (courseService) amb React Query caching + hover prefetch
-- Persistència localStorage: progrés, codi, punts, usuaris, tema, idioma, última sessió
-- React 19 patterns: `use()` en lloc de `useContext()`, FormEvent imports, cap `import React`
-- MainLayout: flex column amb `height: 100dvh`, Header + Outlet amb `flex: 1, overflow: hidden` (sense scroll vertical a les pàgines filles)
-- Notificacions traduïdes als 3 idiomes
-- mooc_last_session per recordar última lliçó
-- Scrollbar estilitzada
-- Spinners fullscreen (fixed, inset:0, zIndex:9999)
-- Header "My Progress" bgcolor adaptatiu: `action.hover` en dark, `alpha(primary, 0.08)` en light
-- Esquema de colors per mode dark al dashboard: fons `#111827`, cards `#1f2937`; mode fancy: fons transparent amb partícules; mode light: fons/blancs per defecte
-- Header AppBar bgcolor per mode: fancy → `black`, dark → `#1f2937`, light → `white`
-- `ParticlesBackground` accepta prop `opacityMultiplier` per controlar opacitat per instància
+- Landing (Hero typewriter + stats + grid de cursos + features + Footer).
+- Navegador de curs de 4 pestanyes amb rail flotant i reordenació de lliçons completades.
+- **Editor Monaco** amb multi-fitxer (Python/React), temes propis, validació, **DiffEditor "Solució Profe"** i **preview React en viu**.
+- Tests (`ExamPage`) de resposta única/múltiple amb feedback i nota.
+- Rànquing d'alumne (`students/overview`) i dashboard amb 5 targetes.
+- Panell de rendiment per tema (`/stats`).
+- Perfil complet (avatar, contrasenya, idioma, organizacions visuals).
+- **Secció professor sencera**: layout, sidebar, tauler, editor d'exercicis, llistats, tests, classificació, cursos locals, invitacions.
+- Multiidioma (CA/ES/EN), 3 modes de tema, toastos, partícules.
+- `netlify.toml` i proxy Vite.
+- Capa React Query per al detall de curs + prefetch.
 
-### ❌ Per Implementar
-- Pàgines teacher: `Courses.tsx`, `Dashboard.tsx`, `Exercises.tsx`, `Students.tsx`
-- Components teacher: `ChatWidget.tsx`, `CourseForm.tsx`, `ExerciseEditor.tsx`, `StatsCards.tsx`, `StudentFilters.tsx`, `StudentTable.tsx`
-- `useTeacherData.ts`, `teacherService.ts`, `TeacherLayout.tsx`
-- `ProgressBar.tsx`, `SearchInput.tsx`
-
-### ⚠️ Observacions
-- `AuthContext` connectat a main.tsx, però StudentDashboard i Header encara fan servir localStorage directament (no `useAuth()`)
-- `authService.login()` NO té fallback local — error si API no disponible
-- `api.ts` és només localStorage (sense axios)
-- `courseService.ts` NO té fallback a `data/courses.ts` — error si API no disponible
-- `src/i18n/index.ts` és duplicat de `src/i18n.ts` i no s'importa (deixat de migració)
-- `src/App.css` existeix però no s'importa
-- Inconsistència color de fons: MUI theme `#141414` vs ParticlesBackground `#0a0a0a` vs scrollbar `#0a0a0a`. **Parcialment resolt**: en mode fancy, `body` i wrapper `App` es posen `transparent` perquè es vegi el canvas. El dark mode del dashboard usa `#111827` (fons) i `#1f2937` (cards)
-- `"react-is": "19.0.0"` override a package.json per compatibilitat MUI v9
-- `Hero.tsx` mostra recompte dinàmic d'estudiants (escolta event `studentsUpdated`)
-- `Login.tsx` rep `students` com a prop (no fusiona internament)
-- `StudentDashboard` dispara `studentsUpdated` en crear/eliminar usuaris; `height: 100%` dins del flex container, sense scroll
-- `LessonTopic.tsx` té `localCourses` no definit (potencial bug)
-- `LessonPage.tsx` crida `courseService.submitChallenge()`, que envia el codi com a `File` (`submission.csv`) dins un `FormData` (`multipart/form-data`)
-- `submitSubmission` queda com a wrapper **deprecated** cap a `submitChallenge`
+### ⚠️ Deute tècnic / pendents
+- Fitxer buit: `services/teacherService.ts`. (`hooks/useTeacherData.ts` era buit però ja s'ha esborrat.)
+- Fitxers orfes: `App.css`, `i18n/index.ts`, `utils/utils.ts`, `utils/validators.ts` i 6 peces de `features/student/`.
+- `useAuth()` no s'usa; `AuthContext.login` no s'actualitza.
+- `babel-plugin-react-compiler` i tot Tailwind declarats però inactius.
+- Duplicació de tipus (`Course`/`Lesson`/`Student`/`Organization`) i de config i18n.
+- `Exercises`/`ExerciseList`/`Test` ignoren el curs seleccionat (fixen `cursos[0]`).
+- `Students` buit hardcoded; `Hackathon` estàtic; "Crear curs" és un no-op.
+- `RendimentDashboard` fabrica la "mitjana" amb `Math.random()`.
+- `Test.tsx` i `CodePreview`/`ExerciseEditor` executen/serveixen codi/HTML sense sanejament.
+- Sense guarda de ruta a `/teacher`; sense validació de token a l'engegada.
+- `Footer` només a Home; `LanguageSwitcher` no persisteix a `mooc-language`.
+- Clau i18n `dashboard.code_correct`/`tests_correct` inexistents als fitxers (es veuen en català).
 
 ---
 
-## 16. APIs Utilitzades
+## 17. APIs Utilitzades
 
-### API REST — Backend `https://algorien.com` (proxy Vite: `/api`)
+Vegeu `docs/apis.md` per a la referència completa. Resum:
 
-| Mètode | Endpoint | Ús | Servei |
-|--------|----------|-----|--------|
-| POST | `/api/users/auth/login/` | Login usuari | `authService.ts` |
-| POST | `/api/users/auth/logout/` | Logout usuari | `authService.ts` |
-| GET | `/api/users/me/settings/` | Dades usuari actual | `authService.ts` |
-| GET | `/api/v1/public/courses/` | Llistat públic cursos | `courseService.ts` |
-| GET | `/api/v1/courses/{slug}/` | Detalls d'un curs | `courseService.ts` |
-| GET | `/api/v1/courses/{slug}/topics/` | Lliçons d'un curs | `courseService.ts` |
-| GET | `/api/v1/courses/{slug}/topics/{topic}/problems/` | Problemes d'un tema | `courseService.ts` |
-| POST | `/api/v1/courses/{slug}/challenges/{challenge}/submissions/` | Enviar solució challenge (com a `File` dins `FormData`) | `courseService.ts` |
-
-### APIs de Tercers / Llibreries
-
-| API / Llibreria | Ús |
-|----------------|-----|
-| **@tanstack/react-query** | Cache + prefetching (useQuery, QueryClientProvider) |
-| **react-router-dom** | SPA routing (Links, Routes, useNavigate, useParams, useLocation) |
-| **i18next + react-i18next** | Traduccions (useTranslation, i18n.changeLanguage) |
-| **framer-motion** | Animacions (motion.div, AnimatePresence, whileInView, whileHover) |
-| **@react-spring/web** | Animacions toast (useTransition, useSpring) |
-| **axios** | HTTP client |
-| **canvas-confetti** | Confetti en completar lliçons |
-| **MUI v9** | Sistema components (ThemeProvider, CssBaseline, Box, Card, Button, Accordion, etc.) |
-| **localStorage API** | Persistència: progrés, codi, punts, usuaris, tema, idioma, submissions, última sessió |
-| **Canvas API** | Fons interactiu partícules (ParticlesBackground) |
-| **window.dispatchEvent** | Comunicació entre components (`auth-state-change`, `lessonProgressUpdated`, `studentsUpdated`) |
-| **babel-plugin-react-compiler** | Optimització React 19 |
+- **Auth/usuari** (`authService`, `register`, `profileService`): login, logout, register, settings (GET/PATCH), avatar (GET/PATCH), orgs, invite.
+- **Cursos** (`courseService`): cursos, temes, problemes, submissions (enviar/consultar/notes/peers), overview d'alumnes.
+- **Tercers**: React Query, react-router v7, i18next, framer-motion, react-spring, axios, canvas-confetti, MUI v9, Monaco, react-markdown, lucide-react, Canvas API, `window.dispatchEvent`.
 
 ---
 
-## 17. Package.json — Scripts i Overrides
+## 18. Scripts i Overrides
 
-### Scripts
-| Script | Comando |
+| Script | Comanda |
 |--------|---------|
 | `dev` | `vite` |
 | `build` | `tsc -b && vite build` |
 | `preview` | `vite preview` |
 
-### Overrides
 ```json
-"overrides": {
-  "react-is": "19.0.0"
-}
+"overrides": { "react-is": "19.0.0" }
 ```
-(Necessari per compatibilitat MUI v9 amb React 19)
