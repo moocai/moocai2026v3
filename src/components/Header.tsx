@@ -12,15 +12,8 @@ import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
 const logo = '/img/logo.webp';
 
-/** Cada activitat superada val 10 punts. */
 const POINTS_PER_LESSON = 10;
 
-/**
- * Punts globals de l'alumne, llegits de `mooc_global_progress_<id>` i
- * `mooc_shared_all_progress` (mateixa fusió que fa el dashboard). S'escolta
- * `lessonProgressUpdated` perquè els punts s'actualitzin en superar una
- * activitat, sense haver de recarregar la pàgina.
- */
 function usePoints() {
   const [points, setPoints] = useState(0);
 
@@ -178,7 +171,7 @@ export function Header() {
           </Box>
 
           {/* DESKTOP NAV */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3 }}>
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3, mr: -5}}>
             <Button onClick={scrollToCourses} sx={commonButtonStyle}>
               {t('footer.courses')}
             </Button>

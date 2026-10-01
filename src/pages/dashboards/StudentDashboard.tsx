@@ -14,6 +14,8 @@ import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
+import CodeIcon from '@mui/icons-material/Code';
+import FactCheckOutlinedIcon from '@mui/icons-material/FactCheckOutlined';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -334,22 +336,29 @@ export default function StudentDashboard() {
   }, [assignedCourses, publicCourses]);
 
   const stats = useMemo(() => {
+    const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
     const course = visibleCourses[courseTabIndex] || null;
-    if (!course || !selectedStudent) return { streak: 0, successRate: 0, remainingHours: 0 };
-    const codeLessons = getFlatLessons(course).filter((l) => !isTestLesson(l));
-    const progress = selectedStudent ? getProgress(selectedStudent.id) : {};
-    const totalCode = codeLessons.length || 0;
-    const doneCode = codeLessons.filter(
-      (l) => progress[`${course.id}_${l.id}`] === true,
-    ).length;
-    const remainingLessons = totalCode - doneCode;
-    const successRate = totalCode > 0 ? Math.round((doneCode / totalCode) * 100) : 0;
-    const remainingHours = Math.round(remainingLessons * 0.5 * 10) / 10;
-    const streak = (() => {
-      const raw = localStorage.getItem(`mooc_streak_${selectedStudent.id}`);
-      return raw ? parseInt(raw, 10) || 0 : 0;
-    })();
-    return { streak, successRate, remainingHours };
+    if (!course || !selectedStudent) return empty;
+
+    const lessons = getFlatLessons(course);
+    const codeLessons = lessons.filter((l) => !isTestLesson(l));
+    const testLessons = lessons.filter((l) => isTestLesson(l));
+    const progress = getProgress(selectedStudent.id);
+    const isDone = (l: any) => progress[`${course.id}_${l.id}`] === true;
+
+    const codeTotal = codeLessons.length;
+    const codeDone = codeLessons.filter(isDone).length;
+    const testTotal = testLessons.length;
+    const testDone = testLessons.filter(isDone).length;
+
+    const successRate = codeTotal > 0 ? Math.round((codeDone / codeTotal) * 100) : 0;
+    const testRate = testTotal > 0 ? Math.round((testDone / testTotal) * 100) : 0;
+    const remainingHours = Math.round((codeTotal - codeDone) * 0.5 * 10) / 10;
+
+    const raw = localStorage.getItem(`mooc_streak_${selectedStudent.id}`);
+    const streak = raw ? parseInt(raw, 10) || 0 : 0;
+
+    return { streak, successRate, remainingHours, codeDone, codeTotal, testRate };
   }, [visibleCourses, courseTabIndex, selectedStudent, dbProgress]);
 
   if (loading) return (
@@ -584,26 +593,54 @@ export default function StudentDashboard() {
                         <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
                           <Stack
                             direction={{ xs: 'row', md: 'column' }}
-                            spacing={2}
-                            sx={{ flex: 1, py: 2, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
+                            spacing={{ xs: 2, md: 1.25 }}
+                            sx={{ flex: 1, py: { xs: 2, md: 1 }, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
                           >
+                            {/* 1. Ratxa */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <WhatshotIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <WhatshotIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.streak')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.streak}</Box> {t('dashboard.days')}
                               </Typography>
                             </Box>
                             <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'none' } }} />
                             <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
+
+                            {/* 2. Taxa d'èxit */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <CheckCircleOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.success_rate')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.successRate}%</Box>
                               </Typography>
                             </Box>
                             <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
+
+                            {/* 4. Problemes de programació correctes */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 30 } }} />
+                              <CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {t('dashboard.code_correct', 'Problemes de programació')}:{' '}
+                                <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>
+                                  {stats.codeDone}/{stats.codeTotal}
+                                </Box>
+                              </Typography>
+                            </Box>
+                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
+
+                            {/* 5. Tests correctes */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <FactCheckOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
+                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+                                {t('dashboard.tests_correct', 'Tests correctes')}:{' '}
+                                <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>
+                                  {stats.testRate}%
+                                </Box>
+                              </Typography>
+                            </Box>
+                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
+                            {/* 3. Temps restant */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                                 {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
                               </Typography>
