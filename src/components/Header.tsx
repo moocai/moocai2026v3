@@ -134,17 +134,12 @@ export function Header() {
     };
   }, [location, mobileOpen]);
 
-  const handleLogout = async () => {
-    try { await authService.logout(); } 
-    catch (e) { console.warn("Logout error", e); } 
-    finally {
-      localStorage.removeItem('token');
-      localStorage.removeItem('currentStudent');
-      setIsLoggedIn(false);
-      setMobileOpen(false);
-      window.dispatchEvent(new Event('authChange'));
-      navigate('/');
-    }
+  const handleLogout = () => {
+    authService.logout();
+    setIsLoggedIn(false);
+    setMobileOpen(false);
+    window.dispatchEvent(new Event('authChange'));
+    navigate('/');
   };
 
   const commonButtonStyle = {

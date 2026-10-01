@@ -3,9 +3,6 @@ import { Course } from '../types';
 import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
 
-/* ------------------------------------------------------------------ */
-/* Configuració d'URL (Blindada)                                      */
-/* ------------------------------------------------------------------ */
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 

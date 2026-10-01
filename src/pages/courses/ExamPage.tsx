@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, RadioGroup, FormControlLabel, FormControl, FormGroup, Stack } from '@mui/material';
-import { ChevronLeft, Send, Zap } from 'lucide-react';
+import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, RadioGroup, FormControlLabel, FormControl, FormGroup, Stack, Alert, AlertTitle } from '@mui/material';
+import { ChevronLeft, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
 import { courseService } from '../../services/courseService';
@@ -19,9 +19,15 @@ export default function ExamPage() {
   const [currentIdx, setCurrentIdx] = useState<number>(0);
   const [exam, setExam] = useState<any>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
-  const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [submissions, setSubmissions] = useState<any[]>([]);
+
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  const REVEAL_DELAY_MS = 3000;
+  const pendingRef = useRef<string[]>([]);
+  const [revealDeadline, setRevealDeadline] = useState<number | null>(null);
+  const [revealMsLeft, setRevealMsLeft] = useState(0);
 
   const lang = i18n.language?.split('-')[0] || 'ca';
 
@@ -31,9 +37,14 @@ export default function ExamPage() {
     return field[lang] || field.ca || field.es || field.en || '';
   }, [lang]);
 
+  // Fa scroll fins al feedback just després d'enviar
+  useEffect(() => {
+    if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [result]);
+
   useEffect(() => {
     if (!courseId || !challengeSlug || !course) return;
-    
+
     const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === challengeSlug));
     const tests = topic?.subTopics?.filter((st: any) => st.type === 'test') || [];
     setTopicTests(tests);
@@ -54,6 +65,7 @@ export default function ExamPage() {
       try {
         setLoading(true);
         setResult(null);
+        setRevealDeadline(null);
         setSelectedAnswers([]);
 
         const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
@@ -82,65 +94,85 @@ export default function ExamPage() {
     return () => { cancelled = true; };
   }, [courseId, currentTestSlug, course]);
 
-  const isLastQuestion = currentIdx === topicTests.length - 1 || topicTests.length === 0;
-
-  const handleSubmit = async () => {
-    if (submitting || !courseId || !currentTestSlug || selectedAnswers.length === 0 || !isLastQuestion) return;
-    setSubmitting(true);
-    setResult(null);
-
-    try {
-      const topic = course?.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
-      if (!topic) throw new Error(t('exam.topic_not_found', "No s'ha trobat el tema del problema"));
-
-      const topicSlug = topic.id;
-      const answersToSubmit = [...selectedAnswers];
-
-      const response = await courseService.submitChallenge(courseId, topicSlug, currentTestSlug, { answers: answersToSubmit });
-      setResult(response);
-
-      const subs = await courseService.getChallengeSubmissions(courseId, topicSlug, currentTestSlug).catch(() => []);
-      setSubmissions(Array.isArray(subs) ? subs : []);
-
-      const passed = response?.correct === true;
-      const savedStudent = localStorage.getItem('currentStudent');
-      let studentId = 'temp';
-
-      try {
-        if (savedStudent) {
-          const parsedStudent = JSON.parse(savedStudent);
-          if (parsedStudent?.id) studentId = parsedStudent.id;
-        }
-      } catch { studentId = 'temp'; }
-
-      const progressKey = `mooc_global_progress_${studentId}`;
-      let progress: Record<string, any> = {};
-      try { progress = JSON.parse(localStorage.getItem(progressKey) || '{}'); } catch { progress = {}; }
-
-      const challengeKey = `${courseId}_${currentTestSlug}`;
-      if (passed) progress[challengeKey] = true;
-      else if (progress[challengeKey] !== true) progress[challengeKey] = 'attempted';
-
-      localStorage.setItem(progressKey, JSON.stringify(progress));
-      window.dispatchEvent(new Event('lessonProgressUpdated'));
-    } catch (error: any) {
-      const detail = error?.response?.data;
-      const message = typeof detail === 'string' ? detail : (detail && typeof detail === 'object' ? Object.values(detail).flat().join(' ') : error?.message || t('exam.error', 'Error en enviar'));
-      console.error('Error en enviar la resposta:', error);
-      setResult({ error: message });
-    } finally {
-      setSubmitting(false);
+  // Comprova la resposta al moment, sense enviar res al backend
+  const evaluate = (answers: string[]) => {
+    const correctSet = new Set<string>(
+      (choices as any[]).filter((c: any) => c.is_correct).map((c: any) => String(c.id))
+    );
+    if (correctSet.size === 0) {
+      setResult({ error: t('exam.no_solution', "No es pot comprovar la resposta: l'examen no inclou la solució") });
+      return;
     }
+
+    const passed = answers.length === correctSet.size && answers.every((a) => correctSet.has(a));
+    setResult({ correct: passed });
+
+    if (!courseId || !currentTestSlug) return;
+    let studentId = 'temp';
+    try {
+      const savedStudent = localStorage.getItem('currentStudent');
+      if (savedStudent) {
+        const parsedStudent = JSON.parse(savedStudent);
+        if (parsedStudent?.id) studentId = parsedStudent.id;
+      }
+    } catch { studentId = 'temp'; }
+
+    const progressKey = `mooc_global_progress_${studentId}`;
+    let progress: Record<string, any> = {};
+    try { progress = JSON.parse(localStorage.getItem(progressKey) || '{}'); } catch { progress = {}; }
+
+    const challengeKey = `${courseId}_${currentTestSlug}`;
+    if (passed) progress[challengeKey] = true;
+    else if (progress[challengeKey] !== true) progress[challengeKey] = 'attempted';
+
+    localStorage.setItem(progressKey, JSON.stringify(progress));
+    window.dispatchEvent(new Event('lessonProgressUpdated'));
   };
 
+  // ---- Revelació diferida: 3 s després de la darrera selecció ----
+  useEffect(() => {
+    if (revealDeadline === null) return;
+    const id = window.setInterval(() => {
+      const left = Math.max(0, revealDeadline - Date.now());
+      setRevealMsLeft(left);
+      if (left === 0) {
+        window.clearInterval(id);
+        setRevealDeadline(null);
+        evaluate(pendingRef.current);
+      }
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [revealDeadline]);
+
+  const armReveal = (answers: string[]) => {
+    pendingRef.current = answers;
+    setRevealMsLeft(REVEAL_DELAY_MS);
+    setRevealDeadline(Date.now() + REVEAL_DELAY_MS);
+  };
+
+  // Selecció múltiple: s'avalua quan s'han marcat tantes opcions com respostes correctes hi ha
   const handleCheckboxChange = (value: string, checked: boolean) => {
-    setSelectedAnswers((previous) => {
-      if (checked) return previous.includes(value) ? previous : [...previous, value];
-      return previous.filter((answer) => answer !== value);
-    });
+    if (answered) return;
+    const next = checked
+      ? (selectedAnswers.includes(value) ? selectedAnswers : [...selectedAnswers, value])
+      : selectedAnswers.filter((answer) => answer !== value);
+    setSelectedAnswers(next);
+    if (next.length >= correctCount) armReveal(next);
+    else setRevealDeadline(null);
   };
 
-  const handleRadioChange = (value: string) => setSelectedAnswers([value]);
+  // Elecció única: en marcar una opció, el feedback surt 3 s després
+  const handleRadioChange = (value: string) => {
+    if (answered) return;
+    setSelectedAnswers([value]);
+    armReveal([value]);
+  };
+
+  const handleRetry = () => {
+    setRevealDeadline(null);
+    setResult(null);
+    setSelectedAnswers([]);
+  };
 
   if (loading && !exam) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
@@ -151,19 +183,67 @@ export default function ExamPage() {
   }
 
   const latestSubmission = submissions?.[submissions.length - 1];
-  const grade = latestSubmission?.grade ?? latestSubmission?.score ?? (typeof result?.correct === 'boolean' ? (result.correct ? exam.score ?? 10 : 0) : undefined);
+  const grade = typeof result?.correct === 'boolean' ? (result.correct ? exam.score ?? 10 : 0) : undefined;
   const title = exam.title || exam.name || getText(exam.subtitle) || currentTestSlug;
   const statement = exam.statement_ca || exam.statement || exam.description || getText(exam.text) || '';
   const examData = (window as any).EXAM_DATA?.[currentTestSlug || ''];
   const rawChoices = examData?.options || exam.choices || [];
-  
+
   const choices = examData ? rawChoices.map((option: any) => ({
     id: option.id,
     is_correct: option.id === examData.correctAnswerId,
     textHtml: `<p>${option.text}</p>`,
   })) : rawChoices;
 
-  const isMultiChoice = choices.filter((choice: any) => choice.is_correct).length > 1;
+  const correctCount = choices.filter((choice: any) => choice.is_correct).length;
+  const isMultiChoice = correctCount > 1;
+
+  // ---- Feedback just després d'enviar ----
+  const answered = !!result && !result.error;
+  const isCorrect = result?.correct === true;
+  const pointsEarned = isCorrect
+    ? (result.points_awarded ?? result.points ?? exam.score ?? 10)
+    : 0;
+
+  // Si el backend retorna result.choices el fem servir; si no, caiem a les opcions locals
+  const reviewChoices: any[] = Array.isArray(result?.choices) ? result.choices : [];
+  const correctChoices: any[] = (reviewChoices.length ? reviewChoices : choices).filter((c: any) => c.is_correct);
+  const correctIds = new Set<string>(correctChoices.map((c: any) => String(c.id)));
+
+  const choiceState = (value: string): 'correct' | 'wrong' | null => {
+    if (!answered) return null;
+    if (correctIds.has(value)) return 'correct';
+    if (selectedAnswers.includes(value)) return 'wrong';
+    return null;
+  };
+
+  const choiceSx = (value: string, checked: boolean) => {
+    const state = choiceState(value);
+    const color = state === 'correct' ? theme.palette.success.main
+      : state === 'wrong' ? theme.palette.error.main
+      : checked ? '#8400ff' : null;
+    return {
+      p: 0.5,
+      borderRadius: 1,
+      borderWidth: state ? 2 : 1,
+      borderColor: color ?? 'divider',
+      bgcolor: color ? alpha(color, 0.08) : 'transparent',
+    };
+  };
+
+  const choiceBadge = (value: string) => {
+    const state = choiceState(value);
+    if (!state) return null;
+    const isSel = selectedAnswers.includes(value);
+    return (
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 4, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, color: state === 'correct' ? 'success.main' : 'error.main' }}>
+        {state === 'correct' ? <CircleCheck size={14} /> : <CircleX size={14} />}
+        {state === 'correct'
+          ? (isSel ? t('exam.your_correct', 'Has encertat!') : t('exam.was_correct', 'Era la resposta correcta'))
+          : t('exam.your_wrong', 'La teva resposta')}
+      </Box>
+    );
+  };
 
   return (
     <Box sx={{ width: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
@@ -200,7 +280,7 @@ export default function ExamPage() {
               </Box>
             </Box>
 
-            <FormControl disabled={submitting} fullWidth>
+            <FormControl disabled={answered} fullWidth>
               {isMultiChoice ? (
                 <FormGroup>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: choices.length > 6 ? '1fr 1fr' : '1fr' }, gap: 1 }}>
@@ -209,12 +289,13 @@ export default function ExamPage() {
                       const value = typeof choice === 'string' ? choice : String(choice.id ?? choice.value ?? index);
                       const checked = selectedAnswers.includes(value);
                       return (
-                        <Paper key={value} variant="outlined" sx={{ p: 0.5, borderRadius: 1, borderColor: checked ? '#8400ff' : 'divider', bgcolor: checked ? alpha('#8400ff', 0.06) : 'transparent' }}>
+                        <Paper key={value} variant="outlined" sx={choiceSx(value, checked)}>
                           <FormControlLabel
                             control={<Checkbox checked={checked} onChange={(event) => handleCheckboxChange(value, event.target.checked)} sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
                             label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
                             sx={{ mx: 1, width: '100%', mr: 0 }}
                           />
+                          {choiceBadge(value)}
                         </Paper>
                       );
                     })}
@@ -228,13 +309,14 @@ export default function ExamPage() {
                       const value = typeof choice === 'string' ? choice : String(choice.id ?? choice.value ?? index);
                       const checked = selectedAnswers[0] === value;
                       return (
-                        <Paper key={value} variant="outlined" sx={{ p: 0.5, borderRadius: 1, borderColor: checked ? '#8400ff' : 'divider', bgcolor: checked ? alpha('#8400ff', 0.06) : 'transparent' }}>
+                        <Paper key={value} variant="outlined" sx={choiceSx(value, checked)}>
                           <FormControlLabel
                             value={value}
                             control={<Radio sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
                             label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
                             sx={{ mx: 1, width: '100%', mr: 0 }}
                           />
+                          {choiceBadge(value)}
                         </Paper>
                       );
                     })}
@@ -242,6 +324,12 @@ export default function ExamPage() {
                 </RadioGroup>
               )}
             </FormControl>
+
+            {revealDeadline !== null && (
+              <Typography sx={{ mt: 2, fontSize: '0.8rem', color: 'text.secondary', textAlign: 'right' }}>
+                {t('exam.reveal_in', "Resposta correcta d'aquí a")} {Math.ceil(revealMsLeft / 1000)} s
+              </Typography>
+            )}
 
             {/* Botons de navegació i enviament */}
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', mt: 3, gap: 2 }}>
@@ -259,55 +347,25 @@ export default function ExamPage() {
               </Box>
 
               <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'stretch', sm: 'flex-end' }, gap: 0.5, width: { xs: '100%', sm: 'auto' } }}>
-                <Button 
-                  variant="contained" 
-                  endIcon={submitting ? <CircularProgress size={18} color="inherit" /> : <Send size={18} />} 
-                  onClick={handleSubmit} 
-                  disabled={selectedAnswers.length === 0 || submitting || !isLastQuestion} 
-                  sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2, width: { xs: '100%', sm: 'auto' } }}
-                >
-                  {submitting ? t('exam.sending', 'Enviant...') : t('exam.submit', 'Enviar')}
-                </Button>
-                {!isLastQuestion && <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', textAlign: { xs: 'center', sm: 'right' } }}>{t('exam.reach_last_question', "Has d'arribar a l'última pregunta per poder enviar")}</Typography>}
-                {isLastQuestion && selectedAnswers.length === 0 && <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', textAlign: { xs: 'center', sm: 'right' } }}>{t('exam.select_at_least_one', 'Selecciona com a mínim una opció')}</Typography>}
-                {isLastQuestion && selectedAnswers.length > 0 && <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', textAlign: { xs: 'center', sm: 'right' } }}>{selectedAnswers.length} {selectedAnswers.length === 1 ? 'opció seleccionada' : 'opcions seleccionades'}</Typography>}
+                {answered ? (
+                  <Button
+                    variant="outlined"
+                    onClick={handleRetry}
+                    sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2, width: { xs: '100%', sm: 'auto' } }}
+                  >
+                    {t('exam.retry', 'Torna-ho a provar')}
+                  </Button>
+                ) : (
+                  isMultiChoice && (
+                    <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', textAlign: { xs: 'center', sm: 'right' } }}>
+                      {t('exam.pick_n', 'Tria {{count}} opcions', { count: correctCount })} ({selectedAnswers.length}/{correctCount})
+                    </Typography>
+                  )
+                )}
               </Box>
             </Box>
           </Paper>
         </Box>
-
-        {result && (
-          <Paper sx={{ p: 3, mb: 3, bgcolor: result.error || result.correct === false ? alpha(theme.palette.error.main, 0.08) : alpha(theme.palette.success.main, 0.08), border: '1px solid', borderColor: result.error || result.correct === false ? 'error.main' : 'success.main', borderRadius: 2 }}>
-            <Typography sx={{ fontWeight: 700, mb: 1, color: result.error || result.correct === false ? 'error.main' : 'success.main' }}>
-              {result.error ? t('exam.error', 'Error') : result.correct === true ? t('exam.correct', 'Resposta correcta!') : result.correct === false ? t('exam.incorrect', 'Resposta incorrecta') : t('exam.success', 'Enviat correctament')}
-            </Typography>
-            {result.error && <Typography color="error">{result.error}</Typography>}
-            {result.feedback && <Typography color="text.secondary">{result.feedback}</Typography>}
-            {Array.isArray(result.choices) && result.choices.length > 0 && (
-              <Stack spacing={1} sx={{ mt: 2 }}>
-                {result.choices.map((choice: any) => {
-                  const wrongPick = choice.was_selected && !choice.is_correct;
-                  const goodPick = choice.was_selected && choice.is_correct;
-                  return (
-                    <Box key={choice.id} sx={{ p: 1.5, borderRadius: 1, fontSize: '0.9rem', border: '1px solid', borderColor: wrongPick ? 'error.main' : goodPick ? 'success.main' : 'divider', bgcolor: wrongPick ? alpha(theme.palette.error.main, 0.06) : goodPick ? alpha(theme.palette.success.main, 0.06) : 'transparent' }}>
-                      <Box component="span" sx={{ mr: 1, fontWeight: 800 }}>{wrongPick ? '✕' : goodPick ? '✓' : '•'}</Box>
-                      {choice.text || choice.textHtml}
-                      {choice.explanation && <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mt: 0.5 }}>{choice.explanation}</Typography>}
-                    </Box>
-                  );
-                })}
-              </Stack>
-            )}
-          </Paper>
-        )}
-
-        {grade !== undefined && grade !== null && (
-          <Paper sx={{ p: 3, mb: 3, bgcolor: alpha('#8400ff', 0.06), border: '1px solid', borderColor: '#8400ff', borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, color: '#8400ff' }}>{t('exam.grade', 'Nota')}</Typography>
-            <Typography sx={{ fontSize: '2rem', fontWeight: 900, color: grade >= 5 ? 'success.main' : 'error.main' }}>{grade}/10</Typography>
-            {latestSubmission?.comment && <Typography sx={{ mt: 1, color: 'text.secondary', fontStyle: 'italic' }}>"{latestSubmission.comment}"</Typography>}
-          </Paper>
-        )}
       </Box>
     </Box>
   );
