@@ -60,10 +60,7 @@ function writeLastCourse(slug: string | undefined, scope: string) {
 type RankedStudent = { id: string; name: string; points: number };
 
 /**
- * Converteix la resposta de `GET /courses/{slug}/students/overview/` en files
- * del leaderboard, ordenades de més a menys punts.
- * Si la teva API fa servir altres noms de camp, ajusta NOMÉS les llistes de
- * claus d'aquesta funció.
+ * Converteix la resposta del leaderboard en files, ordenades de més a menys punts.
  */
 function toRanking(data: any[]): RankedStudent[] {
   const firstNumber = (row: any, keys: string[]): number => {
@@ -78,7 +75,7 @@ function toRanking(data: any[]): RankedStudent[] {
       const user = row?.user ?? row;
       return {
         id: String(user?.id ?? user?.user_id ?? user?.username ?? i),
-        name: String(user?.username ?? user?.name ?? user?.full_name ?? user?.first_name ?? '?'),
+        name: String(user?.username ?? user?.name ?? user?.full_name ?? user?.first_name ?? row?.username ?? '?'),
         points: firstNumber(row, ['points', 'score', 'total_points', 'total_score', 'stars', 'grade']),
       };
     })
@@ -92,9 +89,7 @@ export default function StudentDashboard() {
   const { mode } = useThemeMode();
   const [loading, setLoading] = useState(true);
   const [, setActionLoading] = useState(false);
-  /** `GET /courses/` — cursos assignats al currentUser (o els seus, si és profe). */
   const [assignedCourses, setAssignedCourses] = useState<Course[]>([]);
-  /** `GET /public/courses/` — catàleg de cursos públics. */
   const [publicCourses, setPublicCourses] = useState<Course[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dbProgress, setDbProgress] = useState<Record<string, boolean>>({});
@@ -103,12 +98,9 @@ export default function StudentDashboard() {
   const [loginError, setLoginError] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [courseTabIndex, setCourseTabIndex] = useState(0);
-  /** Quina de les tres llistes mostrem als tabs. */
   const [scope, setScope] = useState<CourseScope>('public');
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
-  /** Classificació del curs seleccionat (`students/overview/`). */
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
-  /** Evita restaurar dues vegades el darrer curs. */
   const restoredRef = useRef(false);
 
   const isMdUp = useMediaQuery('(max-height:900px)');
@@ -157,7 +149,6 @@ export default function StudentDashboard() {
         if (isInitial) setLoading(true);
         if (!mounted) return;
         try {
-          // Dues llistes: els públics del catàleg i els assignats al currentUser.
           const [assignedFromApi, publicFromApi] = await Promise.all([
             courseService.getAllCourses().catch(() => [] as Course[]),
             courseService.getPublicCourses().catch(() => [] as Course[]),
@@ -274,13 +265,6 @@ export default function StudentDashboard() {
     return topics.flatMap(topic => (topic.lessons || []).map(lesson => ({ ...lesson, topicTitle: topic.title })));
   };
 
-  /**
-   * Llista els TEMES d'un curs que tenen almenys una activitat del tipus demanat
-   * (codi o test), amb el recompte fet/total per poder pintar la barra de progrés.
-   * No es mostren les activitats (subtemes), només el tema.
-   * `budget` limita quants temes es mostren perquè la card (molt estreta) no creixi
-   * sense límit, i `hidden` és el nombre de temes que no hi caben.
-   */
   const getTopicSummaries = (
     course: Course,
     matches: (l: any) => boolean,
@@ -294,7 +278,6 @@ export default function StudentDashboard() {
         return {
           key: String(topic.id ?? `topic-${i}`),
           id: topic.id != null ? String(topic.id) : '',
-          // Si el curs no té temes (estructura plana), fem servir el títol del curs.
           title: getText(topic.title) || getText(course.title),
           total: lessons.length,
           done,
@@ -304,16 +287,13 @@ export default function StudentDashboard() {
     return { topics: all.slice(0, budget), hidden: Math.max(0, all.length - budget) };
   };
 
-  /** Llistes base segons l'àmbit triat. 'public' ve del catàleg, la resta de `/courses/`. */
   const scopeSource = scope === 'public' ? publicCourses : assignedCourses;
 
-  /** Subconjunt de cursos que mostrem als tabs segons el filtre del desplegable. */
   const visibleCourses = useMemo(
     () => filterByScope(scopeSource, scope),
     [scopeSource, scope],
   );
 
-  /** Recorda curs + àmbit. Es crida des dels handlers, no des d'un efecte. */
   const persistSelection = (course: Course | undefined, nextScope: CourseScope) => {
     writeLastCourse(course?.slug, nextScope);
   };
@@ -326,7 +306,6 @@ export default function StudentDashboard() {
     persistSelection(filterByScope(source, nextScope)[0], nextScope);
   };
 
-  // Restaura l'últim curs + àmbit quan els cursos ja han arribat de l'API.
   useEffect(() => {
     if (restoredRef.current || assignedCourses.length + publicCourses.length === 0) return;
     restoredRef.current = true;
@@ -341,7 +320,6 @@ export default function StudentDashboard() {
     if (idx >= 0) setCourseTabIndex(idx);
   }, [assignedCourses, publicCourses]);
 
-  // Carrega la classificació del curs seleccionat cada cop que canvia de curs.
   const currentSlug = visibleCourses[courseTabIndex]?.slug;
   const selectedStudentId = selectedStudent?.id;
   useEffect(() => {
@@ -350,11 +328,12 @@ export default function StudentDashboard() {
       return;
     }
     let cancelled = false;
-    courseService.getStudentsOverview(currentSlug)
-      .then((rows) => {
-        // Temporal: mira la consola per veure els noms reals dels camps; després treu-ho.
-        console.debug('[ranking] students/overview', rows);
-        if (!cancelled) setRanking(toRanking(rows));
+    courseService.getCourseLeaderboard(currentSlug)
+      .then((res: any) => {
+        if (!cancelled) {
+          const list = Array.isArray(res) ? res : (res?.results || []);
+          setRanking(toRanking(list));
+        }
       })
       .catch(() => { if (!cancelled) setRanking([]); });
     return () => { cancelled = true; };
@@ -396,20 +375,13 @@ export default function StudentDashboard() {
   const currentProgress = currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
   const progressData = selectedStudent ? getProgress(selectedStudent.id) : {};
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
-  /** Els dos boxes del resum: només temes, amb el progrés de les seves activitats. */
   const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData) : null;
   const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData) : null;
-  const top3Ranking = ranking.slice(0, 3);
 
   const handleStatsClick = () => {
     navigate(`/courses/${currentCourse?.slug}/stats`);
   };
 
-  /**
-   * Obre la pàgina del curs a la pestanya que toca (1 = Programació, 2 = Tests)
-   * amb el tema clicat ja desplegat. Fa servir les mateixes claus de localStorage
-   * que llegeix CourseLessons.
-   */
   const openTopic = (tab: number, topicId: string) => {
     if (!currentCourse?.slug) return;
     try {
@@ -442,13 +414,11 @@ export default function StudentDashboard() {
                 />
             ) : (
               <>
-                {/* --- Course tabs (públic/privat + Python / React / +) --- */}
                 <Box sx={{
                   display: 'inline-flex', alignItems: 'center', mb: 5, mt: isTallScreen ? 25 : 0,
                   bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 5 },
                   flexWrap: 'wrap', maxWidth: '100%',
                 }}>
-                  {/* Desplegable: públic / privat / assignats */}
                   <Button
                     onClick={(e) => setScopeAnchor(e.currentTarget)}
                     aria-haspopup="menu"
@@ -522,14 +492,11 @@ export default function StudentDashboard() {
                       <RestartAltIcon fontSize="small" />
                     </IconButton>
                   )}
-                  
                 </Box>
 
                 {currentCourse ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                    {/* --- 5-card summary row --- */}
                     <Grid container spacing={{ xs: 1.5, md: 2, xl: 4 }} sx={{ mb: { xs: 1.5, md: 5 }, ml: { xl: 2 }, order: { xs: 1, md: 0 } }}>
-                      {/* Progrés general */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.2 }} sx={{ height: { xs: 'auto', md: '100%' } }}>
                         <DashboardCard title={t('dashboard.overall_progress')} compact minHeightXs={110}>
                           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
@@ -544,7 +511,6 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Problemes de codi: només temes */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.code_problems')} compact={!isMdUp}>
                           {codeTopics && codeTopics.topics.length > 0 ? (
@@ -568,7 +534,6 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Exercicis de test: només temes */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.test_exercises')} compact={!isMdUp}>
                           {testTopics && testTopics.topics.length > 0 ? (
@@ -592,28 +557,37 @@ export default function StudentDashboard() {
                         </DashboardCard>
                       </Grid>
 
-                      {/* Leaderboard */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.leaderboard')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, md: 2.5 }} sx={{ width: '100%', mt: 1, alignItems: 'center' }}>
-                            {top3Ranking.map((s) => (
-                              <Stack key={s.id} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                                <Avatar sx={{
-                                  width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
-                                  bgcolor: (s.id === selectedStudent?.id || s.name === selectedStudent?.name) ? 'primary.main' : 'action.disabledBackground',
-                                }}>{s.name.charAt(0).toUpperCase()}</Avatar>
-                                <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontSize: { xs: '0.8rem', md: '0.875rem' } }} noWrap>{s.name}</Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' } }}>{s.points}</Typography>
-                              </Stack>
-                            ))}
-                            {top3Ranking.length === 0 && (
-                              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>{t('dashboard.no_data')}</Typography>
+                            {ranking.length > 0 ? (
+                              ranking.slice(0, 6).map((s, index) => (
+                                <Stack key={s.id || index} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                  <Stack direction="row" spacing={1} sx={{ alignItems: 'center', overflow: 'hidden' }}>
+                                    <Avatar sx={{
+                                      width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
+                                      bgcolor: (s.id === selectedStudent?.id || s.name === selectedStudent?.name) ? 'primary.main' : 'action.disabledBackground',
+                                    }}>
+                                      {s.name.charAt(0).toUpperCase()}
+                                    </Avatar>
+                                    <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }} noWrap>
+                                      {s.name}
+                                    </Typography>
+                                  </Stack>
+                                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' }, flexShrink: 0 }}>
+                                    {s.points} pts
+                                  </Typography>
+                                </Stack>
+                              ))
+                            ) : (
+                              <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', mt: 2 }}>
+                                {t('dashboard.no_data', 'No hi ha dades de rànquing')}
+                              </Typography>
                             )}
                           </Stack>
                         </DashboardCard>
                       </Grid>
 
-                      {/* Més estadístiques */}
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
                           <Stack
@@ -621,11 +595,7 @@ export default function StudentDashboard() {
                             spacing={{ xs: 2, md: 1.25 }}
                             sx={{ flex: 1, py: { xs: 2, md: 1 }, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
                           >
-                            {/* 1. Ratxa */}
                             <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'none' } }} />
-
-                       
-                            {/* 4. Problemes de programació correctes */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
@@ -637,7 +607,6 @@ export default function StudentDashboard() {
                             </Box>
                             <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
 
-                            {/* 5. Tests correctes */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <FactCheckOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
@@ -648,7 +617,6 @@ export default function StudentDashboard() {
                               </Typography>
                             </Box>
                             <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
-                            {/* 3. Temps restant */}
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                               <AccessTimeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
                               <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
@@ -660,7 +628,6 @@ export default function StudentDashboard() {
                       </Grid>
                     </Grid>
 
-                    {/* --- Continua estudiant --- */}
                     <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper', order: { xs: 2, md: 0 } }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
@@ -715,7 +682,6 @@ export default function StudentDashboard() {
 }
 
 type TopicSummary = { key: string; id: string; title: string; total: number; done: number };
-
 
 function TopicList({ topics, hidden, icon: Icon, onOpen, moreLabel }: {
   topics: TopicSummary[];

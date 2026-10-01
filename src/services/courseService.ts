@@ -9,7 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/v1`,
   headers: { 'Content-Type': 'application/json' },
-  timeout: 10000,
+  timeout: 100000,
 });
 
 apiClient.interceptors.request.use((config) => {
@@ -132,10 +132,10 @@ export const courseService = {
     }
   },
 
-  /** `GET /api/v1/courses/{course_slug}/students/overview/` — resum d'alumnes (punts del rànquing). */
-  async getStudentsOverview(courseSlug: string): Promise<any[]> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/students/overview/`);
-    return Array.isArray(data) ? data : (data.results || []);
+  async getCourseLeaderboard(courseSlug: string, limit?: number): Promise<any> {
+    const params = limit ? { limit } : {};
+    const { data } = await apiClient.get(`/courses/${courseSlug}/leaderboard/`, { params });
+    return data;
   },
 
   /** @deprecated Use submitChallenge instead */
