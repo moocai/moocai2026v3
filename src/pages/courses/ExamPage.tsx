@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, RadioGroup, FormControlLabel, FormControl, FormGroup, Stack, Alert, AlertTitle } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
 import { ChevronLeft, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
@@ -20,7 +20,6 @@ export default function ExamPage() {
   const [exam, setExam] = useState<any>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
-  const [submissions, setSubmissions] = useState<any[]>([]);
 
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -76,12 +75,6 @@ export default function ExamPage() {
           loadedExam = await courseService.getChallenge(courseId, topic?.id || '', currentTestSlug).catch(() => null);
         }
         if (!cancelled) setExam(loadedExam || null);
-
-        const topicSlug = topic?.id || '';
-        if (topicSlug) {
-          const subs = await courseService.getChallengeSubmissions(courseId, topicSlug, currentTestSlug).catch(() => []);
-          if (!cancelled) setSubmissions(Array.isArray(subs) ? subs : []);
-        }
       } catch (error) {
         console.error('Error loading exam:', error);
         if (!cancelled) setExam(null);
@@ -182,8 +175,6 @@ export default function ExamPage() {
     return <Box sx={{ p: 4, textAlign: 'center' }}><Typography>{t('lesson.course_not_found', 'Examen no trobat')}</Typography></Box>;
   }
 
-  const latestSubmission = submissions?.[submissions.length - 1];
-  const grade = typeof result?.correct === 'boolean' ? (result.correct ? exam.score ?? 10 : 0) : undefined;
   const title = exam.title || exam.name || getText(exam.subtitle) || currentTestSlug;
   const statement = exam.statement_ca || exam.statement || exam.description || getText(exam.text) || '';
   const examData = (window as any).EXAM_DATA?.[currentTestSlug || ''];
@@ -200,10 +191,6 @@ export default function ExamPage() {
 
   // ---- Feedback just després d'enviar ----
   const answered = !!result && !result.error;
-  const isCorrect = result?.correct === true;
-  const pointsEarned = isCorrect
-    ? (result.points_awarded ?? result.points ?? exam.score ?? 10)
-    : 0;
 
   // Si el backend retorna result.choices el fem servir; si no, caiem a les opcions locals
   const reviewChoices: any[] = Array.isArray(result?.choices) ? result.choices : [];
