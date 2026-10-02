@@ -107,9 +107,16 @@ export default function StudentDashboard() {
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
   const restoredRef = useRef(false);
 
-  const isMdUp = useMediaQuery('(max-height:900px)');
-  const lessonsSliceLimit = isMdUp ? 5 : 7;
+const isMdUp = useMediaQuery('(max-height:900px)');
+  const isLgUp = useMediaQuery('(min-width:1200px)');
+  const isFhdUp = useMediaQuery('(min-width:1800px)');
+  const isQhdUp = useMediaQuery('(min-width:2300px)');
+  const lessonsSliceLimit = isMdUp ? 5 : (isQhdUp ? 13 : (isFhdUp || isLgUp ? 7 : 5));
   const isTallScreen = useMediaQuery('(min-height:1200px)');
+  /* marge superior segons la mida del monitor: en 2560x1440 hi ha molt espai
+     i en 1920x1080 en volem una mica més que en pantalls petites. */
+  const topSpace = isQhdUp ? 12 : isFhdUp ? 6 : 6;
+  const tabsTopSpace = isTallScreen ? 10 : (isFhdUp || isQhdUp ? 8 : 0);
 
   const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
   const getText = (field: any): string => {
@@ -497,7 +504,7 @@ export default function StudentDashboard() {
   return (
     <Box sx={{ position: 'relative', bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#111827' : 'background.default', color: 'text.primary', width: '100%', maxWidth: '100vw', height: '100%', overflow: { xs: 'auto', md: 'hidden' }, display: 'flex', flexDirection: 'column' }}>
         {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
-        <Container maxWidth={false} sx={{ pt: { xs: 2, md: 6 }, px: { xs: 2, sm: 1.5, md: 8, lg: 8, xl: 10 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'auto' } }}>
+        <Container maxWidth={false} sx={{ pt: { xs: 2, md: topSpace }, px: { xs: 2, sm: 1.5, md: 8, lg: 8, xl: 10 }, flex: 1, display: 'flex', flexDirection: 'column', overflow: { xs: 'visible', md: 'auto' } }}>
           <Box sx={{ width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
           {!selectedStudent ? (
                 <Login
@@ -512,7 +519,7 @@ export default function StudentDashboard() {
             ) : (
               <>
                 <Box sx={{
-                  display: 'inline-flex', alignItems: 'center', mb: 5, mt: isTallScreen ? 25 : 0,
+                  display: 'inline-flex', alignItems: 'center', mb: 5, mt: tabsTopSpace,
                   bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 5 },
                   flexWrap: 'wrap', maxWidth: '100%',
                 }}>
