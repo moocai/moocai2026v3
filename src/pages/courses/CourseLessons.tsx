@@ -1,15 +1,9 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
-import {
-  Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab,
-  Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack
-} from '@mui/material';
+import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack} from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {
-  ChevronDown, CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck,
-  ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder
-} from 'lucide-react';
+import {CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +16,6 @@ type I18nField = { ca: string; es: string; en: string };
 type ScopeType = 'public' | 'private' | 'assigned';
 
 const SCOPES: ScopeType[] = ['public', 'private', 'assigned'];
-
 const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
   public: { labelKey: 'courses.scope_public', fallback: 'Públics' },
   private: { labelKey: 'courses.scope_private', fallback: 'Privats' },
@@ -37,13 +30,9 @@ const TAB_ITEMS = [
   { icon: Folder, labelKey: 'lesson.tab_files', fallback: 'Fitxers' },
 ];
 
-function ScopeIcon({ scope }: { scope: ScopeType }) {
-  switch (scope) {
-    case 'public': return <Globe size={16} />;
-    case 'private': return <Lock size={16} />;
-    case 'assigned': return <UserCheck size={16} />;
-  }
-}
+type TopicNavItem = { id: string; title: string; done?: boolean; percent?: number };
+
+function ScopeIcon({ scope }: { scope: ScopeType }) {switch (scope) {case 'public': return <Globe size={16} />; case 'private': return <Lock size={16} />; case 'assigned': return <UserCheck size={16} />;}}
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -59,8 +48,7 @@ export default function CourseLessons() {
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
-
-  const [scope, setScope] = useState<ScopeType>('private');
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [publicCourses, setPublicCourses] = useState<any[]>([]);
   const [assignedCourses, setAssignedCourses] = useState<any[]>([]);
 
@@ -75,10 +63,18 @@ export default function CourseLessons() {
     return list;
   }, []);
 
+  const scope: ScopeType = useMemo(() => {
+    const flag = course?.is_public ?? course?.isPublic;
+    if (typeof flag === 'boolean') return flag ? 'public' : 'private';
+    const listed = [...publicCourses, ...assignedCourses].find(
+      (c) => c.id === courseId || c.slug === courseId
+    );
+    return listed?.isPublic ? 'public' : 'private';
+  }, [course, courseId, publicCourses, assignedCourses]);
+
   const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
 
-  const handleSelectCourse = (option: ScopeType, targetCourseId: string) => {
-    setScope(option);
+  const handleSelectCourse = (targetCourseId: string) => {
     setSubMenuAnchor(null);
     setScopeAnchor(null);
     setActiveSubMenuScope(null);
@@ -90,50 +86,7 @@ export default function CourseLessons() {
     return saved !== null ? JSON.parse(saved) : 0;
   });
 
-  const [expandedLessons, setExpandedLessons] = useState<Set<string>>(() => {
-    const saved = localStorage.getItem(`mooc_expanded_${courseId}`);
-    return saved !== null ? new Set(JSON.parse(saved)) : new Set();
-  });
-
-  // Ordre en què s'han completat les lliçons de teoria (la darrera completada va al final)
-  const [doneOrder, setDoneOrder] = useState<string[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem(`mooc_done_order_${courseId}`) || '[]');
-    } catch {
-      return [];
-    }
-  });
-
-  useEffect(() => {
-    if (courseId) {
-      localStorage.setItem(`mooc_done_order_${courseId}`, JSON.stringify(doneOrder));
-    }
-  }, [doneOrder, courseId]);
-
-  const toggleLessonExpand = (id: string) => {
-    setExpandedLessons(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  };
-
-  const handleToggleAll = () => {
-    const allIds = (course?.content || []).map(l => l.id);
-    setExpandedLessons(prev => prev.size === allIds.length ? new Set() : new Set(allIds));
-  };
-
-  useEffect(() => {
-    if (courseId) {
-      localStorage.setItem(`mooc_tab_${courseId}`, JSON.stringify(mainTab));
-    }
-  }, [mainTab, courseId]);
-
-  useEffect(() => {
-    if (courseId) {
-      localStorage.setItem(`mooc_expanded_${courseId}`, JSON.stringify([...expandedLessons]));
-    }
-  }, [expandedLessons, courseId]);
+  useEffect(() => {if (courseId) {localStorage.setItem(`mooc_tab_${courseId}`, JSON.stringify(mainTab));}}, [mainTab, courseId]);
 
   const getProgressKey = useCallback(() => {
     const saved = localStorage.getItem('currentStudent');
@@ -156,17 +109,12 @@ export default function CourseLessons() {
 
   const [theoryMap, setTheoryMap] = useState<Record<string, string>>({});
 
-  // Càrrega de la teoria de cada lliçó fent ús directe del servei courseService
   useEffect(() => {
     if (!course || !course.content) return;
     course.content.forEach((lesson: any) => {
       courseService.getTopicBySlug(course.id, lesson.id)
-        .then(data => {
-          const markdownValue = data?.theory_md || '';
-          setTheoryMap(prev => ({ ...prev, [lesson.id]: markdownValue }));
-        })
-        .catch(() => {
-          setTheoryMap(prev => ({ ...prev, [lesson.id]: '' }));
+        .then(data => {const markdownValue = data?.theory_md || ''; setTheoryMap(prev => ({ ...prev, [lesson.id]: markdownValue }));})
+        .catch(() => {setTheoryMap(prev => ({ ...prev, [lesson.id]: '' }));
         });
     });
   }, [course]);
@@ -190,38 +138,29 @@ export default function CourseLessons() {
     return () => el.removeEventListener('scroll', save);
   }, [courseId, course]);
 
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {try {const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null;} catch {return null;}});
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  const selectTopic = (id: string) => {
+    setSelectedTopicId(id);
+    setMobileNavOpen(false);
+    try {
+      localStorage.setItem(`mooc_selected_topic_${courseId}`, JSON.stringify(id));
+    } catch {}
+    requestAnimationFrame(() => {
+      const el = contentRef.current;
+      const root = scrollRef.current;
+      if (el && root && el.getBoundingClientRect().top < root.getBoundingClientRect().top) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  };
+
   const [tabsEl, setTabsEl] = useState<HTMLDivElement | null>(null);
   const [showRail, setShowRail] = useState(false);
   const tabsListRef = useRef<HTMLDivElement | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
 
-  const getTabsScroller = () =>
-    (tabsListRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null) ?? null;
-
-  useEffect(() => {
-    const scroller = getTabsScroller();
-    if (!scroller) return;
-    const update = () => {
-      setCanScrollLeft(scroller.scrollLeft > 1);
-      setCanScrollRight(scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1);
-    };
-    update();
-    scroller.addEventListener('scroll', update, { passive: true });
-    window.addEventListener('resize', update);
-    return () => {
-      scroller.removeEventListener('scroll', update);
-      window.removeEventListener('resize', update);
-    };
-    // Es reexecuta en canviar de secció perquè el <Tabs> es remunta.
-  }, [mainTab, isXs]);
-
-  useEffect(() => {
-    const root = scrollRef.current;
-    if (!tabsEl || !root) {
-      setShowRail(false);
-      return;
-    }
+  useEffect(() => {const root = scrollRef.current;if (!tabsEl || !root) {setShowRail(false); return;}
     const observer = new IntersectionObserver(
       ([entry]) => {
         const rootTop = entry.rootBounds?.top ?? 0;
@@ -247,16 +186,12 @@ export default function CourseLessons() {
     localStorage.setItem(`mooc_global_progress_${sId}`, JSON.stringify(newProgress));
     window.dispatchEvent(new Event('lessonProgressUpdated'));
 
-    // La lliçó completada passa al final de la llista
-    setDoneOrder(prev => [...prev.filter(id => id !== lessonId), lessonId]);
-    // ...i es tanca automàticament
-    setExpandedLessons(prev => {
-      const next = new Set(prev);
-      next.delete(lessonId);
-      return next;
-    });
-    // Tornem a dalt perquè l'usuari vegi la següent lliçó pendent
-    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    const lessons: any[] = course?.content || [];
+    const idx = lessons.findIndex((l: any) => l.id === lessonId);
+    const next = [...lessons.slice(idx + 1), ...lessons.slice(0, Math.max(idx, 0))]
+      .find((l: any) => l.id !== lessonId && newProgress[`${courseId}_theory_${l.id}`] !== true);
+    if (next) selectTopic(next.id);
+    else scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getLessonProgress = (lesson: any): number => {
@@ -275,14 +210,6 @@ export default function CourseLessons() {
     if (typeof field === 'string') return field;
     return field[lang] || field['ca'] || '';
   };
-
-  const getLessonsWithType = (type: 'coding' | 'test') =>
-    (course?.content || [])
-      .map(lesson => ({
-        lesson,
-        items: (lesson.subTopics || []).filter((s: any) => s.type === type),
-      }))
-      .filter(({ items }) => items.length > 0);
 
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty) {
@@ -308,12 +235,7 @@ export default function CourseLessons() {
     if (!difficulty) return null;
     const { color, bg, border } = getDifficultyColor(difficulty);
     return (
-      <Box sx={{
-        fontSize: '0.65rem', fontWeight: 700, color,
-        border: `1px solid ${border}`, borderRadius: 5,
-        px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em',
-        bgcolor: bg,
-      }}>
+      <Box sx={{fontSize: '0.65rem', fontWeight: 700, color,border: `1px solid ${border}`, borderRadius: 5, px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em', bgcolor: bg}}>
         {getDifficultyLabel(difficulty)}
       </Box>
     );
@@ -323,20 +245,12 @@ export default function CourseLessons() {
     status === true ? (
       <CheckCircle2 size={16} color={theme.palette.success.main} />
     ) : status === 'attempted' ? (
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 0.5,
-        fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b',
-        border: '1px solid #f59e0b', borderRadius: 5,
-        px: 1, py: 0.2,
-      }}>
+      <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b',border: '1px solid #f59e0b', borderRadius: 5,px: 1, py: 0.2,}}>
         <AlertTriangle size={12} />
         {t('lesson.pending_send', 'Pendent per enviar')}
       </Box>
     ) : (
-      <Box sx={{
-        fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary',
-        border: '1px solid', borderColor: 'divider', borderRadius: 5,
-        px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em',
+      <Box sx={{fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary',border: '1px solid', borderColor: 'divider', borderRadius: 5,px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em',
       }}>
         {t('lesson.pending', 'Pendent')}
       </Box>
@@ -352,42 +266,15 @@ export default function CourseLessons() {
     </Box>
   );
 
-  const renderOverviewRow = (opts: {
-    key: string;
-    icon: ReactNode;
-    label: string;
-    to?: string;
-    onClick?: () => void;
-    right?: ReactNode;
-  }) => {
+  const renderOverviewRow = (opts: {key: string; icon: ReactNode; label: string; to?: string; onClick?: () => void; right?: ReactNode;}) => {
     const content = (
-      <Box sx={{
-        display: 'flex', alignItems: 'center', gap: 1.5,
-        px: 1, py: 1.25,
-        borderBottom: '1px solid', borderColor: 'divider',
-        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) },
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'primary.main' }}>
-          {opts.icon}
-        </Box>
-        <Typography sx={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: 'text.primary' }}>
-          {opts.label}
-        </Typography>
-        {opts.right}
-      </Box>
+      <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5,px: 1, py: 1.25, borderBottom: '1px solid', borderColor: 'divider','&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }}}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'primary.main' }}>{opts.icon}</Box>
+        <Typography sx={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: 'text.primary' }}>{opts.label}</Typography>{opts.right}</Box>
     );
     if (opts.to) {
-      return (
-        <Box key={opts.key} component={RouterLink} to={opts.to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-          {content}
-        </Box>
-      );
-    }
-    return (
-      <Box key={opts.key} onClick={opts.onClick} sx={{ cursor: 'pointer' }}>
-        {content}
-      </Box>
-    );
+      return (<Box key={opts.key} component={RouterLink} to={opts.to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
+      return (<Box key={opts.key} onClick={opts.onClick} sx={{ cursor: 'pointer' }}>{content}</Box>);
   };
 
   if (loading) return (
@@ -398,64 +285,37 @@ export default function CourseLessons() {
 
   if (!course) return <Typography>{t('lesson.course_not_found')}</Typography>;
 
-  const contentCount = course.content?.length || 0;
-  const isAllExpanded = expandedLessons.size === contentCount;
-
-  // Lliçons de teoria: primer les pendents (ordre original) i després les completades
-  // (segons l'ordre en què s'han completat; les que ja ho estaven abans mantenen l'ordre original).
   const isTheoryDone = (lessonId: string) => progress[`${courseId}_theory_${lessonId}`] === true;
   const allLessons: any[] = course.content || [];
-  const theoryLessons = [
-    ...allLessons.filter(l => !isTheoryDone(l.id)),
-    ...allLessons
-      .filter(l => isTheoryDone(l.id))
-      .sort((a, b) => doneOrder.indexOf(a.id) - doneOrder.indexOf(b.id)),
-  ];
+  const isFirstTab = mainTab === 0; const isLastTab = mainTab === TAB_ITEMS.length - 1;
 
-  const scrollTabs = (dir: -1 | 1) => {
-    const scroller = getTabsScroller();
-    if (!scroller) return;
-    scroller.scrollBy({ left: dir * Math.max(160, scroller.clientWidth * 0.8), behavior: 'smooth' });
+  const handleTabArrow = (dir: -1 | 1) => {
+    const target = Math.min(Math.max(mainTab + dir, 0), TAB_ITEMS.length - 1);
+    if (target === mainTab) return;
+    setMainTab(target);
+    const scroller = tabsListRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
+    const tab = tabsListRef.current?.querySelectorAll('[role="tab"]')[target] as HTMLElement | undefined;
+    if (scroller && tab) {
+      const delta = tab.getBoundingClientRect().left - scroller.getBoundingClientRect().left - (scroller.clientWidth - tab.offsetWidth) / 2;
+      if (delta) scroller.scrollBy({ left: delta, behavior: 'smooth' });
+    }
   };
 
-  // Fletxes de desplaçament. Viuen com a germans de les pestanyes, no com a
-  // scrollButtons de MUI (que van superposats i es menjaven el text).
   const navArrow = (dir: -1 | 1) => {
-    const disabled = dir === -1 ? !canScrollLeft : !canScrollRight;
-    const canScroll = !disabled;
+    const disabled = dir === -1 ? isFirstTab : isLastTab;
+    const atStart = isFirstTab;
+    const atEnd = isLastTab;
+    const color = dir === -1 ? (atStart ? '#8400ff' : '#fff') : (atEnd ? '#8400ff' : '#fff');
     return (
-      <IconButton
-        onClick={() => scrollTabs(dir)}
-        disabled={disabled}
-        aria-label={dir === -1 ? t('lesson.tab_prev', 'Pestanya anterior') : t('lesson.tab_next', 'Pestanya següent')}
-        sx={{
-          display: { xs: 'inline-flex', md: 'none' },
-          flexShrink: 0, width: 40, height: 40, p: 0,
-          borderRadius: 999,
-          color: canScroll ? '#8400ff' : alpha('#8400ff', 1),
-          bgcolor: canScroll ? 'transparent' : alpha('#8400ff', 1),
-          '&:hover': { bgcolor: canScroll ? 'transparent' : alpha('#fff', 0) },
-          '&.Mui-disabled': { color: alpha('#fff', 0) },
-        }}
-      >
+      <IconButton onClick={() => handleTabArrow(dir)}  disabled={disabled}  aria-label={dir === -1 ? t('lesson.tab_prev', 'Pestanya anterior') : t('lesson.tab_next', 'Pestanya següent')}
+      sx={{display: { xs: 'inline-flex', md: 'none' }, flexShrink: 0, width: 40, height: 40, p: 0,borderRadius: 999, color,'&.Mui-disabled': { color }}} >
         {dir === -1 ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
       </IconButton>
     );
   };
 
   const renderTabs = () => (
-    /* A xs la barra va de vora a vora: marges negatius que compensen el
-       pl:3 / pr:7.5 del contenidor de scroll (pr:7.5 reserva el rail).
-       Sense width:'100%' perquè un 100% fixe deixaria el marge dret. */
-    <Stack
-      direction="row"
-      spacing={0.5}
-      sx={{
-        alignItems: 'center',
-        ml: { xs: -3, md: 0 },
-        mr: { xs: -6, md: 0 },
-      }}
-    >
+    <Stack direction="row" spacing={0.5} sx={{alignItems: 'center', ml: { xs: -3, md: 0}, mr: { xs: -6, md: 0 }, mt:{lg:3}}}>
       {navArrow(-1)}
       <Box ref={setTabsEl} sx={{ flex: 1, minWidth: 0, display: 'flex', justifyContent: 'center'}}>
         <Tabs
@@ -463,439 +323,261 @@ export default function CourseLessons() {
           value={mainTab}
           onChange={(_, v) => setMainTab(v)}
           variant={isXs ? 'scrollable' : 'standard'}
-          sx={{
-            mb: 4, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider',
-
-            '& .MuiTabs-list': {
-              justifyContent: { xs: 'flex-start' },
-            },
-            '& .MuiTab-root': {
-                textTransform: 'none', fontWeight: 900,
-                fontSize: { xs: '1.2rem', md: '0.95rem' },
-                minHeight: { xs: 60, md: 0 },          // més alçada a mòbil
-                minWidth: { xs: 50, md: 90 },           // MUI posa 90px per defecte i ocupa espai
-                py: { xs: 2, md: 1.5 },
-                px: { xs: 1.75, md: 5 }, 
-                color: mode === 'light' ? '#000' : '#fff',
-              },
+          sx={{ mb: { xs: 4, lg: 8 }, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-list': {justifyContent: { xs: 'flex-start' }},
+            '& .MuiTab-root': {textTransform: 'none', fontWeight: 900,fontSize: { xs: '1.2rem', md: '0.95rem', lg: '1.3rem'}, minHeight: { xs: 60, md: 0 }, minWidth: { xs: 50, md: 90 },py: { xs: 2, md: 1.5}, px: { xs: 1.75, md: 5, lg:10},color: mode === 'light' ? '#000' : '#fff',},
             '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
             '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: { xs: 4, md: 3}},
-          }}
-        >
-          {TAB_ITEMS.map(({ labelKey, fallback }) => (
-            <Tab key={labelKey} label={t(labelKey, fallback)} />
-          ))}
+          }}>
+          {TAB_ITEMS.map(({ labelKey, fallback }) => (<Tab key={labelKey} label={t(labelKey, fallback)} />))}
         </Tabs>
       </Box>
       {navArrow(1)}
     </Stack>
   );
 
-  const renderExpandAll = () => (
-    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-      <Button
-        disableRipple
-        onClick={handleToggleAll}
-        sx={{ textTransform: 'none', fontWeight: 700, fontSize: '0.85rem', color: '#149eca' }}
-      >
-        {isAllExpanded ? t('lesson.collapse_all', 'Col·lapsa-ho tot') : t('lesson.expand_all', 'Expandeix-ho tot')}
-      </Button>
+  const markdownSx = { '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 2, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', maxWidth: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: 'divider', px: { xs: 1, md: 2 }, py: 1, textAlign: 'left', color: 'text.secondary', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: { xs: '0.8rem', md: '0.875rem' } }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } };
+
+  const renderTopicButtons = (items: TopicNavItem[], activeId?: string) =>
+    items.map((item) => {
+      const active = item.id === activeId;
+      return (
+        <Box key={item.id} component={motion.button} layout transition={{ type: 'spring', stiffness: 400, damping: 34 }} type="button" onClick={() => selectTopic(item.id)} aria-current={active ? 'true' : undefined}
+          sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : 'divider', bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary',fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
+          <span>{item.title}</span>
+          {item.done ? (<CheckCircle2 size={16} color={active ? '#fff' : theme.palette.success.main} />) : item.percent !== undefined ? (<Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 800, opacity: 0.8, flexShrink: 0 }}>{item.percent}%</Typography>) : null}
+        </Box>
+      );
+    });
+
+  const renderTopicNav = (items: TopicNavItem[], activeId?: string) => (
+    <Box component="aside" aria-label={t('lesson.topics', 'Temes')}
+      sx={{display: { xs: 'none', md: 'flex' },width: { md: 280, lg: 350},mt:{lg:-13},flexShrink: 0,position: { md: 'sticky' },top: { md: 16},maxHeight: { md: 'calc(100vh - 64px - 35px)' },flexDirection: 'column',gap: 1,overflowY: { md: 'auto' },scrollbarWidth: 'none','&::-webkit-scrollbar': { display: 'none' },}}>
+      {renderTopicButtons(items, activeId)}
     </Box>
   );
+  const renderMobileTopicPanel = (items: TopicNavItem[], activeId?: string) => (
+    <>
+      <Box onClick={() => setMobileNavOpen(false)} sx={{display: { xs: 'block', md: 'none' },position: 'absolute', inset: 0, zIndex: 29,bgcolor: alpha('#000', 0.45),opacity: mobileNavOpen ? 1 : 0,pointerEvents: mobileNavOpen ? 'auto' : 'none',transition: 'opacity 0.25s ease',}}/>
+      <Box component="aside" id="lesson-topics" aria-label={t('lesson.topics', 'Topics')} sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', position: 'absolute', top: 15, left: 0, bottom: 0, zIndex: 30, width: 300, maxWidth: '86vw', bgcolor: 'background.paper', borderRight: '1px solid', borderColor: 'divider', boxShadow: mobileNavOpen ? 6 : 'none', transform: mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease, box-shadow 0.25s ease' }} >
+        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0,}}>
+          <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary' }}>
+            {t('lesson.topics', 'Topics')}
+          </Typography>
+          <IconButton size="small" onClick={() => setMobileNavOpen(false)} aria-label={t('lesson.close_topics', 'Tancar topics')} sx={{ color: 'text.primary' }}>
+            <ChevronLeft size={20} />
+          </IconButton>
+        </Box>
+        <Box sx={{flex: 1, overflowY: 'auto', p: 1.5,display: 'flex', flexDirection: 'column', gap: 1,scrollbarWidth: 'none','&::-webkit-scrollbar': { display: 'none' }}}>
+          {renderTopicButtons(items, activeId)}
+        </Box>
+      </Box>
+    </>
+  );
+
+  const renderMasterDetail = (items: TopicNavItem[], activeId: string | undefined, content: ReactNode) => (
+    <Box sx={{display: 'flex', flexDirection: { xs: 'column', md: 'row' },alignItems: { md: 'flex-start' }, gap: { xs: 2, md: 4 }, mb: 6}}>
+      {renderTopicNav(items, activeId)}
+      <Box ref={contentRef} sx={{ flex: 1, minWidth: 0, width: '100%', maxWidth: { xs: '100%', md: 1400, lg:1950 }, mx: 'auto' }}>
+        {content}
+      </Box>
+    </Box>
+  );
+
+  const buildTopicItems = (showProgress = true): TopicNavItem[] => allLessons.map((l) => ({id: l.id, title: getText(l.title), done: isTheoryDone(l.id), percent: showProgress ? getLessonProgress(l) : undefined})).sort((a, b) => Number(a.done === true) - Number(b.done === true));
+  const topicItems = buildTopicItems(mainTab !== 0);
+  const activeTopicId: string | undefined = allLessons.find((l) => l.id === selectedTopicId)?.id ?? allLessons[0]?.id;
+
+  const renderTheoryTab = () => {
+    if (allLessons.length === 0) {return (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>);}
+    const activeLesson = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
+    const isDone = isTheoryDone(activeLesson.id);
+    const markdown = theoryMap[activeLesson.id];
+
+    return renderMasterDetail(topicItems, activeTopicId, (
+      <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: 2.5 }}>
+          <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>{getText(activeLesson.title)}</Typography>
+          {isDone && <CheckCircle2 size={20} color={theme.palette.success.main} />}
+        </Box>
+
+        {activeLesson.subTopics && activeLesson.subTopics.length > 0 && (
+          <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+            {activeLesson.subTopics.map((sub: any) => {
+              const subTitle = getText(sub.title);
+              if (!subTitle) return null;
+              return (
+              <Button key={sub.id || sub.slug} component={RouterLink} to={`/courses/${courseId}/${activeLesson.id}/topic`}variant="outlined" size="small" sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}>{subTitle} </Button>);
+            })}
+          </Box>
+        )}
+
+        {markdown === undefined ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+        ) : markdown ? (<Box sx={markdownSx}><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown></Box>
+        ) : (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>
+        )}
+
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Button
+            variant={isDone ? 'outlined' : 'contained'} color={isDone ? 'success' : 'primary'} onClick={() => markLessonAsDone(activeLesson.id)}startIcon={<Check size={16} />}sx={{ textTransform: 'none', fontWeight: 700 }}>
+            {isDone ? t('lesson.completed', 'Completat') : t('lesson.mark_as_done', 'Marca com a completat')}
+          </Button>
+        </Box>
+      </Box>
+    ));
+  };
+
+  const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.');
+    if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{emptyMessage}</Typography>;}
+
+    const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
+    const subItems: any[] = (active.subTopics || []).filter((s: any) => s.type === type);
+    const emoji = type === 'coding' ? '💻' : '📝';
+
+    return renderMasterDetail(topicItems, activeTopicId, (
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
+            {getText(active.title)}
+          </Typography>
+        </Box>
+        {subItems.length === 0 ? (
+          <Typography sx={{ color: 'text.secondary', fontStyle: 'italic', fontSize: '0.95rem', px: 2.5, py: 4 }}>
+            {emptyMessage}
+          </Typography>
+        ) : (
+          <Box sx={{ px: 2.5, pb: 1 }}>
+            {subItems.map((sub: any) => {
+              const key = `${courseId}_${sub.problemSlug || sub.slug || active.id}`;
+              const targetSlug = sub.slug || sub.problemSlug || active.id;
+              return renderOverviewRow({
+                key: `${active.id}-${type}-${targetSlug}`,
+                icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], emoji)}</Typography>,
+                label: getText(sub.subtitle || sub.title),
+                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/exam/${targetSlug}`,
+                right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
+              });
+            })}
+          </Box>
+        )}
+      </Box>
+    ));
+  };
+
+  const renderFilesTab = () => {
+    const message = t('lesson.no_files', 'Encara no hi ha fitxers disponibles per aquest curs.');
+    if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{message}</Typography>;}
+
+    return renderMasterDetail(topicItems, activeTopicId, (
+      <Box sx={{border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', textAlign: 'center', py: 10, px: 3, color: 'text.secondary',}}>
+        <FileText size={40} style={{ opacity: 0.5 }} />
+        <Typography sx={{ mt: 2, fontWeight: 600, fontSize: '0.95rem' }}>{message}</Typography>
+      </Box>
+    ));
+  };
 
   return (
     <Box sx={{ position: 'fixed', top: 64, left: 0, right: 0, bottom: 0, bgcolor: 'background.default', overflow: 'hidden' }}>
       {mode === 'fancy' && <ParticlesBackground opacityMultiplier={0.4} />}
+
       <Box sx={{ display: 'flex', height: '100%' }}>
-        <Box ref={scrollRef} sx={{
-          flex: '1 1 auto',
-          minWidth: 0,
-          maxWidth: { md: 'none' },
-          pl: { xs: 3, md: 8 },
-          pr: { xs: 7.5, md: 10 },
-          py: 6,
-          overflowY: 'auto',
-          height: 'calc(100vh - 64px)',
-        }}>
+        <Box ref={scrollRef} sx={{flex: '1 1 auto', minWidth: 0,maxWidth: { md: 'none' },pl: { xs: 3, md: 8 },pr: { xs: 7.5, md: 10 },py: 6,overflowY: 'auto',height: 'calc(100vh - 64px)'}}>
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
 
-            <Box sx={{
-              display: 'inline-flex', alignItems: 'center', mb: 3, mt: isTallScreen ? 2 : 0,
-              bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 3 },
-              flexWrap: 'wrap', maxWidth: '100%',
-            }}>
-              <Button
-                onClick={(e) => setScopeAnchor(e.currentTarget)}
-                aria-haspopup="menu"
-                aria-expanded={Boolean(scopeAnchor)}
-                startIcon={<ScopeIcon scope={scope} />}
-                endIcon={<ExpandMoreIcon fontSize="small" sx={{ transition: 'transform 0.2s', transform: scopeAnchor ? 'rotate(180deg)' : 'none' }} />}
-                sx={{
-                  textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.9rem', md: '1rem' },
-                  color: '#00A896', minWidth: 0, flexShrink: 0, py: 0.75, pr: 0.5,
-                }}
-              >
-                {t(SCOPE_META[scope].labelKey, SCOPE_META[scope].fallback)}
-                <Typography component="span" sx={{ ml: 1, px: 1, borderRadius: 999, bgcolor: 'action.hover', fontSize: '0.75rem', fontWeight: 900 }}>
-                  {visibleCourses.length}
-                </Typography>
-              </Button>
-
-              <Menu
-                anchorEl={scopeAnchor}
-                open={Boolean(scopeAnchor)}
-                onClose={() => {
-                  setScopeAnchor(null);
-                  setSubMenuAnchor(null);
-                  setActiveSubMenuScope(null);
-                }}
-                slotProps={{ paper: { sx: { bgcolor: 'background.paper', minWidth: 220 } } }}
-              >
-                {SCOPES.map((option, idx) => {
-                  const source = option === 'public' ? publicCourses : assignedCourses;
-                  const matchingCourses = filterByScope(source, option);
-                  const isSelectedScope = activeSubMenuScope === option;
-
-                  return (
-                    <Box key={option}>
-                      {idx > 0 && <Divider sx={{ my: 0.5 }} />}
-                      <MenuItem
-                        onClick={(e) => {
-                          setSubMenuAnchor(e.currentTarget);
-                          setActiveSubMenuScope(option);
-                        }}
-                        sx={{
-                          fontWeight: 800, py: 1.25, display: 'flex', justifyContent: 'space-between',
-                          bgcolor: isSelectedScope ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <ScopeIcon scope={option} />
-                          <ListItemText primary={t(SCOPE_META[option].labelKey, SCOPE_META[option].fallback)} />
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
-                            {matchingCourses.length}
-                          </Typography>
-                          <ChevronRight size={16} />
-                        </Box>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'center' }, gap: { xs: 1, lg: 5 }, mt: { lg: 4 }, flexWrap: 'wrap' }}>
+            <Box sx={{display: 'inline-flex', alignItems: 'center', mb: { xs: 3, lg: 1 }, mt: { xs: isTallScreen ? 2 : 0, lg: 0 },bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 3 },flexWrap: 'wrap', maxWidth: '100%',}}>
+                <Button onClick={(e) => setScopeAnchor(e.currentTarget)} aria-haspopup="menu" aria-expanded={Boolean(scopeAnchor)} startIcon={<ScopeIcon scope={scope} />} endIcon={<ExpandMoreIcon fontSize="small" sx={{ transition: 'transform 0.2s', transform: scopeAnchor ? 'rotate(180deg)' : 'none' }} />} sx={{ textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.9rem', md: '1rem' }, color: '#00A896', minWidth: 0, flexShrink: 0, py: 0.75, pr: 0.5 }}>
+                  {t(SCOPE_META[scope].labelKey, SCOPE_META[scope].fallback)}<Typography component="span" sx={{ ml: 1, px: 1, borderRadius: 999, bgcolor: 'action.hover', fontSize: '0.75rem', fontWeight: 900 }}>{visibleCourses.length}</Typography>
+                </Button>
+  
+                <Menu anchorEl={scopeAnchor} open={Boolean(scopeAnchor)}  onClose={() => { setScopeAnchor(null); setSubMenuAnchor(null); setActiveSubMenuScope(null);}}
+                  slotProps={{ paper: { sx: { bgcolor: 'background.paper', minWidth: 220}}}}>
+                  {SCOPES.map((option, idx) => {
+                    const source = option === 'public' ? publicCourses : assignedCourses;
+                    const matchingCourses = filterByScope(source, option);
+                    const isSelectedScope = activeSubMenuScope === option;
+  
+                    return (
+                      <Box key={option}>
+                        {idx > 0 && <Divider sx={{ my: 0.5 }} />}
+                        <MenuItem onClick={(e) => {setSubMenuAnchor(e.currentTarget); setActiveSubMenuScope(option);}}
+                          sx={{fontWeight: 800, py: 1.25, display: 'flex', justifyContent: 'space-between',bgcolor: isSelectedScope ? alpha(theme.palette.primary.main, 0.08) : 'transparent'}}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <ScopeIcon scope={option} />
+                            <ListItemText primary={t(SCOPE_META[option].labelKey, SCOPE_META[option].fallback)} />
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                              {matchingCourses.length}
+                            </Typography>
+                            <ChevronRight size={16} />
+                          </Box>
+                        </MenuItem>
+                      </Box>
+                    );
+                  })}
+                </Menu>
+  
+                <Menu anchorEl={subMenuAnchor} open={Boolean(subMenuAnchor) && Boolean(activeSubMenuScope)} onClose={() => { setSubMenuAnchor(null); setActiveSubMenuScope(null); }} anchorOrigin={{ vertical: 'top', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }} slotProps={{ paper: { sx: { bgcolor: 'background.paper', minWidth: 260, maxHeight: '60vh', overflowY: 'auto', ml: 1 } } }}>
+                  {activeSubMenuScope && filterByScope(
+                    activeSubMenuScope === 'public' ? publicCourses : assignedCourses,
+                    activeSubMenuScope
+                  ).map((c: any) => {
+                    const isCurrentCourse = c.id === courseId;
+                    return (
+                      <MenuItem key={c.id} onClick={() => handleSelectCourse(c.id)} sx={{ py: 1.25, bgcolor: isCurrentCourse ? alpha(theme.palette.primary.main, 0.08) : 'transparent', fontWeight: isCurrentCourse ? 700 : 400, '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) } }}>
+                        <ListItemText
+                          primary={
+                            <Typography sx={{ fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {getText(c.title)}
+                            </Typography>
+                          }
+                        />
                       </MenuItem>
-                    </Box>
-                  );
-                })}
-              </Menu>
+                    );
+                  })}
+                </Menu>
+              </Box>
 
-              <Menu
-                anchorEl={subMenuAnchor}
-                open={Boolean(subMenuAnchor) && Boolean(activeSubMenuScope)}
-                onClose={() => {
-                  setSubMenuAnchor(null);
-                  setActiveSubMenuScope(null);
-                }}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-                slotProps={{
-                  paper: {
-                    sx: { bgcolor: 'background.paper', minWidth: 260, maxHeight: '60vh', overflowY: 'auto', ml: 1 }
-                  }
-                }}
-              >
-                {activeSubMenuScope && filterByScope(
-                  activeSubMenuScope === 'public' ? publicCourses : assignedCourses,
-                  activeSubMenuScope
-                ).map((c: any) => {
-                  const isCurrentCourse = c.id === courseId;
-                  return (
-                    <MenuItem
-                      key={c.id}
-                      onClick={() => handleSelectCourse(activeSubMenuScope, c.id)}
-                      sx={{
-                        py: 1.25,
-                        bgcolor: isCurrentCourse ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-                        fontWeight: isCurrentCourse ? 700 : 400,
-                        '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) }
-                      }}
-                    >
-                      <ListItemText
-                        primary={
-                          <Typography sx={{ fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {getText(c.title)}
-                          </Typography>
-                        }
-                      />
-                    </MenuItem>
-                  );
-                })}
-              </Menu>
+              <Typography variant="h2" sx={{fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },letterSpacing: '0.03em', mt: { xs: 1, lg: 0 }, mb: 2, lineHeight: 1.1}}>
+                {getText(course.title)}
+              </Typography>
             </Box>
 
-            <Typography variant="h2" sx={{
-              fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },
-              letterSpacing: '0.03em', mt: 1, mb: 2, lineHeight: 1.1
-            }}>
-              {getText(course.title)}
-            </Typography>
+            {/* Mòbil: botó "Topics" per obrir/tancar el menú de temes */}
+            <Button onClick={() => setMobileNavOpen((v) => !v)} aria-label={mobileNavOpen ? t('lesson.close_topics', 'Tancar temes') : t('lesson.open_topics', 'Obrir temes')} aria-expanded={mobileNavOpen} aria-controls="lesson-topics" variant="outlined" startIcon={mobileNavOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />} sx={{ display: { xs: 'inline-flex', md: 'none' }, textTransform: 'none', fontWeight: 900, fontSize: '1rem', borderRadius: 999, borderColor: '#00685d', color: '#00685d', px: 2, mt: { xs: 2 }, mb: { xs: -3 } }}> Topics </Button>
 
-            <Typography sx={{ color: 'text.secondary', fontSize: '1.4rem', lineHeight: 1.7, mb: 6, maxWidth: '900px' }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: { xs: '1rem', md: '1.4rem' }, lineHeight: 1.7, mb: 6, maxWidth: '900px' }}>
               {getText(course.description)}
             </Typography>
 
-            {mainTab === 0 && (
-              <Box sx={{ mb: 6 }}>
-                {renderTabs()}
-                {renderExpandAll()}
-                {theoryLessons.map((lesson: any) => {
-                  const isOpen = expandedLessons.has(lesson.id);
-                  const isDone = progress[`${courseId}_theory_${lesson.id}`] === true;
-                  return (
-                    <Box key={lesson.id} sx={{
-                      border: '1px solid', borderColor: 'divider', borderRadius: 2,
-                      mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper',
-                    }}>
-                      <Box
-                        onClick={() => toggleLessonExpand(lesson.id)}
-                        sx={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          px: 2.5, py: 2, cursor: 'pointer',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Box sx={{ display: 'flex', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}>
-                            <ChevronDown size={20} />
-                          </Box>
-                          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-                            {getText(lesson.title)}
-                          </Typography>
-                        </Box>
-                        {isDone && <CheckCircle2 size={18} color={theme.palette.success.main} />}
-                      </Box>
-
-                      {isOpen && (
-                        <Box id={`theory-${lesson.id}`} sx={{ px: 2.5, pb: 2.5 }}>
-                          {lesson.subTopics && lesson.subTopics.length > 0 && (
-                            <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                              {lesson.subTopics.map((sub: any) => {
-                                const subTitle = getText(sub.title);
-                                if (!subTitle) return null;
-                                return (
-                                  <Button
-                                    key={sub.id || sub.slug}
-                                    component={RouterLink}
-                                    to={`/courses/${courseId}/${lesson.id}/topic`}
-                                    variant="outlined"
-                                    size="small"
-                                    sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
-                                  >
-                                    {subTitle}
-                                  </Button>
-                                );
-                              })}
-                            </Box>
-                          )}
-
-                          {theoryMap[lesson.id] ? (
-                            <Box
-                              sx={{ '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 1.8, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: 'divider', px: 2, py: 1, textAlign: 'left', color: 'text.secondary' }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } }}>
-                              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                {theoryMap[lesson.id]}
-                              </ReactMarkdown>
-                            </Box>
-                          ) : (
-                            <Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>
-                              {t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}
-                            </Typography>
-                          )}
-
-                          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-                            <Button
-                              variant={isDone ? "outlined" : "contained"}
-                              color={isDone ? "success" : "primary"}
-                              onClick={() => markLessonAsDone(lesson.id)}
-                              startIcon={<Check size={16} />}
-                              sx={{ textTransform: 'none', fontWeight: 700 }}
-                            >
-                              {isDone ? t('lesson.completed', 'Completat') : t('lesson.mark_as_done', 'Marca com a completat')}
-                            </Button>
-                          </Box>
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-
-            {mainTab === 1 && (
-              <Box sx={{ mb: 6 }}>
-                {renderTabs()}
-                {renderExpandAll()}
-                {getLessonsWithType('coding').length === 0 && (
-                  <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
-                    {t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.')}
-                  </Typography>
-                )}
-                {getLessonsWithType('coding').map(({ lesson, items }) => {
-                  const isOpen = expandedLessons.has(lesson.id);
-                  return (
-                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
-                      <Box
-                        onClick={() => toggleLessonExpand(lesson.id)}
-                        sx={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          px: 2.5, py: 2, cursor: 'pointer',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Box sx={{ display: 'flex', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}>
-                            <ChevronDown size={20} />
-                          </Box>
-                          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-                            {getText(lesson.title)}
-                          </Typography>
-                        </Box>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'text.secondary' }}>
-                          {getLessonProgress(lesson)}%
-                        </Typography>
-                      </Box>
-                      {isOpen && (
-                        <Box sx={{ px: 2.5, pb: 1 }}>
-                          {items.map((sub: any) => {
-                            const key = `${courseId}_${sub.problemSlug || sub.slug || lesson.id}`;
-                            const targetSlug = sub.slug || sub.problemSlug || lesson.id;
-                            return renderOverviewRow({
-                              key: `${lesson.id}-ex-${targetSlug}`,
-                              icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], '💻')}</Typography>,
-                              label: getText(sub.subtitle || sub.title),
-                              to: `/courses/${courseId}/${targetSlug}`,
-                              right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
-                            });
-                          })}
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-
-            {mainTab === 2 && (
-              <Box sx={{ mb: 6 }}>
-                {renderTabs()}
-                {renderExpandAll()}
-                {getLessonsWithType('test').length === 0 && (
-                  <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>
-                    {t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.')}
-                  </Typography>
-                )}
-                {getLessonsWithType('test').map(({ lesson, items }) => {
-                  const isOpen = expandedLessons.has(lesson.id);
-                  return (
-                    <Box key={lesson.id} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, mb: 2.5, overflow: 'hidden', bgcolor: 'background.paper' }}>
-                      <Box
-                        onClick={() => toggleLessonExpand(lesson.id)}
-                        sx={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          px: 2.5, py: 2, cursor: 'pointer',
-                          '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.04) },
-                        }}
-                      >
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <Box sx={{ display: 'flex', transform: isOpen ? 'rotate(0deg)' : 'rotate(-90deg)', transition: 'transform 0.2s' }}>
-                            <ChevronDown size={20} />
-                          </Box>
-                          <Typography sx={{ fontWeight: 800, fontSize: '1.1rem' }}>
-                            {getText(lesson.title)}
-                          </Typography>
-                        </Box>
-                        <Typography sx={{ fontSize: '0.9rem', fontWeight: 700, color: 'text.secondary' }}>
-                          {getLessonProgress(lesson)}%
-                        </Typography>
-                      </Box>
-                      {isOpen && (
-                        <Box sx={{ px: 2.5, pb: 1 }}>
-                          {items.map((sub: any) => {
-                            const key = `${courseId}_${sub.problemSlug || sub.slug || lesson.id}`;
-                            const targetSlug = sub.slug || sub.problemSlug || lesson.id;
-                            return renderOverviewRow({
-                              key: `${lesson.id}-t-${targetSlug}`,
-                              icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], '📝')}</Typography>,
-                              label: getText(sub.subtitle || sub.title),
-                              to: `/courses/${courseId}/exam/${targetSlug}`,
-                              right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
-                            });
-                          })}
-                        </Box>
-                      )}
-                    </Box>
-                  );
-                })}
-              </Box>
-            )}
-
-            {mainTab === 3 && (
-              <Box sx={{ textAlign: 'center', py: 10, color: 'text.secondary' }}>
-                {renderTabs()}
-                <FileText size={40} style={{ opacity: 0.5 }} />
-                <Typography sx={{ mt: 2, fontWeight: 600, fontSize: '0.95rem' }}>
-                  {t('lesson.no_files', 'Encara no hi ha fitxers disponibles per aquest curs.')}
-                </Typography>
-              </Box>
-            )}
+            {mainTab === 0 && (<Box>{renderTabs()}{renderTheoryTab()}</Box>)}
+            {mainTab === 1 && (<Box>{renderTabs()}{renderExerciseTab('coding')}</Box>)}
+            {mainTab === 2 && (<Box>{renderTabs()}{renderExerciseTab('test')}</Box>)}
+            {mainTab === 3 && (<Box>{renderTabs()}{renderFilesTab()}</Box>)}
           </motion.div>
         </Box>
       </Box>
 
       {/* Menú vertical flotant: apareix quan les pestanyes de dalt surten de la pantalla */}
-      <Box
-        sx={{
-          position: 'absolute',
-          right: { xs: 6, md: 20 },
-          top: '50%',
-          zIndex: 20,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 0.5,
-          p: 0.5,
-          borderRadius: 999,
-          bgcolor: alpha(theme.palette.background.paper, 0.85),
-          backdropFilter: 'blur(8px)',
-          border: '1px solid',
-          borderColor: 'divider',
-          boxShadow: 3,
-          transition: 'opacity 0.25s, transform 0.25s',
-          opacity: showRail ? 1 : 0,
-          transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)',
-          pointerEvents: showRail ? 'auto' : 'none',
-        }}
-      >
+      <Box sx={{ position: 'absolute', right: { xs: 7.5, md: 27, lg: 35 }, top: '50%', zIndex: 20, display: 'flex', flexDirection: 'column', gap: 3, p: 1, borderRadius: 999, bgcolor: alpha(theme.palette.background.paper, 0.85), backdropFilter: 'blur(8px)', border: '1px solid', borderColor: 'divider', boxShadow: 3, transition: 'opacity 0.25s, transform 0.25s', opacity: showRail ? 1 : 0, transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)', pointerEvents: showRail ? 'auto' : 'none' }}>
         {TAB_ITEMS.map(({ icon: Icon, labelKey, fallback }, index) => {
           const active = mainTab === index;
           return (
             <Tooltip key={labelKey} title={t(labelKey, fallback)} placement="left">
-              <Box
-                component="button"
-                type="button"
-                aria-label={t(labelKey, fallback)}
-                onClick={() => handleRailTabClick(index)}
-                sx={{
-                  width: { xs: 36, md: 44 },
-                  height: { xs: 36, md: 44 },
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: 'none', borderRadius: '50%', cursor: 'pointer',
-                  bgcolor: active ? '#8400ff' : 'transparent',
-                  color: active ? '#fff' : 'text.secondary',
-                  transition: 'background-color 0.2s, color 0.2s',
-                  '&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.12) },
-                }}
-              >
-                <Icon size={20} />
-              </Box>
+              <Box component="button" type="button" aria-label={t(labelKey, fallback)} onClick={() => handleRailTabClick(index)} sx={{ width: { xs: 36, md: 44 }, height: { xs: 36, md: 44 }, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', cursor: 'pointer', bgcolor: active ? '#8400ff' : 'transparent', color: active ? '#fff' : 'text.secondary', transition: 'background-color 0.2s, color 0.2s', '&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.12) } }}><Icon size={20} /></Box>
             </Tooltip>
           );
         })}
+
+        {/* Mòbil: separador + botó de topics dins del mateix rail flotant */}
+        <Box sx={{ display: { xs: 'block', md: 'none' }, width: 22, height: 1, bgcolor: 'divider', my: -1, flexShrink: 0 }} />
+        <Tooltip title="Topics" placement="left">
+          <Box component="button" type="button" aria-label="Topics" aria-controls="lesson-topics" onClick={() => setMobileNavOpen(true)} sx={{ display: { xs: 'flex', md: 'none' }, width: { xs: 36, md: 44 }, height: { xs: 36, md: 44 }, alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', cursor: 'pointer', bgcolor: 'transparent', color: 'text.secondary', transition: 'background-color 0.2s, color 0.2s', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.12) } }}><ListIcon size={20} /></Box>
+        </Tooltip>
       </Box>
+
+      {/* Menú de temes per a mòbil (ocultat a l'esquerra) */}
+      {renderMobileTopicPanel(topicItems, activeTopicId)}
     </Box>
   );
 }

@@ -28,6 +28,9 @@ interface Course {
   content: Lesson[];
   disabled?: boolean;
   slug?: string;
+  /** El detall del curs el retorna l'API com a `is_public`; les llistes, com `isPublic`. */
+  is_public?: boolean;
+  isPublic?: boolean;
 }
 
 function resolveSlug(courseId: string): string {

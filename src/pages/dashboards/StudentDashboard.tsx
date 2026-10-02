@@ -142,6 +142,50 @@ export default function StudentDashboard() {
     setActionLoading(false);
   }, []);
 
+  /**
+   * Carrega cursos assignats (autenticats) + públics amb el seu detall.
+   * Es crida en muntar, en tornar a la pestanya i just després del login.
+   */
+  const loadCourses = useCallback(async () => {
+    const [assignedFromApi, publicFromApi] = await Promise.all([
+      courseService.getAllCourses().catch((e) => {
+        console.error('[dashboard] getAllCourses ha fallat:', e?.response?.status, e);
+        return [] as Course[];
+      }),
+      courseService.getPublicCourses().catch((e) => {
+        console.error('[dashboard] getPublicCourses ha fallat:', e?.response?.status, e);
+        return [] as Course[];
+      }),
+    ]);
+    const withDetails = async (course: Course) => {
+      try {
+        const detail = await courseService.getFullCourseDetail(course.slug!);
+        const topics: Topic[] = (detail.content || []).map((topic: any) => ({
+          id: topic.id ?? topic.slug,
+          title: topic.title,
+          lessons: (topic.subTopics || []).map((st: any) => ({
+            id: st.problemSlug,
+            title: st.subtitle,
+            theoryInstructions: st.text,
+            challenge: st.text,
+            type: st.type,
+            choices: st.choices,
+            precode: st.precode,
+            difficulty: st.difficulty,
+            score: st.score,
+          })),
+        }));
+        return { ...course, topics };
+      } catch { return course; }
+    };
+    const [assigned, pub] = await Promise.all([
+      Promise.all(assignedFromApi.map(withDetails)),
+      Promise.all(publicFromApi.map(withDetails)),
+    ]);
+    setAssignedCourses(assigned);
+    setPublicCourses(pub);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     const initData = async (isInitial = false) => {
@@ -149,37 +193,17 @@ export default function StudentDashboard() {
         if (isInitial) setLoading(true);
         if (!mounted) return;
         try {
-          const [assignedFromApi, publicFromApi] = await Promise.all([
-            courseService.getAllCourses().catch(() => [] as Course[]),
-            courseService.getPublicCourses().catch(() => [] as Course[]),
-          ]);
-          const withDetails = async (course: Course) => {
-            try {
-              const detail = await courseService.getFullCourseDetail(course.slug!);
-              const topics: Topic[] = (detail.content || []).map((topic: any) => ({
-                id: topic.id ?? topic.slug,
-                title: topic.title,
-                lessons: (topic.subTopics || []).map((st: any) => ({
-                  id: st.problemSlug,
-                  title: st.subtitle,
-                  theoryInstructions: st.text,
-                  challenge: st.text,
-                  type: st.type,
-                  choices: st.choices,
-                  precode: st.precode,
-                  difficulty: st.difficulty,
-                  score: st.score,
-                })),
-              }));
-              return { ...course, topics };
-            } catch { return course; }
-          };
-          setAssignedCourses(await Promise.all(assignedFromApi.map(withDetails)));
-          setPublicCourses(await Promise.all(publicFromApi.map(withDetails)));
+          await loadCourses();
         } catch (err) { console.error("Error carregant cursos:", err); }
 
         const saved = localStorage.getItem('currentStudent');
-        if (saved) {
+        const hasToken = !!localStorage.getItem('token');
+        if (saved && !hasToken) {
+          // Sessió òrfena (token caducat/esborrat): evitem mostrar un dashboard
+          // "loguejat" que només pot veure cursos públics.
+          localStorage.removeItem('currentStudent');
+          setSelectedStudent(null);
+        } else if (saved) {
             const parsed = JSON.parse(saved);
             setSelectedStudent(parsed);
             await fetchProgress(parsed.id);
@@ -202,7 +226,18 @@ export default function StudentDashboard() {
       document.removeEventListener('lessonProgressUpdated', onProgress);
       window.removeEventListener('storage', onProgress);
     };
-  }, [fetchProgress]);
+  }, [fetchProgress, loadCourses]);
+
+  // Quan canvia la sessió (login/logout) recarreguem els cursos sense haver de
+  // refrescar la pàgina. L'event es dispara DESPRÉS que el token estigui desat.
+  useEffect(() => {
+    const onAuthChange = () => {
+      courseService.clearCache();
+      loadCourses().catch((err) => console.error('Error recarregant cursos després del canvi de sessió:', err));
+    };
+    window.addEventListener('auth-state-change', onAuthChange);
+    return () => window.removeEventListener('auth-state-change', onAuthChange);
+  }, [loadCourses]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -220,6 +255,9 @@ export default function StudentDashboard() {
       setSelectedStudent(student);
       localStorage.setItem('currentStudent', JSON.stringify(student));
       fetchProgress(student.id);
+      // Els cursos es van carregar abans del login (només públics): els
+      // recarrega l'efecte que escolta 'auth-state-change' (més avall).
+      courseService.clearCache();
       setUsername("");
       setPassword("");
       setLoginLoading(false);
@@ -308,14 +346,16 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (restoredRef.current || assignedCourses.length + publicCourses.length === 0) return;
-    restoredRef.current = true;
     const saved = readLastCourse();
-    if (!saved) return;
+    if (!saved) { restoredRef.current = true; return; }
     const savedScope: CourseScope =
       saved.scope === 'private' || saved.scope === 'assigned' ? saved.scope : 'public';
-    setScope(savedScope);
     const source = savedScope === 'public' ? publicCourses : assignedCourses;
     const list = filterByScope(source, savedScope);
+    // Si la llista guardada encara és buida (cursos autenticats pendents), esperem
+    if (list.length === 0) return;
+    restoredRef.current = true;
+    setScope(savedScope);
     const idx = list.findIndex((c) => c.slug === saved.slug);
     if (idx >= 0) setCourseTabIndex(idx);
   }, [assignedCourses, publicCourses]);
@@ -426,7 +466,7 @@ export default function StudentDashboard() {
                     startIcon={<ScopeIcon scope={scope} />}
                     endIcon={<ExpandMoreIcon fontSize="small" sx={{ transition: 'transform 0.2s', transform: scopeAnchor ? 'rotate(180deg)' : 'none' }} />}
                     sx={{
-                      textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.8rem', md: '0.875rem' },
+                      textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.87rem', md: '0.875rem' },
                       color: '#00A896', minWidth: 0, flexShrink: 0, py: 0.5, pr: 0.5,
                     }}
                   >
@@ -466,9 +506,7 @@ export default function StudentDashboard() {
                       persistSelection(visibleCourses[val], scope);
                     }}
                     slotProps={{ indicator: { style: { display: 'none' } } }}
-                    variant="scrollable"
-                    scrollButtons="auto"
-                    sx={{ minHeight: 40, maxWidth: { xs: 200, sm: 'none' } }}
+                    sx={{ minHeight: 40, maxWidth: { xs: 200, sm: 'none' }, ml:{xs:-2, lg: 1}}}
                   >
                     {visibleCourses.map((course) => (
                       <Tab
@@ -476,7 +514,7 @@ export default function StudentDashboard() {
                         label={getText(course.title) || course.slug}
                         sx={{
                           minHeight: 40, textTransform: 'none', fontWeight: 700, borderRadius: 999,
-                          color: '#00A896 !important',
+                          color: '#00A896 !important',ml:{xs:-1.1},mr:{lg:2}
                         }}
                       />
                     ))}
@@ -484,7 +522,7 @@ export default function StudentDashboard() {
                   {currentCourse && (
                     <IconButton
                       size="small"
-                      sx={{ ml: 0.5 }}
+                      sx={{ ml: -2}}
                       onClick={() => handleResetCourse(currentCourse.id)}
                       aria-label={t('dashboard.reset_course_tooltip')}
                       title={t('dashboard.reset_course_tooltip')}
