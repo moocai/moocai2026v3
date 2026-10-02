@@ -14,6 +14,7 @@ import {
   updateProfile, extractProfileErrors, fetchOrganizations, fetchMyAvatar, updateMyAvatar, fetchProfile,
   type Organization, type ProfileUser,
 } from '../services/profileService';
+import { invalidateImage } from '../utils/avatarCache';
 
 const languages = [
   { code: 'en', labelKey: 'profile.lang_english' },
@@ -290,6 +291,9 @@ export default function ProfilePage() {
         try {
           const url = await updateMyAvatar(avatarFile);
           if (url) setAvatarUrl(url);
+          // La memòria cau d'avatars ja té la imatge antiga: la netegem.
+          invalidateImage();
+          window.dispatchEvent(new Event('avatarUpdated'));
         } catch (err) {
           addNotification(extractProfileErrors(err), 'error');
         }

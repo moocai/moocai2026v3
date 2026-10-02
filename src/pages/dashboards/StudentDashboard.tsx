@@ -1,6 +1,6 @@
 import {useState, useEffect, useMemo, useCallback, useRef, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Avatar, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
+import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
 import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, AccessTime as AccessTimeIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
@@ -11,6 +11,12 @@ import {Student, Topic, Course} from '../../features/student/types';
 import { courseService } from '../../services/courseService';
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
+import ProtectedAvatar from '../../components/ProtectedAvatar';
+import { courseImages } from '../../data/courses';
+import { preloadImage, userAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
+
+/** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
+const LEADERBOARD_VISIBLE = 6;
 
 const getProgress = (studentId: string): Record<string, boolean> => {
   const perStudent = JSON.parse(localStorage.getItem(`mooc_global_progress_${studentId}`) || '{}');
@@ -57,11 +63,8 @@ function writeLastCourse(slug: string | undefined, scope: string) {
 }
 
 /** Una fila del leaderboard. */
-type RankedStudent = { id: string; name: string; points: number };
+type RankedStudent = { id: string; name: string; username?: string; points: number };
 
-/**
- * Converteix la resposta del leaderboard en files, ordenades de més a menys punts.
- */
 function toRanking(data: any[]): RankedStudent[] {
   const firstNumber = (row: any, keys: string[]): number => {
     for (const k of keys) {
@@ -76,6 +79,7 @@ function toRanking(data: any[]): RankedStudent[] {
       return {
         id: String(user?.id ?? user?.user_id ?? user?.username ?? i),
         name: String(user?.username ?? user?.name ?? user?.full_name ?? user?.first_name ?? row?.username ?? '?'),
+        username: String(user?.username ?? user?.name ?? ''),
         points: firstNumber(row, ['points', 'score', 'total_points', 'total_score', 'stars', 'grade']),
       };
     })
@@ -142,10 +146,13 @@ export default function StudentDashboard() {
     setActionLoading(false);
   }, []);
 
-  /**
-   * Carrega cursos assignats (autenticats) + públics amb el seu detall.
-   * Es crida en muntar, en tornar a la pestanya i just després del login.
-   */
+  const courseAvatarUrl = useCallback((course: Course): string => {
+    const courseTitleStr = getText(course.title);
+    return (course.slug && courseImages[course.slug])
+      || (courseTitleStr && courseImages[courseTitleStr])
+      || `/api/v1/courses/${course.slug}/avatar/`;
+  }, [lang]);
+
   const loadCourses = useCallback(async () => {
     const [assignedFromApi, publicFromApi] = await Promise.all([
       courseService.getAllCourses().catch((e) => {
@@ -157,6 +164,11 @@ export default function StudentDashboard() {
         return [] as Course[];
       }),
     ]);
+
+    // Els avatars dels curs ja surten a les pestanyes: els demanem de seguida,
+    // sense esperar que acabin de baixar tots els detalls (que és el que trigava).
+    void Promise.all([...assignedFromApi, ...publicFromApi].map((c) => preloadImage(courseAvatarUrl(c))));
+
     const withDetails = async (course: Course) => {
       try {
         const detail = await courseService.getFullCourseDetail(course.slug!);
@@ -184,10 +196,26 @@ export default function StudentDashboard() {
     ]);
     setAssignedCourses(assigned);
     setPublicCourses(pub);
-  }, []);
+  }, [lang, courseAvatarUrl]);
 
   useEffect(() => {
     let mounted = true;
+
+    // Arrenca l'avatar de l'usuari i el del curs recordat abans de qualsevol
+    // altra espera: en paral·lel amb la llista de cursos, no després.
+    pruneAvatarCacheOnce();
+    const lastCourseSlug = readLastCourse()?.slug;
+    if (lastCourseSlug) {
+      void preloadImage(`/api/v1/courses/${lastCourseSlug}/avatar/`);
+      const saved = localStorage.getItem('currentStudent');
+      let username: string | undefined;
+      try {
+        const parsed = saved ? JSON.parse(saved) : null;
+        username = parsed?.username || parsed?.id ? String(parsed.username || parsed.id) : undefined;
+      } catch { username = undefined; }
+      if (username) void preloadImage(userAvatarUrl(username, lastCourseSlug));
+    }
+
     const initData = async (isInitial = false) => {
       try {
         if (isInitial) setLoading(true);
@@ -199,8 +227,6 @@ export default function StudentDashboard() {
         const saved = localStorage.getItem('currentStudent');
         const hasToken = !!localStorage.getItem('token');
         if (saved && !hasToken) {
-          // Sessió òrfena (token caducat/esborrat): evitem mostrar un dashboard
-          // "loguejat" que només pot veure cursos públics.
           localStorage.removeItem('currentStudent');
           setSelectedStudent(null);
         } else if (saved) {
@@ -228,12 +254,10 @@ export default function StudentDashboard() {
     };
   }, [fetchProgress, loadCourses]);
 
-  // Quan canvia la sessió (login/logout) recarreguem els cursos sense haver de
-  // refrescar la pàgina. L'event es dispara DESPRÉS que el token estigui desat.
   useEffect(() => {
     const onAuthChange = () => {
       courseService.clearCache();
-      loadCourses().catch((err) => console.error('Error recarregant cursos després del canvi de sessió:', err));
+      loadCourses().catch((err) => console.error('Error recarregant cursos:', err));
     };
     window.addEventListener('auth-state-change', onAuthChange);
     return () => window.removeEventListener('auth-state-change', onAuthChange);
@@ -255,8 +279,6 @@ export default function StudentDashboard() {
       setSelectedStudent(student);
       localStorage.setItem('currentStudent', JSON.stringify(student));
       fetchProgress(student.id);
-      // Els cursos es van carregar abans del login (només públics): els
-      // recarrega l'efecte que escolta 'auth-state-change' (més avall).
       courseService.clearCache();
       setUsername("");
       setPassword("");
@@ -352,7 +374,6 @@ export default function StudentDashboard() {
       saved.scope === 'private' || saved.scope === 'assigned' ? saved.scope : 'public';
     const source = savedScope === 'public' ? publicCourses : assignedCourses;
     const list = filterByScope(source, savedScope);
-    // Si la llista guardada encara és buida (cursos autenticats pendents), esperem
     if (list.length === 0) return;
     restoredRef.current = true;
     setScope(savedScope);
@@ -362,22 +383,58 @@ export default function StudentDashboard() {
 
   const currentSlug = visibleCourses[courseTabIndex]?.slug;
   const selectedStudentId = selectedStudent?.id;
-  useEffect(() => {
+
+  const loadRanking = useCallback(async () => {
     if (!currentSlug || !selectedStudentId) {
       setRanking([]);
       return;
     }
-    let cancelled = false;
-    courseService.getCourseLeaderboard(currentSlug)
-      .then((res: any) => {
-        if (!cancelled) {
-          const list = Array.isArray(res) ? res : (res?.results || []);
-          setRanking(toRanking(list));
-        }
-      })
-      .catch(() => { if (!cancelled) setRanking([]); });
-    return () => { cancelled = true; };
+    try {
+      const res: any = await courseService.getCourseLeaderboard(currentSlug);
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      const rankedList = toRanking(list);
+      setRanking(rankedList);
+
+      // Només demanem els avatars que es veuen: així els de dalt surten
+      // de immediat i no saturen la connexió amb centenars de peticions.
+      const rankingAvatars = rankedList
+        .slice(0, LEADERBOARD_VISIBLE)
+        .filter((s): s is RankedStudent & { username: string } => Boolean(s.username))
+        .map(s => userAvatarUrl(s.username, currentSlug!));
+      void Promise.all(rankingAvatars.map(url => preloadImage(url)));
+    } catch {
+      setRanking([]);
+    }
   }, [currentSlug, selectedStudentId]);
+
+  useEffect(() => {
+    void loadRanking();
+  }, [loadRanking]);
+
+  // Els punts del rànquing els calcula el backend, així que es torna a preguntar
+  // quan hi ha novetats: activitat desada (mateixa pestanya o altra), canvi de
+  // curs o retorn a la pestanya. Amb debounce per agrupar rafegues d'esdeveniments.
+  useEffect(() => {
+    let timer: number | undefined;
+    const schedule = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => { void loadRanking(); }, 400);
+    };
+    const onVisible = () => { if (document.visibilityState === 'visible') schedule(); };
+
+    window.addEventListener('lessonProgressUpdated', schedule);
+    window.addEventListener('storage', schedule);
+    window.addEventListener('focus', onVisible);
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener('lessonProgressUpdated', schedule);
+      window.removeEventListener('storage', schedule);
+      window.removeEventListener('focus', onVisible);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [loadRanking]);
 
   const stats = useMemo(() => {
     const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
@@ -508,16 +565,30 @@ export default function StudentDashboard() {
                     slotProps={{ indicator: { style: { display: 'none' } } }}
                     sx={{ minHeight: 40, maxWidth: { xs: 200, sm: 'none' }, ml:{xs:-2, lg: 1}}}
                   >
-                    {visibleCourses.map((course) => (
-                      <Tab
-                        key={course.id}
-                        label={getText(course.title) || course.slug}
-                        sx={{
-                          minHeight: 40, textTransform: 'none', fontWeight: 700, borderRadius: 999,
-                          color: '#00A896 !important',ml:{xs:-1.1},mr:{lg:2}
-                        }}
-                      />
-                    ))}
+                    {visibleCourses.map((course) => {
+                      const courseTitleStr = getText(course.title);
+                      const avatarSrc = courseAvatarUrl(course);
+
+                      return (
+                        <Tab
+                          key={course.id}
+                          label={
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                              <ProtectedAvatar
+                                src={avatarSrc}
+                                alt={courseTitleStr || course.slug || 'C'}
+                                sx={{ width: 24, height: 24, fontSize: '0.75rem' }}
+                              />
+                              <span>{courseTitleStr || course.slug}</span>
+                            </Stack>
+                          }
+                          sx={{
+                            minHeight: 40, textTransform: 'none', fontWeight: 700, borderRadius: 999,
+                            color: '#00A896 !important',ml:{xs:-1.1},mr:{lg:2}
+                          }}
+                        />
+                      );
+                    })}
                   </Tabs>
                   {currentCourse && (
                     <IconButton
@@ -599,15 +670,17 @@ export default function StudentDashboard() {
                         <DashboardCard title={t('dashboard.leaderboard')} compact={!isMdUp}>
                           <Stack spacing={{ xs: 1.5, md: 2.5 }} sx={{ width: '100%', mt: 1, alignItems: 'center' }}>
                             {ranking.length > 0 ? (
-                              ranking.slice(0, 6).map((s, index) => (
+                              ranking.slice(0, LEADERBOARD_VISIBLE).map((s, index) => (
                                 <Stack key={s.id || index} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', overflow: 'hidden' }}>
-                                    <Avatar sx={{
-                                      width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
-                                      bgcolor: (s.id === selectedStudent?.id || s.name === selectedStudent?.name) ? 'primary.main' : 'action.disabledBackground',
-                                    }}>
-                                      {s.name.charAt(0).toUpperCase()}
-                                    </Avatar>
+                                    <ProtectedAvatar 
+                                      src={s.username && currentCourse?.slug ? userAvatarUrl(s.username, currentCourse.slug) : undefined}
+                                      alt={s.name}
+                                      sx={{
+                                        width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
+                                        bgcolor: (s.id === selectedStudent?.id || s.name === selectedStudent?.name) ? 'primary.main' : 'action.disabledBackground',
+                                      }}
+                                    />
                                     <Typography variant="body2" sx={{ fontSize: { xs: '0.8rem', md: '0.875rem' } }} noWrap>
                                       {s.name}
                                     </Typography>

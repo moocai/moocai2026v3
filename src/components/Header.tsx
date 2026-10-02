@@ -184,6 +184,7 @@ export function Header() {
             <ThemeToggleButton />
             {!studentName && <LanguageSwitcher />}
             {studentName && <PointsBadge points={points} />}
+            {/* Aquí s'integra el menú d'avatar de l'usuari amb la imatge del header */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
             {isLoggedIn && (
@@ -200,6 +201,8 @@ export function Header() {
           {/* MOBILE CONTROLS */}
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
+            {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
+            {studentName && <UserAvatarMenu studentName={studentName} />}
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
               {mobileOpen ? <CloseIcon fontSize="large" /> : <MenuIcon fontSize="large" />}
             </IconButton>

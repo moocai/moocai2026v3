@@ -24,6 +24,11 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export const api = {
+  // Aquest és el mètode que faltava per fer get genèrics (avatars, fitxers, etc.)
+  get: async (url: string, config = {}) => {
+    return apiClient.get(url, config);
+  },
+
   getStudentProgress: async (studentId: string) => {
     return getProgress(studentId);
   },
@@ -44,7 +49,6 @@ export const api = {
     });
     setProgress(studentId, local);
 
-    // Netejar el codi de l'usuari per a totes les lliçons d'aquest curs
     Object.keys(localStorage).forEach(key => {
       if (key.startsWith(`code_${studentId}_${courseId}_`)) {
         localStorage.removeItem(key);
@@ -54,7 +58,6 @@ export const api = {
       }
     });
 
-    // Netejar última sessió si era d'aquest curs
     try {
       const lastSession = JSON.parse(localStorage.getItem('mooc_last_session') || '{}');
       if (lastSession.courseId === courseId) {
