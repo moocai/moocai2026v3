@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Play, RotateCcw, Lock, Sparkles, Code2, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
@@ -15,6 +15,7 @@ import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
+import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
 
 interface Student { id: string; name: string; }
 
@@ -118,6 +119,111 @@ function BackToCourseButton({ label, onClick, fontSize = 11 }: { label: string; 
   );
 }
 
+// === Validació de rellevància: el que escriu l'usuari ha de tenir a veure amb l'enunciat ===
+const STOPWORDS = new Set((
+  // català
+  'aquest aquesta aquests aquestes aixo això amb per com que són sou som has han hem heu una uns unes els les del dels pel pels mes més molt molta tot tota tots totes seu seva seus seves nostre vostre fer fem fet fins entre sobre sota cada quan quin quina mentre doncs perque perquè també tambe sense dins fora ' +
+  // castellà
+  'este esta estos estas eso esto con por como los las del una unos unas para pero mas más muy todo toda todos todas sus nuestro vuestro hacer hace hecho hasta entre sobre cada cuando cual mientras entonces porque tambien también sin dentro fuera ' +
+  // anglès
+  'the and for are but not you all any can had her was one our out has have this that with from they will what when your into than then them these those there their been were which while would could should about each make like just over also'
+).split(/\s+/).filter(Boolean));
+
+const normalizeText = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+const extractKeywords = (s: string): Set<string> => {
+  const out = new Set<string>();
+  normalizeText(s).split(/[^a-z0-9]+/).forEach((w) => {
+    if (w.length >= 3 && !STOPWORDS.has(w) && !/^\d+$/.test(w)) out.add(w);
+  });
+  return out;
+};
+
+// Dues paraules "coincideixen" si són iguals o comparteixen l'arrel (primers 5 caràcters)
+const sameWord = (a: string, b: string) =>
+  a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 5) === b.slice(0, 5));
+
+// Recull recursivament tots els textos de l'activitat (qualsevol idioma/camp), excepte metadades
+const STATEMENT_SKIP_KEYS = new Set(['id', 'slug', 'problemSlug', 'type', 'precode', 'image', 'img', 'url', 'icon', 'order', 'points']);
+function collectStatementStrings(node: any, extraSkip?: Set<string>, depth = 0): string[] {
+  if (node == null || depth > 5) return [];
+  if (typeof node === 'string') return [node];
+  if (Array.isArray(node)) return node.flatMap((n) => collectStatementStrings(n, extraSkip, depth + 1));
+  if (typeof node === 'object') {
+    return Object.entries(node).flatMap(([k, v]) => (STATEMENT_SKIP_KEYS.has(k) || extraSkip?.has(k) ? [] : collectStatementStrings(v, extraSkip, depth + 1)));
+  }
+  return [];
+}
+
+
+const PY_CONCEPTS: Array<{ label: string; words: string[]; test: RegExp }> = [
+  { label: 'print()', words: ['imprim', 'print', 'mostr', 'escriu', 'escrib', 'output', 'sortida', 'salida'], test: /\bprint\s*\(/ },
+  { label: 'assignació de variable', words: ['variabl', 'assign', 'asign'], test: /^\s*[A-Za-z_]\w*\s*(?:[+\-*/%]?=)(?!=)/m },
+  { label: 'enter', words: ['enter', 'entero', 'integer'], test: /\b\d+\b|\bint\s*\(/ },
+  { label: 'decimal', words: ['decimal', 'float', 'flotant'], test: /\d+\.\d+|\bfloat\s*\(/ },
+  { label: 'cadena de text', words: ['cadena', 'string', 'caracter'], test: /["']/ },
+  { label: 'llista', words: ['llista', 'lista', 'list'], test: /\[|\blist\s*\(/ },
+  { label: 'diccionari', words: ['diccionari', 'diccionario', 'dict'], test: /\{|\bdict\s*\(/ },
+  { label: 'for/while', words: ['bucle', 'repeteix', 'repite', 'loop', 'mentre', 'while', 'iter'], test: /\bfor\b|\bwhile\b/ },
+  { label: 'if', words: ['condicion', 'condition', 'else', 'altrament', 'sino'], test: /\bif\b/ },
+  { label: 'def', words: ['funci', 'function', 'defin'], test: /\bdef\b|\blambda\b/ },
+  { label: 'operació', words: ['suma', 'resta', 'multiplic', 'divid', 'operaci', 'calcul'], test: /[+\-*/%]|\bsum\s*\(/ },
+  { label: 'input()', words: ['demana', 'pregunta', 'input', 'entrada', 'teclat'], test: /\binput\s*\(/ },
+  { label: 'return', words: ['retorn', 'return', 'devuelve'], test: /\breturn\b/ },
+  { label: 'import', words: ['import'], test: /\bimport\b|\bfrom\b/ },
+];
+
+// Analitza el codi segons els conceptes que demana l'enunciat. Retorna null si no n'activa cap.
+function analyzePythonConcepts(code: string, statementOnly: string): { active: string[]; missing: string[]; pass: boolean } | null {
+  const words = Array.from(extractKeywords(statementOnly));
+  const active = PY_CONCEPTS.filter((c) => words.some((w) => c.words.some((p) => w.startsWith(p))));
+  if (active.length === 0) return null;
+  const cleanCode = code.split('\n').map((l) => l.replace(/#.*$/, '')).join('\n');
+  const missing = active.filter((c) => !c.test.test(cleanCode)).map((c) => c.label);
+  const required = active.length <= 2 ? active.length : Math.ceil(active.length * 0.75);
+  return { active: active.map((c) => c.label), missing, pass: active.length - missing.length >= required };
+}
+
+// Retorna true si la resposta té relació amb l'enunciat de l'activitat.
+// Ignora el codi inicial (precode) perquè no compti com a coincidència.
+function isRelatedToStatement(userText: string, statementParts: Array<string | undefined>, precode?: string, language: string = 'python', statementOnly: string = ''): boolean {
+  let cleaned = userText || '';
+  if (precode) {
+    const pre = new Set(precode.split('\n').map((l) => l.trim()).filter(Boolean));
+    cleaned = cleaned.split('\n').filter((l) => !pre.has(l.trim())).join('\n');
+  }
+  if (!cleaned.trim()) return false;
+  // 1) Codi Python: valida per conceptes (print, assignació, bucle...) segons el que demana l'enunciat
+  if (language === 'python') {
+    const byConcepts = analyzePythonConcepts(cleaned, statementOnly);
+    if (byConcepts?.pass) return true;
+  }
+  // 2) Resposta en llenguatge natural: coincidència de paraules clau amb l'enunciat
+  const userWords = extractKeywords(cleaned);
+  if (userWords.size === 0) return false;
+  const statementWords = Array.from(extractKeywords(statementParts.filter(Boolean).join(' ')));
+  // Si no hem pogut llegir cap paraula clau de l'enunciat, NO enviem (mai obrim la porta per defecte)
+  if (statementWords.length === 0) return false;
+  let matches = 0;
+  userWords.forEach((w) => { if (statementWords.some((sw) => sameWord(w, sw))) matches++; });
+  const required = Math.min(2, statementWords.length);
+  // Cal un mínim de coincidències I que la majoria del que s'ha escrit sigui del tema
+  // (així no val barrejar 2 paraules bones amb text sense sentit)
+  const ratio = matches / userWords.size;
+  return matches >= required && ratio >= 0.5;
+}
+
+// El servidor NO corregeix les activitats: una resposta 2xx vol dir "rebut".
+// Només es considera rebutjada si el servidor ho diu explícitament.
+function isRejectedResult(r: any): boolean {
+  if (!r) return false;
+  const d = r.data ?? r;
+  const status = String(d.status ?? d.result ?? d.verdict ?? '').toLowerCase();
+  return d.passed === false || d.correct === false || d.is_correct === false || d.success === false
+    || ['incorrect', 'failed', 'fail', 'wrong', 'error', 'rejected'].includes(status);
+}
+
 export default function LessonPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
   const { t, i18n } = useTranslation();
@@ -143,6 +249,7 @@ export default function LessonPage() {
   // === Multi-model: un sol editor, un model/fitxer per llenguatge ===
   const [selectedLanguage, setSelectedLanguage] = useState<EditorLang>('python');
   const [codeByLang, setCodeByLang] = useState<Record<EditorLang, string>>({ python: '', react: '' });
+  const [testedCode, setTestedCode] = useState<string | null>(null); // codi Python que ha passat Test Python
   const userInput = codeByLang[selectedLanguage];
   const userInputRef = useRef(userInput); userInputRef.current = userInput;
   const codeStorageRef = useRef(codeByLang); codeStorageRef.current = codeByLang;
@@ -224,6 +331,24 @@ export default function LessonPage() {
   };
 
   const currentProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+  // Sincronització editor <-> enunciat: es recalcula cada cop que l'usuari escriu
+  const statementShown = [getText(currentProblem?.subtitle), typeof currentProblem?.text === 'string' ? currentProblem.text : getText(currentProblem?.text)].join(' ');
+  const isRelated = useMemo(
+    () => !!currentProblem && isRelatedToStatement(userInput, collectStatementStrings(currentProblem), currentProblem?.precode, selectedLanguage, statementShown),
+    [userInput, currentProblem, selectedLanguage, statementShown]
+  );
+  const missingHint = (() => {
+    if (isRelated || selectedLanguage !== 'python' || !userInput.trim()) return '';
+    const a = analyzePythonConcepts(userInput.split('\n').filter((l) => l.trim() !== '').join('\n'), statementShown);
+    return a?.missing.length ? ` · falta: ${a.missing.join(', ')}` : '';
+  })();
+  const showOffTopicHint = userInput.trim().length > 0 && !isRelated;
+  // Python: Enviar només es desbloqueja si el codi actual té relació amb l'enunciat I s'ha provat amb "Test Python".
+  // Si l'usuari canvia el codi després de provar-lo, es torna a bloquejar.
+  const hasBeenTested = selectedLanguage !== 'python' || (testedCode !== null && testedCode === userInput);
+  const canSubmit = isRelated && hasBeenTested;
+  const showTestHint = selectedLanguage === 'python' && userInput.trim().length > 0 && isRelated && !hasBeenTested;
+
 
   // Els problemes de tipus "test" no es resolen amb codi: es respon amb `answers`
   // a ExamPage. Si arribem aqui (URL directa o "seguent" des d'un exercici),
@@ -336,6 +461,7 @@ export default function LessonPage() {
         react: saved?.react || '',
       });
       setDiagnostics([]);
+      setTestedCode(null);
       // Recupera l'estat de vista (cursor/selecció/scroll) desat per a aquesta lliçó
       try {
         const rawView = localStorage.getItem(`${codeStorageKey}_view`);
@@ -397,9 +523,7 @@ export default function LessonPage() {
         globalProgress[key] = true;
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
         if (!wasAlreadyComplete) {
-          const totalDone = Object.values(globalProgress).filter(Boolean).length;
-          const totalPts = totalDone * 10;
-          setConsoleOutput(p => [...p, `🏆 +10 Punts! (Total: ${totalPts})`]);
+          setConsoleOutput(p => [...p, '🏆 +10 Punts!']);
         }
       } else if (!globalProgress[key]) {
         globalProgress[key] = 'attempted';
@@ -424,18 +548,46 @@ export default function LessonPage() {
       navigate(`/courses/${courseId}/exam/${lessonId}`, { replace: true });
       return;
     }
+    // Validació: la resposta ha de tenir relació amb l'enunciat; si no, no s'envia
+    const statementText = collectStatementStrings(currentProblem);
+    const related = isRelatedToStatement(userInputRef.current, statementText, currentProblem?.precode, selectedLanguage, statementShown);
+    console.debug('[Validació enunciat]', { related, input: userInputRef.current, statementShown, concepts: analyzePythonConcepts(userInputRef.current, statementShown) });
+    if (related && selectedLanguage === 'python' && testedCode !== userInputRef.current) {
+      const msg = t('lesson.test_first_error', "Primer executa el codi amb «Test Python»: Enviar es desbloqueja quan el resultat és coherent amb l'activitat.");
+      setConsoleOutput([`⚠️ ${msg}`]);
+      addNotification(msg, 'error');
+      return;
+    }
+    if (!related) {
+      const offTopicMsg = t('lesson.off_topic_error', "El que has escrit no té relació amb l'enunciat de l'activitat. Revisa'l i torna-ho a provar.");
+      setConsoleOutput([`⚠️ ${offTopicMsg}${missingHint}`]);
+      setStatus('fail');
+      addNotification(offTopicMsg, 'error');
+      return;
+    }
     setConsoleOutput(["[SISTEMA]: Executant..."]);
     setStatus('idle');
     try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, "📤 Enviat al servidor..."]);
       const result = await courseService.submitChallenge(courseId!,topic.id,lessonId!,{code: userInputRef.current, language: selectedLanguage });
       setConsoleOutput(p => [...p, "✅ Resposta enviada al servidor"]);
-      const passed = result?.status === 'correct' || result?.passed === true;
+      const passed = !isRejectedResult(result);
+      console.debug('[Enviar] resposta del servidor', result, { passed });
       const msg = result?.feedback || (passed ? "✅ COMPLETAT!" : null);
       if (msg) setConsoleOutput(p => [...p, msg]);
       setUnlocked(true);
-      await handleSaveProgress(true);
+      // Només es marca com a completada (i suma punts) si el servidor l'ha donat per correcta
+      await handleSaveProgress(passed);
       if (passed) {setStatus('pass'); confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
+        // Sincronitza els punts amb el backend: actualitza header i leaderboard
+
       } else {  setStatus('fail');}
+
+      // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
+      // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
+      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0).then(() => {
+        const st = getCurrentStudent();
+        if (st) setConsoleOutput(p => [...p, `🏆 Punts totals: ${getTotalPoints(st.id)}`]);
+      });
 
       if (currentUser) {
         const submissions = JSON.parse(localStorage.getItem(`mooc_submissions_${courseId}_${lessonId}`) || '[]');
@@ -471,6 +623,14 @@ export default function LessonPage() {
   };
 
   const handleLocalRun = () => {if (selectedLanguage !== 'python') {setConsoleOutput([`[LOCAL RUN]: Execució local finalitzada.`]); return;}
+    // Consola sincronitzada amb editor + enunciat (només Python): si no té relació, no s'executa
+    if (!isRelated) {
+      const msg = t('lesson.off_topic_error', "El que has escrit no té relació amb l'enunciat de l'activitat. Revisa'l i torna-ho a provar.") + missingHint;
+      setConsoleOutput([`⚠️ ${msg}`]);
+      setTestedCode(null);
+      addNotification(msg, 'error');
+      return;
+    }
     const source = userInputRef.current .split('\n') .map(l => l.replace(/#.*$/, '').replace(/\s+$/, '')) .filter(l => l.trim().length > 0) .map(l => ({ indent: l.match(/^\s*/)![0].length, text: l.trim() }));
     const variables: Record<string, any> = {};
     const outputs: string[] = [];
@@ -570,9 +730,25 @@ export default function LessonPage() {
         idx += 1;
       }
     };
-    run(source, variables, outputs);
-    if (outputs.length > 0) {setConsoleOutput(outputs);} 
-    else {setConsoleOutput(["[LOCAL RUN]: Codi executat correctament.", "*(Nota: No s'han detectat sentències print() evaluables)*"]);}
+    try {
+      run(source, variables, outputs);
+    } catch (err: any) {
+      setConsoleOutput([`⚠️ Error d'execució: ${err?.message || err}`]);
+      setTestedCode(null);
+      return;
+    }
+    // Si l'enunciat demana imprimir, cal que s'hagi imprès alguna cosa; si no, n'hi ha prou amb que el codi s'executi
+    const needsPrint = !!analyzePythonConcepts(userInputRef.current, statementShown)?.active.includes('print()');
+    if (outputs.length > 0) {
+      setConsoleOutput([...outputs, '', "✅ El resultat té relació amb l'activitat: ja pots enviar."]);
+      setTestedCode(userInputRef.current);
+    } else if (needsPrint) {
+      setConsoleOutput(["⚠️ L'enunciat demana imprimir un resultat, però el codi no imprimeix res (usa print(...)).", "Enviar continua bloquejat."]);
+      setTestedCode(null);
+    } else {
+      setConsoleOutput(["[LOCAL RUN]: Codi executat correctament.", "✅ Codi relacionat amb l'activitat: ja pots enviar."]);
+      setTestedCode(userInputRef.current);
+    }
   };
 
   const loadPeerSolutions = async () => {
@@ -671,6 +847,8 @@ export default function LessonPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={{ python: getFile('python'), react: getFile('react') }} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
+                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
+                {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
                 <IconButton size="small" onClick={() => setShowLiveRender(v => !v)} sx={{ p: 0.5 }}>
                   {showLiveRender ? <EyeOff size={14} color="#fff" /> : <Eye size={14} color="#fff" />}
                 </IconButton>
@@ -728,7 +906,7 @@ export default function LessonPage() {
           <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
             <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
             <Button onClick={handleLocalRun} variant="outlined" sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit' }}>Codetest</Button>
-            <Button onClick={handleRunTests} variant="contained" fullWidth sx={{fontWeight: 900, borderRadius: 1, fontSize: 13 }}>{t('lesson.run')}</Button>
+            <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" fullWidth sx={{fontWeight: 900, borderRadius: 1, fontSize: 13 }}>{t('lesson.run')}</Button>
           </Stack>
           <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1.5, p: 1 }}>
             <ChevronRight size={20}/>
@@ -867,6 +1045,8 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>
                 <EditorFileTabs value={selectedLanguage} files={{ python: getFile('python'), react: getFile('react') }} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
+                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
+                {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 32, height: 32, '&:hover': { bgcolor: '#333' } }}>
@@ -875,7 +1055,7 @@ export default function LessonPage() {
                 <Button onClick={handleLocalRun} variant="outlined" startIcon={<Code2 size={14}/>} sx={{ borderColor: '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
                   Test Python 
                 </Button>
-                <Button onClick={handleRunTests} variant="contained" startIcon={<Play size={12} fill="#000"/>} sx={{ bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
+                <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<Play size={12} fill="#000"/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
                   {t('lesson.run', 'Enviar')}
                 </Button>
               </Stack>

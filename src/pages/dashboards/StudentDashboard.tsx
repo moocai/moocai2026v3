@@ -14,6 +14,7 @@ import ParticlesBackground from '../../components/ParticlesBackground';
 import ProtectedAvatar from '../../components/ProtectedAvatar';
 import { courseImages } from '../../data/courses';
 import { preloadImage, userAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
+import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -399,6 +400,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     try {
       const res: any = await courseService.getCourseLeaderboard(currentSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
+      console.debug('[Leaderboard] resposta del backend', { curs: currentSlug, files: list.length, mostra: JSON.stringify(list.slice(0, 3)) });
+      syncOwnPointsFromList(currentSlug, list); // header i leaderboard comparteixen els mateixos punts
       const rankedList = toRanking(list);
       setRanking(rankedList);
 
@@ -410,7 +413,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
         .map(s => userAvatarUrl(s.username, currentSlug!));
       void Promise.all(rankingAvatars.map(url => preloadImage(url)));
     } catch {
-      setRanking([]);
+      // Si falla la petició es conserva el rànquing anterior (no el buidem)
     }
   }, [currentSlug, selectedStudentId]);
 
@@ -423,9 +426,13 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   // curs o retorn a la pestanya. Amb debounce per agrupar rafegues d'esdeveniments.
   useEffect(() => {
     let timer: number | undefined;
+    let timer2: number | undefined;
     const schedule = () => {
       if (timer) window.clearTimeout(timer);
+      if (timer2) window.clearTimeout(timer2);
       timer = window.setTimeout(() => { void loadRanking(); }, 400);
+      // Segon refresc: el backend pot trigar uns segons a recalcular els punts
+      timer2 = window.setTimeout(() => { void loadRanking(); }, 3000);
     };
     const onVisible = () => { if (document.visibilityState === 'visible') schedule(); };
 
@@ -436,12 +443,35 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
     return () => {
       if (timer) window.clearTimeout(timer);
+      if (timer2) window.clearTimeout(timer2);
       window.removeEventListener('lessonProgressUpdated', schedule);
       window.removeEventListener('storage', schedule);
       window.removeEventListener('focus', onVisible);
       document.removeEventListener('visibilitychange', onVisible);
     };
   }, [loadRanking]);
+
+  // Sincronització amb el header: quan es publiquen punts nous (p. ex. en acabar una
+  // activitat), la fila de l'alumne al rànquing agafa el mateix valor i es reordena.
+  useEffect(() => {
+    if (!currentSlug || !selectedStudentId) return;
+    const studentName = selectedStudent?.name;
+    const apply = () => {
+      const pts = getBackendPoints(selectedStudentId)[currentSlug];
+      if (pts == null) return;
+      setRanking((prev) => {
+        let changed = false;
+        const next = prev.map((r) => {
+          const isMe = r.id === selectedStudentId || (!!studentName && r.name === studentName);
+          if (isMe && r.points !== pts) { changed = true; return { ...r, points: pts }; }
+          return r;
+        });
+        return changed ? next.sort((a, b) => b.points - a.points) : prev;
+      });
+    };
+    window.addEventListener(POINTS_EVENT, apply);
+    return () => window.removeEventListener(POINTS_EVENT, apply);
+  }, [currentSlug, selectedStudentId, selectedStudent?.name]);
 
   const stats = useMemo(() => {
     const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
