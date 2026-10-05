@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { registerUser, type RegisterPayload } from './register';
+import { publicClient } from './httpClient';
 
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
@@ -7,7 +8,7 @@ const LOGOUT_TIMEOUT = 5000;
 
 export const authService = {
   login: async (username: string, password: string) => {
-    const response = await axios.post(`${BASE_URL}/users/auth/login/`, { username, password });
+    const response = await publicClient.post('/users/auth/login/', { username, password });
     const data = response.data;
 
     if (data?.token) {

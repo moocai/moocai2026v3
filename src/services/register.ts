@@ -1,9 +1,7 @@
 import axios from 'axios';
+import { publicClient } from './httpClient';
 
-// @ts-ignore - Vite replaces import.meta.env statically at build time
-const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
-
-export const REGISTER_URL = `${BASE_URL}/users/register/`;
+export const REGISTER_URL = '/users/register/';
 
 export interface Organization {
   id: number;
@@ -29,7 +27,7 @@ export interface RegisterPayload {
 }
 
 export async function loadRegistrationData(): Promise<RegistrationInfo> {
-  const response = await axios.get<RegistrationInfo>(REGISTER_URL);
+  const response = await publicClient.get<RegistrationInfo>(REGISTER_URL);
   return response.data;
 }
 
@@ -53,7 +51,7 @@ export async function registerUser(payload: RegisterPayload) {
     formData.append('avatar', payload.avatar);
   }
 
-  const response = await axios.post(REGISTER_URL, formData);
+  const response = await publicClient.post(REGISTER_URL, formData);
 
   const data = response.data as { token?: string } | undefined;
   if (data?.token) {

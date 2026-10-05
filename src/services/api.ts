@@ -1,27 +1,10 @@
-import axios from 'axios';
+import { apiClient } from './httpClient';
 
 const getProgress = (studentId: string) =>
   JSON.parse(localStorage.getItem(`mooc_global_progress_${studentId}`) || '{}');
 
 const setProgress = (studentId: string, data: Record<string, boolean>) =>
   localStorage.setItem(`mooc_global_progress_${studentId}`, JSON.stringify(data));
-
-// @ts-ignore - Vite replaces import.meta.env statically at build time
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-
-const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 100000,
-});
-
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
-  }
-  return config;
-});
 
 export const api = {
   // Aquest és el mètode que faltava per fer get genèrics (avatars, fitxers, etc.)

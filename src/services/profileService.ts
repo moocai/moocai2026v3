@@ -1,11 +1,9 @@
 import axios from 'axios';
+import { apiClient } from './httpClient';
 
-// @ts-ignore - Vite replaces import.meta.env statically at build time
-const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
-
-export const PROFILE_URL = `${BASE_URL}/users/me/settings/`;
-export const ORGS_URL = `${BASE_URL}/orgs/`;
-export const MY_AVATAR_URL = `${BASE_URL}/users/me/avatar/`;
+export const PROFILE_URL = '/users/me/settings/';
+export const ORGS_URL = '/orgs/';
+export const MY_AVATAR_URL = '/users/me/avatar/';
 
 export interface Organization {
   id: number;
@@ -35,34 +33,28 @@ export interface ProfileUser {
   name?: string;
 }
 
-function authHeaders() {
-  const token = localStorage.getItem('token');
-  // El backend és DRF amb TokenAuthentication (`www-authenticate: Token`).
-  return token ? { Authorization: `Token ${token}` } : undefined;
-}
-
 /**
  * Llegeix el perfil autenticat. Es_prefereix a `localStorage`, que només
  * desa el que va arriving del login i deixa camps com `username` o
  * `first_name` buits.
  */
 export async function fetchProfile(): Promise<ProfileUser> {
-  const { data } = await axios.get<ProfileUser>(PROFILE_URL, { headers: authHeaders() });
+  const { data } = await apiClient.get<ProfileUser>(PROFILE_URL);
   return data;
 }
 
 export async function updateProfile(payload: ProfilePayload): Promise<ProfileUser> {
-  const { data } = await axios.patch<ProfileUser>(PROFILE_URL, payload, { headers: authHeaders() });
+  const { data } = await apiClient.patch<ProfileUser>(PROFILE_URL, payload);
   return data;
 }
 
 export async function fetchOrganizations(): Promise<Organization[]> {
-  const { data } = await axios.get<Organization[] | { results: Organization[] }>(ORGS_URL, { headers: authHeaders() });
+  const { data } = await apiClient.get<Organization[] | { results: Organization[] }>(ORGS_URL);
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
 export async function fetchMyAvatar(): Promise<string | null> {
-  const { data } = await axios.get<{ avatar?: string | null } | string | null>(MY_AVATAR_URL, { headers: authHeaders() });
+  const { data } = await apiClient.get<{ avatar?: string | null } | string | null>(MY_AVATAR_URL);
   if (typeof data === 'string') return data;
   return data?.avatar ?? null;
 }
@@ -70,9 +62,7 @@ export async function fetchMyAvatar(): Promise<string | null> {
 export async function updateMyAvatar(file: File): Promise<string | null> {
   const formData = new FormData();
   formData.set('avatar', file);
-  const { data } = await axios.patch<{ avatar?: string | null } | string | null>(MY_AVATAR_URL, formData, {
-    headers: authHeaders(),
-  });
+  const { data } = await apiClient.patch<{ avatar?: string | null } | string | null>(MY_AVATAR_URL, formData);
   if (typeof data === 'string') return data;
   return data?.avatar ?? null;
 }
