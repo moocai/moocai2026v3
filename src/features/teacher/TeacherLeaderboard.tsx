@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Typography, Card, Avatar, Stack, Tabs, Tab, Chip, useTheme, Grid } from '@mui/material';
 import { Trophy, Medal, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -7,45 +7,12 @@ import { courseService } from '../../services/courseService';
 interface StudentData {
   id: string;
   name: string;
-  email: string;
+  email?: string;
+  username?: string;
   totalPoints: number;
   exercisesCompleted: number;
   totalExercises: number;
   progress: number;
-  coursePoints: Record<string, number>;
-}
-
-const SHARED_PROGRESS_KEY = 'mooc_shared_all_progress';
-
-function getCourseTopics(course: any): { title?: string; lessons: { id: string }[] }[] {
-  if (course.topics && course.topics.length > 0) return course.topics;
-  if (course.content && course.content.length > 0) {
-    const lessons = course.content.flatMap((item: any) =>
-      (item.subTopics || []).map((st: any) => ({
-        id: st.problemSlug,
-      }))
-    );
-    return [{ title: '', lessons }];
-  }
-  return [];
-}
-
-function getCourseProgress(course: any, studentId: string): number {
-  const topics = getCourseTopics(course);
-  const totalLessons = topics.reduce((acc, topic) => acc + (topic.lessons?.length || 0), 0) || 0;
-  if (totalLessons === 0) return 0;
-  const allProgress = JSON.parse(localStorage.getItem(SHARED_PROGRESS_KEY) || '{}');
-  const studentData = allProgress[studentId] || {};
-  const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter((l: any) => studentData[`${course.id}_${l.id}`]).length || 0), 0) || 0;
-  return Math.round((done / totalLessons) * 100);
-}
-
-function getCoursePoints(course: any, studentId: string): number {
-  const topics = getCourseTopics(course);
-  const allProgress = JSON.parse(localStorage.getItem(SHARED_PROGRESS_KEY) || '{}');
-  const studentData = allProgress[studentId] || {};
-  const done = topics.reduce((acc, topic) => acc + (topic.lessons?.filter((l: any) => studentData[`${course.id}_${l.id}`]).length || 0), 0) || 0;
-  return done * 10;
 }
 
 function getMedalColor(position: number): string {
@@ -72,22 +39,16 @@ export function TeacherLeaderboard() {
   const [courses, setCourses] = useState<any[]>([]);
   const [rankingTab, setRankingTab] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [ranking, setRanking] = useState<StudentData[]>([]);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [totalExercises, setTotalExercises] = useState(0);
 
+  // Cargar cursos al inicio
   useEffect(() => {
     (async () => {
       try {
         const coursesFromApi = await courseService.getAllCourses();
-        const fullCourses = await Promise.all(
-          coursesFromApi.map(async (course) => {
-            try {
-              const detail = await courseService.getFullCourseDetail(course.slug!);
-              return { ...course, topics: detail.content || [] };
-            } catch {
-              return course;
-            }
-          })
-        );
-        setCourses(fullCourses);
+        setCourses(coursesFromApi);
       } catch (err) {
         console.error('Error loading courses:', err);
       } finally {
@@ -96,58 +57,54 @@ export function TeacherLeaderboard() {
     })();
   }, []);
 
-  const students = useMemo(() => {
-    const localStudents = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
-    const deletedIds = JSON.parse(localStorage.getItem('mooc_deleted_ids') || '[]');
-    return localStudents.filter(
-      (s: any) => !deletedIds.includes(s.id) && s.role !== 'teacher'
-    );
+  // Cargar ranking cuando cambia el curso seleccionado
+  const loadRanking = useCallback(async (courseSlug: string) => {
+    setRankingLoading(true);
+    try {
+      const res: any = await courseService.getCourseLeaderboard(courseSlug);
+      const list = Array.isArray(res) ? res : (res?.results || []);
+      
+      // Mapear datos de la API al formato StudentData
+      const mapped: StudentData[] = list.map((item: any, idx: number) => ({
+        id: item.user_id || item.id || String(idx),
+        name: item.full_name || item.username || item.name || `Estudiante ${idx + 1}`,
+        email: item.email,
+        username: item.username,
+        totalPoints: item.total_points || item.points || 0,
+        exercisesCompleted: item.completed_exercises || item.exercises_completed || 0,
+        totalExercises: item.total_exercises || 0,
+        progress: item.progress_percentage || item.progress || 0,
+      }));
+      
+      setRanking(mapped);
+      
+      // Calcular total de ejercicios del curso
+      if (list.length > 0 && list[0].total_exercises) {
+        setTotalExercises(list[0].total_exercises);
+      }
+    } catch (err) {
+      console.error('Error loading leaderboard:', err);
+      setRanking([]);
+    } finally {
+      setRankingLoading(false);
+    }
   }, []);
 
-  const rankedStudents = useMemo<StudentData[]>(() => {
-    const currentCourse = courses[rankingTab];
-    if (!currentCourse) return [];
-
-    return students
-      .map((student: any) => {
-        const coursePoints = getCoursePoints(currentCourse, student.id);
-        const courseProgress = getCourseProgress(currentCourse, student.id);
-        const totalPoints = courses.reduce((acc, course) => acc + getCoursePoints(course, student.id), 0);
-        const totalExercises = courses.reduce((acc, course) => {
-          const topics = getCourseTopics(course);
-          return acc + topics.reduce((a, t) => a + (t.lessons?.length || 0), 0);
-        }, 0);
-        const exercisesCompleted = Math.round(totalPoints / 10);
-
-        return {
-          id: student.id,
-          name: student.name,
-          email: student.email,
-          totalPoints,
-          exercisesCompleted,
-          totalExercises,
-          progress: courseProgress,
-          coursePoints: { [currentCourse.id]: coursePoints },
-        };
-      })
-      .sort((a: StudentData, b: StudentData) => b.totalPoints - a.totalPoints);
-  }, [students, courses, rankingTab]);
-
-  const totalExercises = useMemo(() => {
-    return courses.reduce((acc, course) => {
-      const topics = getCourseTopics(course);
-      return acc + topics.reduce((a: number, t: any) => a + (t.lessons?.length || 0), 0);
-    }, 0);
-  }, [courses]);
+  // Cargar ranking cuando cambia el tab
+  useEffect(() => {
+    if (courses.length > 0 && courses[rankingTab]) {
+      loadRanking(courses[rankingTab].slug || courses[rankingTab].id);
+    }
+  }, [courses, rankingTab, loadRanking]);
 
   const stats = useMemo(() => ({
-    totalStudents: students.length,
+    totalStudents: ranking.length,
     totalExercises,
-    avgProgress: rankedStudents.length
-      ? Math.round(rankedStudents.reduce((acc, s) => acc + s.progress, 0) / rankedStudents.length)
+    avgProgress: ranking.length
+      ? Math.round(ranking.reduce((acc, s) => acc + s.progress, 0) / ranking.length)
       : 0,
-    activeStudents: rankedStudents.filter(s => s.totalPoints > 0).length,
-  }), [students, rankedStudents, totalExercises]);
+    activeStudents: ranking.filter(s => s.totalPoints > 0).length,
+  }), [ranking, totalExercises]);
 
   if (loading) {
     return (
@@ -214,13 +171,17 @@ export function TeacherLeaderboard() {
             )}
             
             <Box sx={{ p: { xs: 1.5, md: 3 } }}>
-              {rankedStudents.length === 0 ? (
+              {rankingLoading ? (
+                <Box sx={{ py: 6, textAlign: 'center' }}>
+                  <Typography color="text.secondary">{t('teacher.cargando')}</Typography>
+                </Box>
+              ) : ranking.length === 0 ? (
                 <Box sx={{ py: 6, textAlign: 'center' }}>
                   <Typography color="text.secondary">{t('teacher.sinEstudiantes')}</Typography>
                 </Box>
               ) : (
                 <Stack spacing={1}>
-                  {rankedStudents.map((student, idx) => {
+                  {ranking.map((student, idx) => {
                     const isTop3 = idx < 3;
                     const medalColor = getMedalColor(idx);
                     
