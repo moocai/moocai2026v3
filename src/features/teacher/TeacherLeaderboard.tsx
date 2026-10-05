@@ -47,43 +47,18 @@ export function TeacherLeaderboard() {
   useEffect(() => {
     (async () => {
       try {
-        const [assignedFromApi, publicFromApi] = await Promise.all([
-          courseService.getAllCourses().catch(() => []),
-          courseService.getPublicCourses().catch(() => []),
-        ]);
-
-        const withDetails = async (course: any) => {
-          try {
-            const detail = await courseService.getFullCourseDetail(course.slug!);
-            const topics = (detail.content || []).map((topic: any) => ({
-              id: topic.id ?? topic.slug,
-              title: topic.title,
-              lessons: (topic.subTopics || []).map((st: any) => ({
-                id: st.problemSlug,
-                title: st.subtitle,
-                type: st.type,
-                choices: st.choices,
-                precode: st.precode,
-              })),
-            }));
-            return { ...course, topics };
-          } catch { return course; }
-        };
-
-        const [assigned, pub] = await Promise.all([
-          Promise.all(assignedFromApi.map(withDetails)),
-          Promise.all(publicFromApi.map(withDetails)),
-        ]);
-
-        // Combinar cursos asignados y públicos, eliminando duplicados
-        const allCourses = [...assigned];
-        pub.forEach(course => {
-          if (!allCourses.find(c => c.id === course.id)) {
-            allCourses.push(course);
-          }
-        });
-
-        setCourses(allCourses);
+        const coursesFromApi = await courseService.getAllCourses();
+        const fullCourses = await Promise.all(
+          coursesFromApi.map(async (course) => {
+            try {
+              const detail = await courseService.getFullCourseDetail(course.slug!);
+              return { ...course, topics: detail.content || [] };
+            } catch {
+              return course;
+            }
+          })
+        );
+        setCourses(fullCourses);
       } catch (err) {
         console.error('Error loading courses:', err);
       } finally {
