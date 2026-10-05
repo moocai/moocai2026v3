@@ -1,35 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Avatar, Box, useTheme } from '@mui/material';
-import { preloadImage, userAvatarUrl } from '../utils/avatarCache';
+import { myAvatarUrl, preloadImage } from '../utils/avatarCache';
 
 interface Props {
   studentName: string;
-}
-
-/** Mateixa clau que fa servir StudentDashboard per recordar l'últim curs. */
-const LAST_COURSE_KEY = 'mooc_dashboard_last_course';
-
-function readCurrentCourseSlug(): string | undefined {
-  try {
-    const raw = localStorage.getItem(LAST_COURSE_KEY);
-    const slug = raw ? JSON.parse(raw)?.slug : undefined;
-    return slug ? String(slug) : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function readUsername(): string | undefined {
-  const saved = localStorage.getItem('currentStudent');
-  if (!saved) return undefined;
-  try {
-    const parsed = JSON.parse(saved);
-    const username = parsed.username || parsed.id;
-    return username ? String(username) : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export function UserAvatarMenu({ studentName }: Props) {
@@ -40,12 +15,14 @@ export function UserAvatarMenu({ studentName }: Props) {
   // Comparteix la memòria cau amb el dashboard: si allà ja s'ha carregat
   // la mateixa imatge, aquí surt a l'instant sense cap petició.
   const loadAvatar = useCallback(async () => {
-    const username = readUsername();
-    if (!username) {
+    const src = myAvatarUrl();
+    if (!src) {
       setAvatarSrc(null);
       return;
     }
-    const url = await preloadImage(userAvatarUrl(username, readCurrentCourseSlug()));
+    // L'avatar propi té el seu endpoint: abans es demanava per curs amb
+    // l'id de l'usuari (no el username), i sense curs, una ruta que no existeix.
+    const url = await preloadImage(src);
     setAvatarSrc(url);
   }, []);
 

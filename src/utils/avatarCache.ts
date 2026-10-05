@@ -79,11 +79,31 @@ async function idbPrune() {
   }
 }
 
-/** URL d'usuari del mateix tipus que fa servir el rànquing del dashboard. */
-export function userAvatarUrl(username: string, slug?: string): string {
-  return slug
-    ? `/api/v1/users/${username}/avatar/${slug}/`
-    : `/api/v1/users/${username}/avatar/`;
+/**
+ * Avatar de l'usuari autenticat (no depèn de cap curs). L'URL del backend és la
+ * mateixa per a tothom, així que s'hi afegeix `?u=<id>` (el backend l'ignora)
+ * perquè la memòria cau, que persisteix a IndexedDB, no mostri l'avatar d'un
+ * usuari anterior al mateix navegador.
+ */
+export function myAvatarUrl(): string | undefined {
+  try {
+    const raw = localStorage.getItem('currentStudent');
+    const id = raw ? JSON.parse(raw)?.id : undefined;
+    return id != null && localStorage.getItem('token')
+      ? `/api/v1/users/me/avatar/?u=${encodeURIComponent(String(id))}`
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Avatar d'un altre usuari dins d'un curs que compartiu. El backend no té cap
+ * ruta sense curs (`/users/<username>/avatar/` donava 404), i espera el
+ * `username`, no l'id.
+ */
+export function userAvatarUrl(username: string, slug: string): string {
+  return `/api/v1/users/${username}/avatar/${slug}/`;
 }
 
 async function fetchAsBlob(src: string): Promise<Blob | null> {

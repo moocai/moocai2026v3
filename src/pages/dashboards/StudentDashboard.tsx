@@ -13,7 +13,7 @@ import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import ProtectedAvatar from '../../components/ProtectedAvatar';
 import { courseImages } from '../../data/courses';
-import { preloadImage, userAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
+import { myAvatarUrl, preloadImage, userAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
@@ -215,14 +215,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     const lastCourseSlug = readLastCourse()?.slug;
     if (lastCourseSlug) {
       void preloadImage(`/api/v1/courses/${lastCourseSlug}/avatar/`);
-      const saved = localStorage.getItem('currentStudent');
-      let username: string | undefined;
-      try {
-        const parsed = saved ? JSON.parse(saved) : null;
-        username = parsed?.username || parsed?.id ? String(parsed.username || parsed.id) : undefined;
-      } catch { username = undefined; }
-      if (username) void preloadImage(userAvatarUrl(username, lastCourseSlug));
     }
+    void preloadImage(myAvatarUrl());
 
     const initData = async (isInitial = false) => {
       try {
