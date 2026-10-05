@@ -48,7 +48,17 @@ export function TeacherLeaderboard() {
     (async () => {
       try {
         const coursesFromApi = await courseService.getAllCourses();
-        setCourses(coursesFromApi);
+        const fullCourses = await Promise.all(
+          coursesFromApi.map(async (course) => {
+            try {
+              const detail = await courseService.getFullCourseDetail(course.slug!);
+              return { ...course, topics: detail.content || [] };
+            } catch {
+              return course;
+            }
+          })
+        );
+        setCourses(fullCourses);
       } catch (err) {
         console.error('Error loading courses:', err);
       } finally {
