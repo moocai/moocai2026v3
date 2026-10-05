@@ -57,7 +57,6 @@ Tots amb `Authorization: Token {token}` i `Content-Type: application/json` (exce
 | GET | `/courses/{slug}/topics/{topic}/problems/{problem}/` | Detall d'un problema. |
 | POST | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia resposta. Body JSON: coding `{ code, language? }`, test `{ answers: [id, …] }`. |
 | GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Submissions pròpies del problema. |
-| GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | Notes del problema. |
 | GET | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | Submissions d'altres alumnes. Retorna `[]` si falla. |
 | GET | `/courses/{slug}/students/overview/` | Resum d'alumnes del curs (punts per al rànquing). |
 
@@ -129,7 +128,6 @@ Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldr
 | 17 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/` | courseService | ✅ |
 | 18 | POST | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | courseService | ✅ |
 | 19 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | courseService | ✅ |
-| 20 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/grades/` | courseService | ✅ |
 | 21 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | courseService | ✅ |
 | 22 | GET | `/api/v1/courses/{slug}/students/overview/` | courseService | ✅ |
 

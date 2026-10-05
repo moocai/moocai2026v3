@@ -102,11 +102,6 @@ export const courseService = {
     return Array.isArray(data) ? data : (data.results || []);
   },
 
-  async getChallengeGrades(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/grades/`);
-    return Array.isArray(data) ? data : (data.results || []);
-  },
-
   async getPeerSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     try {
       const { data } = await apiClient.get(

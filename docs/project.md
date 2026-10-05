@@ -322,7 +322,6 @@ Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache
 | `submitChallenge(c, t, p, body)` | POST `/courses/{c}/topics/{t}/problems/{p}/submissions/` |
 | `getChallenge(c, t, p)` | GET `.../problems/{p}/` |
 | `getChallengeSubmissions(c, t, p)` | GET `.../submissions/` |
-| `getChallengeGrades(c, t, p)` | GET `.../submissions/grades/` |
 | `getPeerSubmissions(c, t, p)` | GET `.../submissions/peers/` (torna `[]` si falla) |
 | `getStudentsOverview(c)` | GET `/courses/{c}/students/overview/` |
 | `getFullCourseDetail(slug)` | Composa curs + temes + problemes (2 + T crides) |
