@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { courseService } from '../services/courseService';
 
 /**
@@ -117,6 +118,10 @@ export function syncOwnPointsFromList(courseSlug: string, list: any[]) {
 export async function refreshCoursePoints(courseSlug: string, retries = 4, delayMs = 1000): Promise<number | null> {
   const student = getCurrentStudent();
   if (!student) return null;
+  // Només els membres del curs poden llegir el leaderboard (en un curs públic sense
+  // matrícula seria un 403). La llista de cursos propis ja és a la memòria cau.
+  const myCourses = await courseService.getAllCourses().catch(() => []);
+  if (!myCourses.some((c) => c.slug === courseSlug)) return null;
   const before = getBackendPoints(student.id)[courseSlug];
   let last: number | null = null;
   for (let i = 0; i <= retries; i++) {
@@ -131,7 +136,12 @@ export async function refreshCoursePoints(courseSlug: string, retries = 4, delay
         setCoursePoints(student.id, courseSlug, own);
         if (before == null || own > before) return own;
       }
-    } catch { /* es reintenta */ }
+    } catch (err) {
+      // Un 4xx (sense permís, curs inexistent...) no canviarà reintentant.
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      if (status && status >= 400 && status < 500) return last;
+      /* error de xarxa o 5xx: es reintenta */
+    }
     if (i < retries) await new Promise((r) => setTimeout(r, delayMs));
   }
   return last;

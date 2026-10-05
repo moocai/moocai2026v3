@@ -390,9 +390,12 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
   const currentSlug = visibleCourses[courseTabIndex]?.slug;
   const selectedStudentId = selectedStudent?.id;
+  // El leaderboard només el poden veure els membres del curs: en un curs públic
+  // on l'alumne no està matriculat el backend respon 403.
+  const isMemberOfCurrent = Boolean(currentSlug && assignedCourses.some((c) => c.slug === currentSlug));
 
   const loadRanking = useCallback(async () => {
-    if (!currentSlug || !selectedStudentId) {
+    if (!currentSlug || !selectedStudentId || !isMemberOfCurrent) {
       setRanking([]);
       return;
     }
@@ -414,7 +417,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     } catch {
       // Si falla la petició es conserva el rànquing anterior (no el buidem)
     }
-  }, [currentSlug, selectedStudentId]);
+  }, [currentSlug, selectedStudentId, isMemberOfCurrent]);
 
   useEffect(() => {
     void loadRanking();
