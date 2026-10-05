@@ -1018,7 +1018,11 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 2, color: 'primary.main' }}>
                   {t('lesson.tab_ai_help', 'IA')}
                 </Typography>
-                <AiHelpPanel courseId={courseId!} lessonId={lessonId!} />
+                <AiHelpPanel
+                  courseId={courseId!}
+                  topicSlug={course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId))?.id}
+                  lessonId={lessonId!}
+                />
               </Box>
             )}
           </Box>

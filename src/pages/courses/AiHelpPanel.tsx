@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { Box, Button, Typography, CircularProgress, alpha, useTheme } from '@mui/material';
+import { apiClient } from '../../services/httpClient';
 
-export function AiHelpPanel({ courseId, lessonId }: { courseId: string, lessonId: string }) {
+export function AiHelpPanel({ courseId, topicSlug, lessonId }: { courseId: string, topicSlug?: string, lessonId: string }) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const theme = useTheme();
@@ -9,15 +11,17 @@ export function AiHelpPanel({ courseId, lessonId }: { courseId: string, lessonId
   const fetchAiReview = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/courses/${courseId}/topics/general/problems/${lessonId}/submissions/review/`);
-      
-      if (!response.ok) throw new Error('Error al servidor');
-      
-      const data = await response.json();
-      // Canvia 'data.review' pel nom de la propietat que et retorni el teu backend
-      setFeedback(data.review || data.feedback || "Revisió completada.");
+      if (!topicSlug) throw new Error('Topic not found');
+      // Abans: `fetch` sense token (401) i el tema fixat a "general" (404).
+      const { data } = await apiClient.get(
+        `/courses/${courseId}/topics/${topicSlug}/problems/${lessonId}/submissions/review/`
+      );
+      setFeedback(data?.review_text || "Revisió completada.");
     } catch (err) {
-      setFeedback("No s'ha pogut obtenir la revisió. Comprova la connexió.");
+      // El backend explica per què no hi ha revisió (p. ex. encara no hi ha cap
+      // solució acceptada, o la revisió no està llesta): es mostra tal qual.
+      const detail = axios.isAxiosError(err) ? (err.response?.data as { detail?: string } | undefined)?.detail : undefined;
+      setFeedback(detail || "No s'ha pogut obtenir la revisió. Comprova la connexió.");
     } finally {
       setLoading(false);
     }
