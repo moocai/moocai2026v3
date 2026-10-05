@@ -7,8 +7,10 @@ import { courseService } from '../services/courseService';
 export function MainLayout() {
   useEffect(() => {
     courseService.getAllCourses().then(courses => {
-      courses.forEach(course => courseService.getFullCourseDetail(course.slug!));
-    });
+      courses.forEach(course => {
+        courseService.getFullCourseDetail(course.slug!).catch(() => { /* precàrrega opcional */ });
+      });
+    }).catch(() => { /* precàrrega opcional: cada pàgina carrega el que necessita */ });
   }, []);
 
   return (

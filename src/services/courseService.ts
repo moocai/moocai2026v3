@@ -36,6 +36,9 @@ export const courseService = {
    * alumnes els cursos actius matriculats i staff tots.
    */
   async getAllCourses(forceRefresh = false): Promise<Course[]> {
+    // L'endpoint requereix sessió: sense token sempre respon 401. No es desa a la
+    // memòria cau perquè, en fer login, la primera crida ja vagi al servidor.
+    if (!localStorage.getItem('token')) return [];
     if (!forceRefresh && allCoursesCache) {
       return allCoursesCache;
     }
