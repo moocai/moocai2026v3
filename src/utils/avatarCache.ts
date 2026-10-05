@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import axios from 'axios';
 import { api } from '../services/api';
 
 const DB_NAME = 'mooc-avatars';
@@ -10,6 +11,12 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const memoryCache = new Map<string, string>();
 /** src -> petició en curs, per no demanar la mateixa imatge dues vegades. */
 const inFlight = new Map<string, Promise<string | null>>();
+/**
+ * src que el servidor ha respost amb 403/404 (sense avatar o sense permís).
+ * No es tornen a demanar en aquesta sessió: abans cada remuntatge repetia la
+ * mateixa petició fallida. Els errors de xarxa i 5xx no s'hi guarden.
+ */
+const failed = new Set<string>();
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -114,7 +121,9 @@ async function fetchAsBlob(src: string): Promise<Blob | null> {
     const res = await api.get(cleanUrl, { responseType: 'blob' });
     const blob = res.data instanceof Blob ? res.data : new Blob([res.data as BlobPart]);
     return blob.size > 0 ? blob : null;
-  } catch {
+  } catch (err) {
+    const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+    if (status === 403 || status === 404) failed.add(src);
     return null;
   }
 }
@@ -149,6 +158,7 @@ function resolveFromCache(src: string): Promise<string | null> {
 export function preloadImage(src?: string): Promise<string | null> {
   if (!src) return Promise.resolve(null);
   if (src.startsWith('/img/') || src.startsWith('blob:') || src.startsWith('http')) return Promise.resolve(src);
+  if (failed.has(src)) return Promise.resolve(null);
   const pending = inFlight.get(src);
   if (pending) return pending;
   return resolveFromCache(src);
@@ -187,6 +197,7 @@ export function useImageUrl(src?: string): string | null {
 
 /** Invalida una imatge (després de pujar-ne una de nova) o totes si no es passa cap src. */
 export function invalidateImage(src?: string) {
+  if (src) failed.delete(src); else failed.clear();
   const targets = src ? [src] : [...memoryCache.keys()];
   for (const key of targets) {
     const url = memoryCache.get(key);
