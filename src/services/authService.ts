@@ -1,9 +1,6 @@
-import axios from 'axios';
 import { registerUser, type RegisterPayload } from './register';
-import { publicClient } from './httpClient';
+import { clearSession, publicClient } from './httpClient';
 
-// @ts-ignore - Vite replaces import.meta.env statically at build time
-const BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
 const LOGOUT_TIMEOUT = 5000;
 
 export const authService = {
@@ -20,13 +17,23 @@ export const authService = {
 
   register: (payload: RegisterPayload) => registerUser(payload),
 
-  logout: () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('currentStudent');
+  /**
+   * Tanca la sessió local a l'instant i demana al backend que revoqui el token.
+   * El token es llegeix abans d'esborrar-lo: sense ell, el backend respon 401
+   * i el token continuaria sent vàlid fins que caduqués.
+   */
+  logout: async () => {
+    const token = localStorage.getItem('token');
+    clearSession();
+    if (!token) return;
 
-    void axios
-      .post(`${BASE_URL}/users/auth/logout/`, null, { timeout: LOGOUT_TIMEOUT })
+    await publicClient
+      .post('/users/auth/logout/', null, {
+        headers: { Authorization: `Token ${token}` },
+        timeout: LOGOUT_TIMEOUT,
+      })
       .catch(() => {
+        /* el logout local ja s'ha fet; si falla, el token caducarà sol */
       });
   },
 
