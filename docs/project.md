@@ -331,7 +331,7 @@ Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache
 Clau `mooc_local_courses`: `getAll`, `getById`, `save`, `remove`, `cloneFrom`.
 
 ### `profileService.ts` — perfil (sense timeout)
-`fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `fetchMyAvatar()` GET `/users/me/avatar/` · `updateMyAvatar(file)` **PATCH** (FormData `avatar`) · `extractProfileErrors()`.
+`fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `updateMyAvatar(file)` **PATCH** (FormData `avatar`) · `extractProfileErrors()`.
 
 ### `register.ts` — alta d'usuari
 `loadRegistrationData()` GET `/users/register/` (sense auth) · `registerUser(payload)` **POST** `/users/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.

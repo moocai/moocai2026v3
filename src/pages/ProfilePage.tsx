@@ -11,10 +11,10 @@ import { useThemeMode } from '../hooks/useTheme';
 import { useNotifications } from '../contexts/NotificationContext';
 import ParticlesBackground from '../components/ParticlesBackground';
 import {
-  updateProfile, extractProfileErrors, fetchOrganizations, fetchMyAvatar, updateMyAvatar, fetchProfile,
+  updateProfile, extractProfileErrors, fetchOrganizations, updateMyAvatar, fetchProfile,
   type Organization, type ProfileUser,
 } from '../services/profileService';
-import { invalidateImage } from '../utils/avatarCache';
+import { invalidateImage, myAvatarUrl, preloadImage } from '../utils/avatarCache';
 
 const languages = [
   { code: 'en', labelKey: 'profile.lang_english' },
@@ -222,13 +222,12 @@ export default function ProfilePage() {
       })
       .catch(() => { /* el backend pot no exposar orgs, es manté la demo */ });
 
-    // `avatar_url` ve al GET del perfil; si no hi és, cau al endpoint dedicat.
-    const loadAvatarIfMissing = async (fromProfile: string | undefined) => {
-      if (fromProfile) { if (active) setAvatarUrl(fromProfile); return; }
-      try {
-        const url = await fetchMyAvatar();
-        if (active && url) setAvatarUrl(url);
-      } catch { /* sense avatar, es mostra la inicial */ }
+    // L'`avatar_url` del perfil no es pot carregar des d'aquesta app (la imatge
+    // sortia trencada). `GET /users/me/avatar/` retorna la imatge (binària, no
+    // JSON), així que es carrega com a blob amb la memòria cau compartida amb el header.
+    const loadAvatar = async () => {
+      const url = await preloadImage(myAvatarUrl());
+      if (active && url) setAvatarUrl(url);
     };
 
     // El backend és la font de veritat dels camps; `localStorage` queda de
@@ -241,9 +240,9 @@ export default function ProfilePage() {
         if (data.email) setEmail(data.email);
         if (data.username) setUsername(data.username);
         mirrorProfileToStorage(data);
-        return loadAvatarIfMissing(data.avatar_url);
+        return loadAvatar();
       })
-      .catch(() => { if (active) return loadAvatarIfMissing(undefined); });
+      .catch(() => { if (active) return loadAvatar(); });
 
     return () => { active = false; };
   }, []);
@@ -289,8 +288,8 @@ export default function ProfilePage() {
 
       if (avatarFile) {
         try {
-          const url = await updateMyAvatar(avatarFile);
-          if (url) setAvatarUrl(url);
+          // La previsualització ja mostra el fitxer triat; el backend respon 204.
+          await updateMyAvatar(avatarFile);
           // La memòria cau d'avatars ja té la imatge antiga: la netegem.
           invalidateImage();
           window.dispatchEvent(new Event('avatarUpdated'));

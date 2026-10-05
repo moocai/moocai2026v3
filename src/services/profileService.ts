@@ -53,18 +53,15 @@ export async function fetchOrganizations(): Promise<Organization[]> {
   return Array.isArray(data) ? data : (data?.results ?? []);
 }
 
-export async function fetchMyAvatar(): Promise<string | null> {
-  const { data } = await apiClient.get<{ avatar?: string | null } | string | null>(MY_AVATAR_URL);
-  if (typeof data === 'string') return data;
-  return data?.avatar ?? null;
-}
-
-export async function updateMyAvatar(file: File): Promise<string | null> {
+/**
+ * Puja un avatar nou. El backend respon 204 sense cos: per mostrar-lo,
+ * cal tornar-lo a llegir (p. ex. amb `preloadImage(myAvatarUrl())` després
+ * d'`invalidateImage()`).
+ */
+export async function updateMyAvatar(file: File): Promise<void> {
   const formData = new FormData();
   formData.set('avatar', file);
-  const { data } = await apiClient.patch<{ avatar?: string | null } | string | null>(MY_AVATAR_URL, formData);
-  if (typeof data === 'string') return data;
-  return data?.avatar ?? null;
+  await apiClient.patch(MY_AVATAR_URL, formData);
 }
 
 export function extractProfileErrors(error: unknown): string {

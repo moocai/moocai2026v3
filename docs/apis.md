@@ -36,8 +36,8 @@ Aquest document recull **totes les APIs REST** que consumeix l'aplicació fronte
 | GET | `/users/me/settings/` | Perfil de l'usuari autenticat. | Token | `profileService.fetchProfile` |
 | PATCH | `/users/me/settings/` | Actualitza perfil. Body JSON `{ first_name, last_name, email, current_password?, new_password1?, new_password2? }`. `username` no és editable. | Token | `profileService.updateProfile` |
 | GET | `/orgs/` | Llista d'organitzacions. Accepta array o `{ results }`. | Token | `profileService.fetchOrganizations` |
-| GET | `/users/me/avatar/` | Avatar de l'usuari (string o `{ avatar }`). | Token | `profileService.fetchMyAvatar` |
-| PATCH | `/users/me/avatar/` | Puja avatar. Body **FormData** `avatar`. | Token | `profileService.updateMyAvatar` |
+| GET | `/users/me/avatar/` | Avatar de l'usuari (imatge binària). Es carrega com a blob amb `avatarCache` (`myAvatarUrl()`). | Token | `utils/avatarCache` |
+| PATCH | `/users/me/avatar/` | Puja avatar. Body **FormData** `avatar`. Respon 204 sense cos. | Token | `profileService.updateMyAvatar` |
 | POST | `/users/invite/` | Convida un usuari per correu. Body JSON `{ email }`. | Token | `api.inviteUser` |
 
 ---
