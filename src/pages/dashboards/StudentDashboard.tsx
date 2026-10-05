@@ -280,7 +280,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       const student: Student = {
         id: data?.user?.id != null ? String(data.user.id) : username,
         name: data?.user?.name || username,
-        code: password,
         email: data?.user?.email || username,
         role,
       };

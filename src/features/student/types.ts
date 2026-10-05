@@ -1,7 +1,8 @@
 export interface Student {
   id: string;
   name: string;
-  code: string;
+  /** @deprecated Ja no es desa (era la contrasenya en clar). */
+  code?: string;
   email: string;
   role?: 'student' | 'teacher';
   average?: number;
