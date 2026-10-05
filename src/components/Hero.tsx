@@ -5,7 +5,8 @@ import { Box, Container, Typography, useTheme, useMediaQuery } from '@mui/materi
 import { useTranslation } from 'react-i18next';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import { courseService } from '../services/courseService';
-import { statsService } from '../services/statsService';
+// TODO(stats): pendent de parlar-ho. Veure el comentari de `updateStudents` més avall.
+// import { statsService } from '../services/statsService';
 import { useThemeMode } from '../hooks/useTheme';
 
 interface TypewriterProps { words: string[]; }
@@ -60,19 +61,24 @@ export default function Hero() {
   const { mode } = useThemeMode();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // null = encara no carregat (o ha fallat i no hi havia valor previ)
-  const [studentCount, setStudentCount] = useState<number | null>(null);
+  // TODO(stats): pendent de parlar-ho.
+  // `GET /api/v1/public/stats/` no existeix a algorien: la petició donava 404 a
+  // cada visita i el valor sempre era "—". Abans de crear cap endpoint cal decidir
+  // què ha de comptar (tots els alumnes d'algorien? només els dels cursos públics
+  // de moocai?) i si aquesta dada ha de ser pública. Mentrestant, desactivat.
+  // const [studentCount, setStudentCount] = useState<number | null>(null);
   const [courseCount, setCourseCount] = useState(0);
 
-  // Alumnes: comptador real del servidor (endpoint públic, no depèn del login)
-  const updateStudents = useCallback(() => {
-    statsService
-      .getStudentCount()
-      .then(setStudentCount)
-      .catch(() => {
-        // Si falla, es manté l'últim valor conegut (o "—" si no n'hi ha)
-      });
-  }, []);
+  // TODO(stats): pendent de parlar-ho (veure més amunt).
+  // // Alumnes: comptador real del servidor (endpoint públic, no depèn del login)
+  // const updateStudents = useCallback(() => {
+  //   statsService
+  //     .getStudentCount()
+  //     .then(setStudentCount)
+  //     .catch(() => {
+  //       // Si falla, es manté l'últim valor conegut (o "—" si no n'hi ha)
+  //     });
+  // }, []);
 
   // Cursos: només si hi ha sessió; en fer logout es posa a 0 a l'instant
   const updateCourses = useCallback(() => {
@@ -87,17 +93,18 @@ export default function Hero() {
     }
   }, []);
 
-  useEffect(() => {
-    updateStudents();
-    // Es torna a demanar si algú dispara 'studentsUpdated' (p. ex. després d'un registre)
-    // o quan canvia la sessió (login/logout)
-    window.addEventListener('studentsUpdated', updateStudents);
-    window.addEventListener('authChange', updateStudents);
-    return () => {
-      window.removeEventListener('studentsUpdated', updateStudents);
-      window.removeEventListener('authChange', updateStudents);
-    };
-  }, [updateStudents]);
+  // TODO(stats): pendent de parlar-ho (veure més amunt).
+  // useEffect(() => {
+  //   updateStudents();
+  //   // Es torna a demanar si algú dispara 'studentsUpdated' (p. ex. després d'un registre)
+  //   // o quan canvia la sessió (login/logout)
+  //   window.addEventListener('studentsUpdated', updateStudents);
+  //   window.addEventListener('authChange', updateStudents);
+  //   return () => {
+  //     window.removeEventListener('studentsUpdated', updateStudents);
+  //     window.removeEventListener('authChange', updateStudents);
+  //   };
+  // }, [updateStudents]);
 
   useEffect(() => {
     updateCourses();
@@ -110,7 +117,8 @@ export default function Hero() {
   }, [updateCourses]);
 
   const stats = [
-    { label: t('hero.stats.students'), value: studentCount ?? '—', delay: 0 },
+    // TODO(stats): pendent de parlar-ho (veure més amunt).
+    // { label: t('hero.stats.students'), value: studentCount ?? '—', delay: 0 },
     { label: t('hero.stats.courses'), value: courseCount, delay: 0.2 },
     { label: t('hero.stats.support'), value: '24/7', delay: 0.4 },
   ];
@@ -142,7 +150,7 @@ export default function Hero() {
             {t('hero.subtitle')}
           </Typography>
 
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(3, 1fr)' }, gap: { xs: 2, md: 5 }, width: '100%', maxWidth: '1100px', mx: 'auto', mt: -3 }}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: `repeat(${stats.length}, 1fr)`, sm: `repeat(${stats.length}, 1fr)` }, gap: { xs: 2, md: 5 }, width: '100%', maxWidth: '1100px', mx: 'auto', mt: -3 }}>
             {stats.map((stat, i) => {
               const statColors = [theme.palette.primary.main, '#10b981', '#f59e0b'];
               return (

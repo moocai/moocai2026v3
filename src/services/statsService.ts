@@ -1,3 +1,5 @@
+// TODO(stats): pendent de parlar-ho. `GET /api/v1/public/stats/` no existeix a
+// algorien (sempre responia 404). Ara mateix no es fa servir enlloc; veure `Hero.tsx`.
 const API_URL = import.meta.env.VITE_API_URL || '';
 const TIMEOUT_MS = 3000;
 
