@@ -1,5 +1,5 @@
 # MOOC React 2026
-**Última actualització: 1 d'octubre de 2026**
+**Última actualització: 6 d'octubre de 2026**
 
 > Aquest document descriu **l'estat real del codi** a la data indicada. Les seccions marcades amb ⚠️ recullen deute tècnic o discrepàncies detectades llegint el codi, no suposicions.
 
@@ -59,7 +59,7 @@ moocai2026/
 ├── tsconfig.json                     # strict + noUnusedLocals + noUnusedParameters, jsx react-jsx
 ├── netlify.toml                      # build→dist, redirect /api/*→algorien.com, SPA fallback
 │
-├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3)
+├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3, fix1, fix2)
 │
 ├── public/
 │   ├── data.js                       # Fixture global antic (window.EXAM_DATA), 569 B
@@ -79,7 +79,7 @@ moocai2026/
     │
     ├── components/
     │   ├── Header.tsx                # AppBar sticky + usePoints + role switcher + menú mòbil
-    │   ├── Hero.tsx                  # Landing: typewriter + stats (default export)
+    │   ├── Hero.tsx                  # Landing: typewriter + stats (default export); comptador via usePublicStats
     │   ├── Footer.tsx                # Només s'usa a Home (no a MainLayout)
     │   ├── CourseCard.tsx            # Card de curs (Home) amb prefetch on hover
     │   ├── ParticlesBackground.tsx   # Canvas de partícules (default export, prop opacityMultiplier)
@@ -106,7 +106,7 @@ moocai2026/
     │
     ├── features/
     │   ├── student/
-    │   │   ├── types.ts              # Student, Lesson, Topic, Course (shape propi)
+    │   │   ├── types.ts              # Student, Lesson, Topic, Course (shape propi); Student.code → opcional (fix2)
     │   │   ├── Login.tsx             # Login + registre + "forgot" (UI), consumeix register API
     │   │   ├── RendimentDashboard.tsx# /courses/:courseId/stats (gràfics de barres)
     │   │   ├── CourseCard.tsx        # 
@@ -130,6 +130,8 @@ moocai2026/
     │
     ├── hooks/
     │   ├── useCourse.ts              # React Query: useCourse + prefetchCourse
+    │   ├── useCourses.ts             # React Query: useAllCourses/usePublicCourses/useCourseDetail + prefetch
+    │   ├── usePublicStats.ts         # React Query: comptador d'alumnes (gate VITE_ENABLE_PUBLIC_STATS)
     │   ├── useI18n.ts                # Re-export d'I18nContext
     │   └── useTheme.ts               # Re-export de ThemeContext
     │
@@ -144,7 +146,7 @@ moocai2026/
     │   │   ├── CourseLessons.tsx     # Tabs Teoria/Programació/Tests/Fitxers + rail flotant
     │   │   ├── LessonPage.tsx        # Monaco + Solució Profe + preview React + panell IA
     │   │   ├── ExamPage.tsx          # /courses/:courseId/exam/:challengeSlug
-    │   │   ├── AiHelpPanel.tsx       # Revisió IA via fetch directe
+    │   │   ├── AiHelpPanel.tsx       # Revisió IA via client compartit (api.get); usa topicSlug real
     │   │   └── ${courseId}/${lesson.id}/LessonTopic.tsx  # ⚠️ Path literal amb ${...}
     │   ├── dashboards/
     │   │   └── StudentDashboard.tsx  # Login, resum, 5 cards, classificació
@@ -160,12 +162,14 @@ moocai2026/
     │       └── InviteStudents.tsx    # POST /users/invite/
     │
     ├── services/
-    │   ├── api.ts                    # HÍBRID: localStorage (progrés) + POST /users/invite/ · timeout 3000
-    │   ├── authService.ts            # login/logout/register/getToken (sense timeout)
-    │   ├── courseService.ts          # Cursos + submissions + overview · timeout 10000
+    │   ├── httpClient.ts             # NOU (fix2): apiClient (Token + gestió 401) i publicClient (sense token) · baseURL /api/v1
+    │   ├── api.ts                    # HÍBRID: localStorage (progrés) + apiClient compartit (api.get, inviteUser)
+    │   ├── authService.ts            # login/logout/register/getToken (publicClient; logout 5000 ms amb token explícit)
+    │   ├── courseService.ts          # Cursos + submissions + overview · apiClient (timeout 100000)
     │   ├── localCourseService.ts     # Cursos locals (mooc_local_courses), sense HTTP
-    │   ├── profileService.ts         # Perfil, avatars, orgs (sense timeout)
-    │   ├── register.ts               # GET+POST /users/register/ (FormData)
+    │   ├── profileService.ts         # Perfil, avatars, orgs · apiClient (timeout 100000)
+    │   ├── statsService.ts           # GET /public/stats/ — gated per env, resilient (number | null)
+    │   ├── register.ts               # GET+POST /users/register/ (FormData) · publicClient
     │   └── teacherService.ts         # ⚠️ BUID (0 bytes), importat enlloc
     │
     ├── theme/
@@ -233,7 +237,7 @@ StrictMode
 ⚠️ La ruta 4 s'importa des d'un directori amb nom literal ``${courseId}/${lesson.id}`` (`App.tsx:6`), fruit d'una interpolació enganxada per error. Funciona perquè el nom del fitxer hi coincideix.
 
 ### Layouts
-- **`MainLayout`**: `Header` + `Outlet` dins `height: 100dvh; overflow: hidden`. En muntar fa prefetch de `getAllCourses()` i `getFullCourseDetail()` de cada curs. **No** renderitza `Footer`.
+- **`MainLayout`**: `Header` + `Outlet` dins `height: 100dvh; overflow: hidden`. En muntar fa **prefetch a la cache de React Query**: `prefetchAllCourses()` i, per a cada curs, `prefetchCourseDetail()` (una única petició per curs, compartida amb la portada, el dashboard i `CourseLessons`). **No** renderitza `Footer`.
 - **`TeacherLayout`**: `Sidebar` col·lapsable (64/256px) + header de 64px amb logo i `ThemeToggleButton` + `<ChatWidget />` global. Sense dades pròpies.
 
 ---
@@ -260,7 +264,7 @@ Tests de resposta única o múltiple (`RadioGroup`/`FormGroup`). Carrega via `us
 Dos gràfics de barres (codi / test) per tema, amb línia discontínua "Mitjana". **Totes les dades vénen de `localStorage`** via `getFullCourseDetail` (només el catàleg). ⚠️ La "mitjana" és **fabricada** amb `Math.random()` (`RendimentDashboard.tsx:217,228`), no ve de cap endpoint de notes.
 
 ### `StudentDashboard` (`/dashboards/student`)
-Login (component `Login`), resum del curs en 5 targetes (progrés general, problemes de codi per tema, tests per tema, classificació top-3, més estadístiques) i "Continua estudiant". La classificació es carrega de `getStudentsOverview` i es mapeja amb `toRanking`.
+Login (component `Login`), resum del curs en 5 targetes (progrés general, problemes de codi per tema, tests per tema, classificació top-3, més estadístiques) i "Continua estudiant". **Les llistes i els detalls es carreguen amb React Query**: `useAllCourses()` (assignats) i `usePublicCourses()` per als tabs públics/privats/assignats, i `useQueries(['course', slug])` per desplegar els `topics` de cada curs (`withCourseDetail`). La classificació es carrega de `getStudentsOverview` (només per a cursos **propis/assignats**; als públics el rànquing queda buit, `isOwnCourse` a `loadRanking`) i es mapeja amb `toRanking`. Als `auth-state-change` s'invaliden les queries i es crida `courseService.clearCache()`.
 
 ### `ProfilePage` (`/profile`, `/teacher/profile`)
 4 targetes: preferències d'idioma, organitzacions, detalls del compte (amb canvi de contrasenya) i avatar. Usa `profileService`. El camp `username` és de només lectura (el `PATCH` no l'accepta). ⚠️ L'organització seleccionada és visual: no s'envia enlloc.
@@ -282,6 +286,11 @@ Login (component `Login`), resum del curs en 5 targetes (progrés general, probl
 |------|------------|
 | `useCourse(courseId)` | React Query. `queryKey: ['course', id]`, `staleTime: 30min`, `gcTime: 60min`, `retry: 1`, `enabled` si `courseId` és vàlid. Resol ids `clone-*` a l'slug original via `localCourseService`. |
 | `prefetchCourse(queryClient, courseId)` | `prefetchQuery` del detall de curs (hover a `CourseCard`). |
+| `useAllCourses(enabled)` | React Query. `['courses']` → `getAllCourses()`. `staleTime 5min`, `gcTime 30min`, `retry 1`. (`Home`, `StudentDashboard`). |
+| `usePublicCourses(enabled)` | React Query. `['public-courses']` → `getPublicCourses()`. Mateixos temps de llista. (`StudentDashboard`). |
+| `useCourseDetail(slug)` | React Query. `['course', slug]` → `getFullCourseDetail()`. **Mateixa key** que `useCourse`, compartida entre portada/dashboard/lliçons. (`StudentDashboard`). |
+| `prefetchAllCourses(qc)` / `prefetchCourseDetail(qc, slug)` | Prefetch de llistes i detalls a la cache (usats pel `MainLayout` i `CourseCard`). |
+| `usePublicStats()` | React Query. `['public-stats']` → `statsService.getStudentCount()`. Només s'activa amb `VITE_ENABLE_PUBLIC_STATS=true|'1'` (l'endpoint encara no existeix). (`Hero`). |
 | `useTheme()` | Re-export de `{ ThemeProvider, useThemeMode }`. |
 | `useI18n()` | Re-export de `{ I18nProvider, useI18n }`. |
 
@@ -291,25 +300,31 @@ Login (component `Login`), resum del curs en 5 targetes (progrés general, probl
 
 ## 8. Serveis
 
-### `api.ts` — **híbrid** (localStorage + 1 crida HTTP)
-Client axios `baseURL: ${VITE_API_URL}/api/v1`, `Authorization: Token <token>`, **`timeout: 3000`**.
+### `httpClient.ts` — clients HTTP compartits (nou, fix2)
+- `apiClient` (`baseURL: ${VITE_API_URL}/api/v1`, **`timeout: 100000`**): interceptor de petició que afegeix `Authorization: Token <token>`; interceptor de resposta que, davant d'un **401 causat pel token actual** (caducat), neteja `token` + `currentStudent` i dispara `auth-state-change`. Un **401 tard d'un token antic** s'ignora i no tanca una sessió més nova.
+- `publicClient` (mateix `baseURL`, **sense timeout**): no envia cap token automàtic; l'usen login i registre (amb un token caducat desat, aquestes crides rebrien 401).
+- Cap dels dos fixa `Content-Type`: axios el posa sol (JSON / multipart).
+
+### `api.ts` — **híbrid** (localStorage + client axios compartit)
+Usa l'`apiClient` de `httpClient.ts` (`Authorization: Token <token>`, **`timeout: 100000`**). És el client HTTP **compartit** que també fan servir `statsService` i l'avatar/AiHelpPanel (`api.get`).
 
 | Mètode | Transport | Detall |
 |--------|-----------|--------|
+| `get(url, config)` | **HTTP** (GET genèric) | Client compartit per a `statsService` i `AiHelpPanel`. |
 | `getStudentProgress(studentId)` | localStorage | Llegeix ``mooc_global_progress_${studentId}`` |
 | `postProgress({studentId, courseId, lessonId, status})` | localStorage | Escriu `${courseId}_${lessonId}` i dispara `lessonProgressUpdated` (window + document) |
 | `resetCourse(studentId, courseId)` | localStorage | Esborra progrés, `code_*` i `mooc_submissions_*` del curs |
 | `inviteUser(email)` | **POST** `/users/invite/` | Body `{ email }` |
 
 ### `authService.ts` — login real de l'alumne
-Sense `axios.create` → **sense timeout**, sense interceptor (per tant el `logout` no envia token).
+Usa el `publicClient` de `httpClient.ts` (sense token automàtic).
 - `login(username, password)` → **POST** `/users/auth/login/` (JSON `{ username, password }`); desa `token`.
-- `logout()` → POST `/users/auth/logout/` (sense body); neteja `token` i `currentStudent`.
+- `logout()` → llegeix el `token` **abans** de netejar, buida `token` + `currentStudent` de seguida i després envia **POST** `/users/auth/logout/` (sense body, `Authorization: Token <token>` **explícit**, `timeout: 5000 ms`) per **revocar-lo**. Mai no llança (`catch` buit).
 - `register(payload)` → delega a `register.ts`.
 - `getToken()`.
 
 ### `courseService.ts` — contingut de cursos
-Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache`, `allCoursesCache`, `publicCoursesCache`).
+Usa l'`apiClient` de `httpClient.ts` (`timeout: 100000`, `Token` automàtic, sense `Content-Type` manual), amb caches en memòria (`fullCourseCache`, `allCoursesCache`, `publicCoursesCache`). ⚠️ `getAllCourses()` sense `token` retorna `[]` **sense fer cap petició**.
 
 | Mètode | Endpoint |
 |--------|----------|
@@ -322,7 +337,6 @@ Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache
 | `submitChallenge(c, t, p, body)` | POST `/courses/{c}/topics/{t}/problems/{p}/submissions/` |
 | `getChallenge(c, t, p)` | GET `.../problems/{p}/` |
 | `getChallengeSubmissions(c, t, p)` | GET `.../submissions/` |
-| `getChallengeGrades(c, t, p)` | GET `.../submissions/grades/` |
 | `getPeerSubmissions(c, t, p)` | GET `.../submissions/peers/` (torna `[]` si falla) |
 | `getStudentsOverview(c)` | GET `/courses/{c}/students/overview/` |
 | `getFullCourseDetail(slug)` | Composa curs + temes + problemes (2 + T crides) |
@@ -331,11 +345,14 @@ Client `timeout: 10000`, JSON, `Token`, amb caches en memòria (`fullCourseCache
 ### `localCourseService.ts` — cursos locals (sense HTTP)
 Clau `mooc_local_courses`: `getAll`, `getById`, `save`, `remove`, `cloneFrom`.
 
-### `profileService.ts` — perfil (sense timeout)
-`fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `fetchMyAvatar()` GET `/users/me/avatar/` · `updateMyAvatar(file)` **PATCH** (FormData `avatar`) · `extractProfileErrors()`.
+### `profileService.ts` — perfil
+Usa l'`apiClient` de `httpClient.ts` (sense cap header manual). `fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `updateMyAvatar(file)` **PATCH** `/users/me/avatar/` (FormData `avatar`, respon **204** → `Promise<void>`; la imatge es torna a carregar amb `avatarCache`) · `extractProfileErrors()`.
 
 ### `register.ts` — alta d'usuari
-`loadRegistrationData()` GET `/users/register/` (sense auth) · `registerUser(payload)` **POST** `/users/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.
+Usa el `publicClient` de `httpClient.ts` (sense token). `loadRegistrationData()` GET `/users/register/` (sense auth) · `registerUser(payload)` **POST** `/users/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.
+
+### `statsService.ts` — comptador públic d'alumnes
+`getStudentCount()` **GET** `/public/stats/` → `{ students: number }`, sobre el client compartit de `api.ts`. Retorna `number | null` (null si falla o si `students` no és un nombre finit), sense llançar. ⚠️ **L'endpoint encara no existeix** al backend: la crida només s'activa quan `VITE_ENABLE_PUBLIC_STATS=true|'1'`, controlat per `usePublicStats`.
 
 ### `teacherService.ts` — ⚠️ buit (0 bytes)
 
@@ -344,7 +361,8 @@ Clau `mooc_local_courses`: `getAll`, `getById`, `save`, `remove`, `cloneFrom`.
 ## 9. Autenticació i rols — dos fluxos en paral·lel
 
 1. **`AuthContext`** (`AuthProvider` + `useAuth()`): llegeix `currentStudent` i `token` de localStorage; exposa `login`/`logout`. ⚠️ `useAuth()` **no es consumeix enlloc** i `AuthContext.login` no omple `user`, de manera que `isAuthenticated` no s'activa mai per aquesta via.
-2. **Flux real**: `StudentDashboard.handleLogin` crida `authService.login()` directament i desa `currentStudent` a localStorage. El `Header` llegeix `token`/`currentStudent` de localStorage directament.
+2. **Flux real**: `StudentDashboard.handleLogin` crida `authService.login()` directament i desa `currentStudent` a localStorage (ja **no** hi posa `code`; fix2). El `Header` llegeix `token`/`currentStudent` de localStorage directament.
+3. **Capa HTTP** (`src/services/httpClient.ts`, nou a fix2): `apiClient` afegeix `Authorization: Token` a cada petició i, si rep un **401 amb el token actual**, neteja `token` + `currentStudent` i dispara `auth-state-change` (un 401 d'un token antic en vol s'ignora). `publicClient` no envia token i el fan servir login i registre. `authService.logout()` llegeix el token **abans** de netejar-lo, el neteja de seguida i després el revoca amb `POST /users/auth/logout/` (`Authorization` explícit, 5000 ms), sense llençar mai.
 
 La navegació a `/teacher` es fa des del commutador de rol del `Header` (`mooc_role`). **No hi ha validació real del token** en engegar.
 
@@ -456,14 +474,14 @@ npm run preview
 3. **`src/data/courses.ts`** — mapa d'imatges (només 2 entrades).
 
 ### Esdeveniments com a bus d'estat
-`lessonProgressUpdated` (progrés), `auth-state-change` (sessió/perfil), `studentsUpdated` (Hero), `teacher-course-changed` (Sidebar), i els natius `storage` i `visibilitychange`. ⚠️ `Header` encara dispara un `authChange` llegat que ningú escolta.
+`lessonProgressUpdated` (progrés), `auth-state-change` (sessió/perfil; el disparen `Header`, `AuthContext`, `StudentDashboard`, `ProfilePage` i `pointsSync`, **i** `httpClient` en un 401 caducat), `studentsUpdated` (Hero), `teacher-course-changed` (Sidebar), i els natius `storage` i `visibilitychange`. ⚠️ `Header` encara dispara un `authChange` llegat que ningú escolta.
 
 ---
 
 ## 16. Estat Actual del Projecte
 
 ### ✅ Implementat
-- Landing (Hero typewriter + stats + grid de cursos + features + Footer).
+- Landing (Hero typewriter + stats amb `usePublicStats` + grid de cursos + features + Footer).
 - Navegador de curs de 4 pestanyes amb rail flotant i reordenació de lliçons completades.
 - **Editor Monaco** amb multi-fitxer (Python/React), temes propis, validació, **DiffEditor "Solució Profe"** i **preview React en viu**.
 - Tests (`ExamPage`) de resposta única/múltiple amb feedback i nota.
@@ -473,9 +491,11 @@ npm run preview
 - **Secció professor sencera**: layout, sidebar, tauler, editor d'exercicis, llistats, tests, classificació, cursos locals, invitacions.
 - Multiidioma (CA/ES/EN), 3 modes de tema, toastos, partícules.
 - `netlify.toml` i proxy Vite.
-- Capa React Query per al detall de curs + prefetch.
+- **React Query** per a les **llistes i detalls de cursos** (portada, dashboard de l'alumne i `MainLayout` prefetch) i el **comptador d'estadístiques** de la portada (`usePublicStats`), amb claus compartides (`['course', slug]`) que dedupliquen les peticions. (`docs/fix1.md`.)
+- **Client HTTP únic** (`docs/fix2.md`): `src/services/httpClient.ts` amb `apiClient` (token + tancament de sessió en 401 caducat) i `publicClient` (login/registre); **logout que revoca el token** al servidor; `Student.code` ja no es desa a `currentStudent`.
 
 ### ⚠️ Deute tècnic / pendents
+- **Estadístiques de la portada**: `GET /public/stats/` encara no existeix al backend; el comptador d'alumnes queda en "—" (`null`) fins que s'afegeixi i s'activi `VITE_ENABLE_PUBLIC_STATS`.
 - Fitxer buit: `services/teacherService.ts`. (`hooks/useTeacherData.ts` era buit però ja s'ha esborrat.)
 - Fitxers orfes: `App.css`, `i18n/index.ts`, `utils/utils.ts`, `utils/validators.ts` i 6 peces de `features/student/`.
 - `useAuth()` no s'usa; `AuthContext.login` no s'actualitza.
@@ -495,8 +515,10 @@ npm run preview
 
 Vegeu `docs/apis.md` per a la referència completa. Resum:
 
-- **Auth/usuari** (`authService`, `register`, `profileService`): login, logout, register, settings (GET/PATCH), avatar (GET/PATCH), orgs, invite.
+- **Capa HTTP** (`httpClient.ts`): client compartit `apiClient` (token + 401) i `publicClient` (login/registre); d'`api.ts` en surt `api.get`, que consumeixen `statsService`, `avatarCache` i `AiHelpPanel`.
+- **Auth/usuari** (`authService`, `register`, `profileService`): login, logout (**revoca el token**), register, settings (GET/PATCH), avatar (PATCH `/users/me/avatar/`; el GET es llegeix com a imatge via `avatarCache`), orgs, invite.
 - **Cursos** (`courseService`): cursos, temes, problemes, submissions (enviar/consultar/notes/peers), overview d'alumnes.
+- **Estadístiques** (`statsService`): `GET /public/stats/` — ⚠️ **previst**, no existeix encara; activat només si `VITE_ENABLE_PUBLIC_STATS=true`.
 - **Tercers**: React Query, react-router v7, i18next, framer-motion, react-spring, axios, canvas-confetti, MUI v9, Monaco, react-markdown, lucide-react, Canvas API, `window.dispatchEvent`.
 
 ---

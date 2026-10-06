@@ -1,20 +1,23 @@
-const API_URL = import.meta.env.VITE_API_URL || '';
-const TIMEOUT_MS = 3000;
+import { api } from './api';
 
 export const statsService = {
-  /** GET /api/v1/public/stats/ -> { students: number } (endpoint públic, sense token) */
-  async getStudentCount(): Promise<number> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  /**
+   * GET /api/v1/public/stats/ -> { students: number } (endpoint públic, sense token).
+   *
+   * Decideix (TODO(stats)): el comptador compta el nombre d'alumnes actius de la
+   * plataforma i és una xifra pública. El backend encara no exposa aquest
+   * endpoint, així que la crida NOMÉS es fa quan `VITE_ENABLE_PUBLIC_STATS`
+   * està activada (vegeu `usePublicStats`). Si el backend no el té, es retorna
+   * `null` sense llançar: la UI pot amagar l'estadística en lloc de demanar-la
+   * a cada visita de la portada.
+   */
+  async getStudentCount(): Promise<number | null> {
     try {
-      const res = await fetch(`${API_URL}/api/v1/public/stats/`, {
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`Error carregant estadístiques (${res.status})`);
-      const data: { students: number } = await res.json();
-      return Number.isFinite(data.students) ? data.students : 0;
-    } finally {
-      clearTimeout(timer);
+      const res = await api.get('/public/stats/');
+      const data = res.data as { students?: number };
+      return Number.isFinite(data.students) ? Number(data.students) : null;
+    } catch {
+      return null;
     }
   },
 };

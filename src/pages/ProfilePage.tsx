@@ -11,10 +11,10 @@ import { useThemeMode } from '../hooks/useTheme';
 import { useNotifications } from '../contexts/NotificationContext';
 import ParticlesBackground from '../components/ParticlesBackground';
 import {
-  updateProfile, extractProfileErrors, fetchOrganizations, fetchMyAvatar, updateMyAvatar, fetchProfile,
+  updateProfile, extractProfileErrors, fetchOrganizations, updateMyAvatar, fetchProfile,
   type Organization, type ProfileUser,
 } from '../services/profileService';
-import { invalidateImage } from '../utils/avatarCache';
+import { invalidateImage, preloadImage, myAvatarUrl } from '../utils/avatarCache';
 
 const languages = [
   { code: 'en', labelKey: 'profile.lang_english' },
@@ -222,11 +222,12 @@ export default function ProfilePage() {
       })
       .catch(() => { /* el backend pot no exposar orgs, es manté la demo */ });
 
-    // `avatar_url` ve al GET del perfil; si no hi és, cau al endpoint dedicat.
-    const loadAvatarIfMissing = async (fromProfile: string | undefined) => {
-      if (fromProfile) { if (active) setAvatarUrl(fromProfile); return; }
+    // L'avatar es carrega amb la memòria cau compartida (blob amb el header
+    // d'autenticació). `avatar_url` del settings no es pot obrir des d'aquesta
+    // app: el navegador hi rebia l'index.html en lloc de la imatge.
+    const loadAvatar = async () => {
       try {
-        const url = await fetchMyAvatar();
+        const url = await preloadImage(myAvatarUrl() ?? undefined);
         if (active && url) setAvatarUrl(url);
       } catch { /* sense avatar, es mostra la inicial */ }
     };
@@ -241,9 +242,9 @@ export default function ProfilePage() {
         if (data.email) setEmail(data.email);
         if (data.username) setUsername(data.username);
         mirrorProfileToStorage(data);
-        return loadAvatarIfMissing(data.avatar_url);
+        return loadAvatar();
       })
-      .catch(() => { if (active) return loadAvatarIfMissing(undefined); });
+      .catch(() => { if (active) return loadAvatar(); });
 
     return () => { active = false; };
   }, []);
@@ -289,11 +290,14 @@ export default function ProfilePage() {
 
       if (avatarFile) {
         try {
-          const url = await updateMyAvatar(avatarFile);
-          if (url) setAvatarUrl(url);
+          // `PATCH /users/me/avatar/` respon 204 (sense cos): no hi ha cap URL
+          // a llegir de la resposta, es torna a carregar des de la memòria cau.
+          await updateMyAvatar(avatarFile);
           // La memòria cau d'avatars ja té la imatge antiga: la netegem.
           invalidateImage();
           window.dispatchEvent(new Event('avatarUpdated'));
+          const fresh = await preloadImage(myAvatarUrl() ?? undefined);
+          if (fresh) setAvatarUrl(fresh);
         } catch (err) {
           addNotification(extractProfileErrors(err), 'error');
         }

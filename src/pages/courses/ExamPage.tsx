@@ -4,7 +4,6 @@ import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radi
 import { ChevronLeft, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
-import { courseService } from '../../services/courseService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -69,12 +68,11 @@ export default function ExamPage() {
 
         const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
         const problem = topic?.subTopics?.find((st: any) => st.problemSlug === currentTestSlug);
-        let loadedExam = problem;
 
-        if (!loadedExam) {
-          loadedExam = await courseService.getChallenge(courseId, topic?.id || '', currentTestSlug).catch(() => null);
-        }
-        if (!cancelled) setExam(loadedExam || null);
+        // Sense fallback: si el problema no és dins del tema, l'examen es mostra
+        // com a "no trobat". L'antiga crida amb `topic?.id || ''` construïa
+        // `/topics//problems/<slug>/` (404) i acabava en el mateix resultat.
+        if (!cancelled) setExam(problem || null);
       } catch (error) {
         console.error('Error loading exam:', error);
         if (!cancelled) setExam(null);

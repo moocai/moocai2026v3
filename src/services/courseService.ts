@@ -1,24 +1,7 @@
-import axios from 'axios';
 import { Course } from '../types';
 import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
-
-// @ts-ignore - Vite replaces import.meta.env statically at build time
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
-
-const apiClient = axios.create({
-  baseURL: `${API_BASE_URL}/api/v1`,
-  headers: { 'Content-Type': 'application/json' },
-  timeout: 100000,
-});
-
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Token ${token}`;
-  }
-  return config;
-});
+import { apiClient } from './httpClient';
 
 /* ------------------------------------------------------------------ */
 /* Servei                                                             */
@@ -51,8 +34,13 @@ export const courseService = {
   /**
    * `GET /api/v1/courses/` és sensible al rol: professors veuen els seus,
    * alumnes els cursos actius matriculats i staff tots.
+   * Sense sessió no es fa cap petició (l'API respon 401); la llista buida
+   * no es cacheja perquè el login la torni a demanar.
    */
   async getAllCourses(forceRefresh = false): Promise<Course[]> {
+    if (!localStorage.getItem('token')) {
+      return [];
+    }
     if (!forceRefresh && allCoursesCache) {
       return allCoursesCache;
     }
@@ -113,11 +101,6 @@ export const courseService = {
 
   async getChallengeSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`);
-    return Array.isArray(data) ? data : (data.results || []);
-  },
-
-  async getChallengeGrades(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
-    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/grades/`);
     return Array.isArray(data) ? data : (data.results || []);
   },
 

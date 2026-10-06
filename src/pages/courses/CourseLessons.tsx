@@ -43,7 +43,7 @@ export default function CourseLessons() {
   const isTallScreen = useMediaQuery('(min-height: 900px)');
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const { data: course, isLoading: loading } = useCourse(courseId);
+  const { data: course, isLoading: loading } = useCourse(courseId);TAB_ITEMS
 
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
@@ -324,7 +324,7 @@ export default function CourseLessons() {
           onChange={(_, v) => setMainTab(v)}
           variant={isXs ? 'scrollable' : 'standard'}
           sx={{ mb: { xs: 4, lg: 8 }, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-list': {justifyContent: { xs: 'flex-start' }},
-            '& .MuiTab-root': {textTransform: 'none', fontWeight: 900,fontSize: { xs: '1.2rem', md: '0.95rem', lg: '1.3rem'}, minHeight: { xs: 60, md: 0 }, minWidth: { xs: 50, md: 90 },py: { xs: 2, md: 1.5}, px: { xs: 1.75, md: 5, lg:10},color: mode === 'light' ? '#000' : '#fff',},
+            '& .MuiTab-root': {textTransform: 'none', fontWeight: 900,fontSize: { xs: '1.2rem', md: '0.95rem', lg: '1.3rem'}, minHeight: { xs: 60, md: 0 }, minWidth: { xs: 50, md: 90 },py: { xs: 2, md: 1.5}, px: { xs: 1.75, md: 7, lg:8},color: mode === 'light' ? '#000' : '#fff',},
             '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
             '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: { xs: 4, md: 3}},
           }}>
@@ -351,7 +351,7 @@ export default function CourseLessons() {
 
   const renderTopicNav = (items: TopicNavItem[], activeId?: string) => (
     <Box component="aside" aria-label={t('lesson.topics', 'Temes')}
-      sx={{display: { xs: 'none', md: 'flex' },width: { md: 280, lg: 350},mt:{lg:-13},flexShrink: 0,position: { md: 'sticky' },top: { md: 16},maxHeight: { md: 'calc(100vh - 64px - 35px)' },flexDirection: 'column',gap: 1,overflowY: { md: 'auto' },scrollbarWidth: 'none','&::-webkit-scrollbar': { display: 'none' },}}>
+      sx={{display: { xs: 'none', md: 'flex' },width: { md: 280, lg: 350},mt:{lg:0},flexShrink: 0,flexDirection: 'column',gap: 2}}>
       {renderTopicButtons(items, activeId)}
     </Box>
   );

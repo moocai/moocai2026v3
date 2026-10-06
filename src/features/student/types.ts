@@ -1,7 +1,7 @@
 export interface Student {
   id: string;
   name: string;
-  code: string;
+  code?: string;
   email: string;
   role?: 'student' | 'teacher';
   average?: number;

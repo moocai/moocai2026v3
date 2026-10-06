@@ -10,6 +10,8 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 const memoryCache = new Map<string, string>();
 /** src -> petició en curs, per no demanar la mateixa imatge dues vegades. */
 const inFlight = new Map<string, Promise<string | null>>();
+/** Avatars que han tornat 403/404 en aquesta sessió: es mostren la inicial. */
+const failed = new Set<string>();
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
@@ -79,11 +81,29 @@ async function idbPrune() {
   }
 }
 
-/** URL d'usuari del mateix tipus que fa servir el rànquing del dashboard. */
-export function userAvatarUrl(username: string, slug?: string): string {
-  return slug
-    ? `/api/v1/users/${username}/avatar/${slug}/`
-    : `/api/v1/users/${username}/avatar/`;
+/**
+ * URL de l'avatar d'un altre usuari en un curs. El slug del curs és obligatori:
+ * `/users/<username>/avatar/` sense curs no existeix (404).
+ */
+export function userAvatarUrl(username: string, slug: string): string {
+  return `/api/v1/users/${username}/avatar/${slug}/`;
+}
+
+/**
+ * URL de l'avatar de l'usuari autenticat. `currentStudent` desa l'**id** i no
+ * sempre hi ha username, així que es fa servir `/users/me/avatar/`.
+ * El `?u=<id>` no canvia la petició però sí la clau de la memòria cau, de manera
+ * que un navegador compartit no mostra l'avatar de l'usuari anterior.
+ */
+export function myAvatarUrl(): string | null {
+  try {
+    const raw = localStorage.getItem('currentStudent');
+    if (!raw) return null;
+    const id = JSON.parse(raw)?.id;
+    return id ? `/api/v1/users/me/avatar/?u=${encodeURIComponent(String(id))}` : null;
+  } catch {
+    return null;
+  }
 }
 
 async function fetchAsBlob(src: string): Promise<Blob | null> {
@@ -94,7 +114,11 @@ async function fetchAsBlob(src: string): Promise<Blob | null> {
     const res = await api.get(cleanUrl, { responseType: 'blob' });
     const blob = res.data instanceof Blob ? res.data : new Blob([res.data as BlobPart]);
     return blob.size > 0 ? blob : null;
-  } catch {
+  } catch (err: any) {
+    // 403/404 es recorden durant la sessió (no es torna a demanar la imatge).
+    // Errors de xarxa i 5xx no es recorden: es poden recuperar en la següent càrrega.
+    const status = err?.response?.status;
+    if (status === 403 || status === 404) failed.add(src);
     return null;
   }
 }
@@ -102,6 +126,7 @@ async function fetchAsBlob(src: string): Promise<Blob | null> {
 function resolveFromCache(src: string): Promise<string | null> {
   const cached = memoryCache.get(src);
   if (cached) return Promise.resolve(cached);
+  if (failed.has(src)) return Promise.resolve(null);
   const request = (async () => {
     const fromIdb = await idbGet(src);
     if (fromIdb) {
@@ -173,6 +198,9 @@ export function invalidateImage(src?: string) {
     if (url) URL.revokeObjectURL(url);
     memoryCache.delete(key);
   }
+  // També s'obliden els 403/404 recordats: la imatge pot haver canviat.
+  if (src) failed.delete(src);
+  else failed.clear();
   if (!src) {
     void openDb().then((db) => {
       if (!db) return;

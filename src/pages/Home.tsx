@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { Container, Box, Typography, Grid, CircularProgress, useTheme } from '@mui/material';
@@ -7,7 +8,7 @@ import { Header } from '../components/Header';
 import Hero from '../components/Hero';
 import { Footer } from '../components/Footer';
 import { CourseCard } from '../components/CourseCard';
-import { courseService } from '../services/courseService';
+import { useAllCourses, ALL_COURSES_KEY } from '../hooks/useCourses';
 import { Course } from '../types';
 
 const flipVariants = {
@@ -54,30 +55,12 @@ export default function Home() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [coursesList, setCoursesList] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
-  // @ts-ignore
-  const [_isLoggedIn, setIsLoggedIn] = useState(() => Boolean(localStorage.getItem('currentStudent')));
+  const [isLoggedIn, setIsLoggedIn] = useState(() => Boolean(localStorage.getItem('currentStudent')));
+  const queryClient = useQueryClient();
 
-  const fetchCourses = useCallback(async () => {
-    const isLoggedIn = Boolean(localStorage.getItem('currentStudent'));
-    if (!isLoggedIn) {
-      setCoursesList([]);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const data = await courseService.getAllCourses();
-      setCoursesList(data);
-      data.forEach(course => courseService.getFullCourseDetail(course.slug!));
-    } catch (error) {
-      console.error("Error carregant cursos des de l'API:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // La llista de cursos es llegeix de la cache de React Query (mateixa queryKey
+  // que el prefetch del MainLayout i que CourseLessons) → una sola petició.
+  const { data: coursesList = [], isLoading: loading } = useAllCourses(isLoggedIn);
 
   useEffect(() => {
     const saved = localStorage.getItem('currentStudent');
@@ -86,8 +69,6 @@ export default function Home() {
       navigate('/dashboards/student', { replace: true });
       return;
     }
-
-    fetchCourses();
 
     // Si veníem amb la intenció de fer scroll cap a "courses", ho executem ara
     if (location.state?.scrollTo === 'courses') {
@@ -99,12 +80,16 @@ export default function Home() {
       }, 100);
     }
 
-    const onVisible = () => { if (document.visibilityState === 'visible') fetchCourses(); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
+      }
+    };
     document.addEventListener('visibilitychange', onVisible);
-    
+
     const handleAuthChange = () => {
       setIsLoggedIn(Boolean(localStorage.getItem('currentStudent')));
-      fetchCourses();
+      queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
     };
 
     window.addEventListener('authChange', handleAuthChange);
@@ -115,7 +100,7 @@ export default function Home() {
       window.removeEventListener('authChange', handleAuthChange);
       window.removeEventListener('storage', handleAuthChange);
     };
-  }, [location, navigate, fetchCourses]);
+  }, [location, navigate, queryClient]);
 
   const features = [
     {icon: '⚡', title: t('home.features.code_title'), desc: t('home.features.code_desc') },

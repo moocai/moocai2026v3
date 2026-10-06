@@ -1,5 +1,6 @@
 import {useState, useEffect, useMemo, useCallback, useRef, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
+import {useQueryClient, useQueries} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
 import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, AccessTime as AccessTimeIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
@@ -9,11 +10,12 @@ import {useNotifications} from '../../contexts/NotificationContext';
 import {Login} from '../../features/student/Login';
 import {Student, Topic, Course} from '../../features/student/types';
 import { courseService } from '../../services/courseService';
+import { useAllCourses, usePublicCourses, ALL_COURSES_KEY, PUBLIC_COURSES_KEY } from '../../hooks/useCourses';
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import ProtectedAvatar from '../../components/ProtectedAvatar';
 import { courseImages } from '../../data/courses';
-import { preloadImage, userAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
+import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
@@ -47,6 +49,27 @@ function filterByScope(courses: Course[], scope: CourseScope): Course[] {
   if (scope === 'public') return courses.filter((c) => c.isPublic !== false);
   if (scope === 'private') return courses.filter((c) => c.isPublic === false);
   return courses;
+}
+
+/** Afegeix els `topics` del detall obtingut de la cache de React Query al curs. */
+function withCourseDetail(course: Course, detail: any): Course {
+  if (!detail?.content) return course;
+  const topics: Topic[] = (detail.content || []).map((topic: any) => ({
+    id: topic.id ?? topic.slug,
+    title: topic.title,
+    lessons: (topic.subTopics || []).map((st: any) => ({
+      id: st.problemSlug,
+      title: st.subtitle,
+      theoryInstructions: st.text,
+      challenge: st.text,
+      type: st.type,
+      choices: st.choices,
+      precode: st.precode,
+      difficulty: st.difficulty,
+      score: st.score,
+    })),
+  }));
+  return { ...course, topics };
 }
 
 /** Clau on es recorda l'últim curs i filtre que l'usuari estava mirant. */
@@ -92,10 +115,7 @@ export default function StudentDashboard() {
   const navigate = useNavigate();
   const { addNotification } = useNotifications();
   const { mode } = useThemeMode();
-  const [loading, setLoading] = useState(true);
   const [, setActionLoading] = useState(false);
-  const [assignedCourses, setAssignedCourses] = useState<Course[]>([]);
-  const [publicCourses, setPublicCourses] = useState<Course[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [dbProgress, setDbProgress] = useState<Record<string, boolean>>({});
   const [username, setUsername] = useState("");
@@ -107,6 +127,52 @@ export default function StudentDashboard() {
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
   const restoredRef = useRef(false);
+  const queryClient = useQueryClient();
+
+  // Cursos (llistes i detalls) llegits de la cache de React Query: la mateixa
+  // queryKey que el prefetch del MainLayout i que CourseLessons → una única
+  // petició per curs encara que s'obri des de llocs diferents.
+  const assignedQuery = useAllCourses();
+  const publicQuery = usePublicCourses();
+
+  const detailSlugs = useMemo(() => {
+    const seen = new Set<string>();
+    for (const c of assignedQuery.data ?? []) if (c.slug) seen.add(c.slug);
+    for (const c of publicQuery.data ?? []) if (c.slug) seen.add(c.slug);
+    return [...seen];
+  }, [assignedQuery.data, publicQuery.data]);
+
+  const detailResults = useQueries({
+    queries: detailSlugs.map((slug) => ({
+      queryKey: ['course', slug],
+      queryFn: () => courseService.getFullCourseDetail(slug),
+      staleTime: 30 * 60 * 1000,
+      gcTime: 60 * 60 * 1000,
+      retry: 1,
+    })),
+  });
+
+  // «loadedDetailCount» és el senyal estable que fa recomputar la relació
+  // slug → detall només quan arriba un detall (evita bucles de re-render).
+  const loadedDetailCount = detailResults.reduce((n, d) => n + (d.isLoading ? 0 : 1), 0);
+
+  const detailBySlug = useMemo(() => {
+    const map = new Map<string, any>();
+    detailSlugs.forEach((slug, i) => {
+      const data = detailResults[i]?.data;
+      if (data) map.set(slug, data);
+    });
+    return map;
+  }, [detailSlugs, loadedDetailCount]);
+
+  const assignedCourses = useMemo(
+    () => (assignedQuery.data ?? []).map((c) => withCourseDetail(c, detailBySlug.get(String(c.slug)))),
+    [assignedQuery.data, detailBySlug],
+  );
+  const publicCourses = useMemo(
+    () => (publicQuery.data ?? []).map((c) => withCourseDetail(c, detailBySlug.get(String(c.slug)))),
+    [publicQuery.data, detailBySlug],
+  );
 
 const isMdUp = useMediaQuery('(max-height:900px)');
   const isLgUp = useMediaQuery('(min-width:1200px)');
@@ -161,115 +227,65 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       || `/api/v1/courses/${course.slug}/avatar/`;
   }, [lang]);
 
-  const loadCourses = useCallback(async () => {
-    const [assignedFromApi, publicFromApi] = await Promise.all([
-      courseService.getAllCourses().catch((e) => {
-        console.error('[dashboard] getAllCourses ha fallat:', e?.response?.status, e);
-        return [] as Course[];
-      }),
-      courseService.getPublicCourses().catch((e) => {
-        console.error('[dashboard] getPublicCourses ha fallat:', e?.response?.status, e);
-        return [] as Course[];
-      }),
-    ]);
-
-    // Els avatars dels curs ja surten a les pestanyes: els demanem de seguida,
+  useEffect(() => {
+    // Els avatars dels cursos ja surten a les pestanyes: es demanen de seguida,
     // sense esperar que acabin de baixar tots els detalls (que és el que trigava).
-    void Promise.all([...assignedFromApi, ...publicFromApi].map((c) => preloadImage(courseAvatarUrl(c))));
-
-    const withDetails = async (course: Course) => {
-      try {
-        const detail = await courseService.getFullCourseDetail(course.slug!);
-        const topics: Topic[] = (detail.content || []).map((topic: any) => ({
-          id: topic.id ?? topic.slug,
-          title: topic.title,
-          lessons: (topic.subTopics || []).map((st: any) => ({
-            id: st.problemSlug,
-            title: st.subtitle,
-            theoryInstructions: st.text,
-            challenge: st.text,
-            type: st.type,
-            choices: st.choices,
-            precode: st.precode,
-            difficulty: st.difficulty,
-            score: st.score,
-          })),
-        }));
-        return { ...course, topics };
-      } catch { return course; }
-    };
-    const [assigned, pub] = await Promise.all([
-      Promise.all(assignedFromApi.map(withDetails)),
-      Promise.all(publicFromApi.map(withDetails)),
-    ]);
-    setAssignedCourses(assigned);
-    setPublicCourses(pub);
-  }, [lang, courseAvatarUrl]);
+    for (const c of assignedQuery.data ?? []) void preloadImage(courseAvatarUrl(c));
+    for (const c of publicQuery.data ?? []) void preloadImage(courseAvatarUrl(c));
+  }, [assignedQuery.data, publicQuery.data, courseAvatarUrl]);
 
   useEffect(() => {
-    let mounted = true;
-
     // Arrenca l'avatar de l'usuari i el del curs recordat abans de qualsevol
     // altra espera: en paral·lel amb la llista de cursos, no després.
     pruneAvatarCacheOnce();
     const lastCourseSlug = readLastCourse()?.slug;
-    if (lastCourseSlug) {
-      void preloadImage(`/api/v1/courses/${lastCourseSlug}/avatar/`);
-      const saved = localStorage.getItem('currentStudent');
-      let username: string | undefined;
-      try {
-        const parsed = saved ? JSON.parse(saved) : null;
-        username = parsed?.username || parsed?.id ? String(parsed.username || parsed.id) : undefined;
-      } catch { username = undefined; }
-      if (username) void preloadImage(userAvatarUrl(username, lastCourseSlug));
+    if (lastCourseSlug) void preloadImage(`/api/v1/courses/${lastCourseSlug}/avatar/`);
+    // Avatar propi: /users/me/avatar/. `currentStudent` desa l'id i la URL
+    // /users/<id>/avatar/ no existeix, així que abans tornava 404/403.
+    void preloadImage(myAvatarUrl() ?? undefined);
+
+    const saved = localStorage.getItem('currentStudent');
+    const hasToken = !!localStorage.getItem('token');
+    if (saved && !hasToken) {
+      localStorage.removeItem('currentStudent');
+      setSelectedStudent(null);
+    } else if (saved) {
+      const parsed = JSON.parse(saved);
+      setSelectedStudent(parsed);
+      void fetchProgress(parsed.id);
     }
 
-    const initData = async (isInitial = false) => {
-      try {
-        if (isInitial) setLoading(true);
-        if (!mounted) return;
-        try {
-          await loadCourses();
-        } catch (err) { console.error("Error carregant cursos:", err); }
-
-        const saved = localStorage.getItem('currentStudent');
-        const hasToken = !!localStorage.getItem('token');
-        if (saved && !hasToken) {
-          localStorage.removeItem('currentStudent');
-          setSelectedStudent(null);
-        } else if (saved) {
-            const parsed = JSON.parse(saved);
-            setSelectedStudent(parsed);
-            await fetchProgress(parsed.id);
-        }
-      } catch (err) { console.error("Error inesperat:", err); }
-      finally { if (isInitial) setLoading(false); }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        // En tornar a la pestanya es revaliden les llistes (poden haver canviat).
+        queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
+        queryClient.invalidateQueries({ queryKey: PUBLIC_COURSES_KEY });
+      }
     };
-    initData(true);
-    const onVisible = () => { if (document.visibilityState === 'visible') initData(); };
     document.addEventListener('visibilitychange', onVisible);
     const onProgress = () => {
-      const saved = localStorage.getItem('currentStudent');
-      if (saved) fetchProgress(JSON.parse(saved).id);
+      const savedSt = localStorage.getItem('currentStudent');
+      if (savedSt) void fetchProgress(JSON.parse(savedSt).id);
     };
     document.addEventListener('lessonProgressUpdated', onProgress);
     window.addEventListener('storage', onProgress);
     return () => {
-      mounted = false;
       document.removeEventListener('visibilitychange', onVisible);
       document.removeEventListener('lessonProgressUpdated', onProgress);
       window.removeEventListener('storage', onProgress);
     };
-  }, [fetchProgress, loadCourses]);
+  }, [fetchProgress, queryClient]);
 
   useEffect(() => {
     const onAuthChange = () => {
       courseService.clearCache();
-      loadCourses().catch((err) => console.error('Error recarregant cursos:', err));
+      queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
+      queryClient.invalidateQueries({ queryKey: PUBLIC_COURSES_KEY });
+      queryClient.invalidateQueries({ queryKey: ['course'] });
     };
     window.addEventListener('auth-state-change', onAuthChange);
     return () => window.removeEventListener('auth-state-change', onAuthChange);
-  }, [loadCourses]);
+  }, [queryClient]);
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
@@ -280,7 +296,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       const student: Student = {
         id: data?.user?.id != null ? String(data.user.id) : username,
         name: data?.user?.name || username,
-        code: '***',
         email: data?.user?.email || username,
         role,
       };
@@ -393,7 +408,11 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const selectedStudentId = selectedStudent?.id;
 
   const loadRanking = useCallback(async () => {
-    if (!currentSlug || !selectedStudentId) {
+    // El backend respon 403 als qui no estan matriculats al curs, així que el
+    // rànquing només es demana per als cursos propis (els de l'àmbit "assignats").
+    const isOwnCourse = (assignedQuery.data ?? []).some((c) => c.slug === currentSlug);
+    if (!currentSlug || !selectedStudentId || !isOwnCourse) {
+      // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
       setRanking([]);
       return;
     }
@@ -415,7 +434,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     } catch {
       // Si falla la petició es conserva el rànquing anterior (no el buidem)
     }
-  }, [currentSlug, selectedStudentId]);
+  }, [currentSlug, selectedStudentId, assignedQuery.data]);
 
   useEffect(() => {
     void loadRanking();
@@ -498,6 +517,11 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
     return { streak, successRate, remainingHours, codeDone, codeTotal, testRate };
   }, [visibleCourses, courseTabIndex, selectedStudent, dbProgress]);
+
+  const loading =
+    assignedQuery.isLoading ||
+    publicQuery.isLoading ||
+    (detailSlugs.length > 0 && loadedDetailCount < detailSlugs.length);
 
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: mode === 'fancy' ? 'transparent' : 'background.default', zIndex: 9999 }}>

@@ -331,6 +331,9 @@ export default function LessonPage() {
   };
 
   const currentProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+  // Slug real del tema que conté el problema (abans la revisió IA demanava "general").
+  const currentTopicSlug: string =
+    course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId))?.id ?? '';
   // Sincronització editor <-> enunciat: es recalcula cada cop que l'usuari escriu
   const statementShown = [getText(currentProblem?.subtitle), typeof currentProblem?.text === 'string' ? currentProblem.text : getText(currentProblem?.text)].join(' ');
   const isRelated = useMemo(
@@ -1018,7 +1021,7 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 2, color: 'primary.main' }}>
                   {t('lesson.tab_ai_help', 'IA')}
                 </Typography>
-                <AiHelpPanel courseId={courseId!} lessonId={lessonId!} />
+                <AiHelpPanel courseId={courseId!} topicSlug={currentTopicSlug} lessonId={lessonId!} />
               </Box>
             )}
           </Box>

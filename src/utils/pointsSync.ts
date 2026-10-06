@@ -113,10 +113,18 @@ export function syncOwnPointsFromList(courseSlug: string, list: any[]) {
 /**
  * Després d'una activitat superada: torna a demanar el leaderboard (amb reintents,
  * per si el backend triga a calcular) fins que els punts pugen, i els publica.
+ * Només es fa servir amb els cursos propis: la API respon 403 als qui no hi estan
+ * matriculats, i un 4xx no es reintenta (no es resol amb més intents).
  */
 export async function refreshCoursePoints(courseSlug: string, retries = 4, delayMs = 1000): Promise<number | null> {
   const student = getCurrentStudent();
   if (!student) return null;
+  try {
+    const mine = await courseService.getAllCourses();
+    if (!mine.some((c) => c.slug === courseSlug)) return null;
+  } catch {
+    return null;
+  }
   const before = getBackendPoints(student.id)[courseSlug];
   let last: number | null = null;
   for (let i = 0; i <= retries; i++) {
@@ -131,7 +139,11 @@ export async function refreshCoursePoints(courseSlug: string, retries = 4, delay
         setCoursePoints(student.id, courseSlug, own);
         if (before == null || own > before) return own;
       }
-    } catch { /* es reintenta */ }
+    } catch (err: any) {
+      // 4xx (401/403/404…): es deixa de reintentar, la resposta no canviarà.
+      const status = err?.response?.status;
+      if (typeof status === 'number' && status >= 400 && status < 500) return last;
+    }
     if (i < retries) await new Promise((r) => setTimeout(r, delayMs));
   }
   return last;
