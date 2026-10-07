@@ -75,7 +75,7 @@ new QueryClient({
 | `src/pages/dashboards/StudentDashboard.tsx` | `useAllCourses()` + `usePublicCourses()` + `useQueries(['course', slug])` per als detalls (dedup amb la resta); `invalidateQueries` de llistes i detalls en `auth-state-change` |
 | `src/pages/courses/CourseLessons.tsx` | `useCourse(courseId)` — substitueix el `useState`+`useEffect` original |
 | `src/pages/courses/LessonPage.tsx` | `useCourse(courseId)` — idem |
-| `src/pages/courses/ExamPage.tsx` | `useCourse(courseId)` — idem |
+| `src/pages/courses/TopicTestPage.tsx` | `useCourse(courseId)` — idem |
 
 `useCourse` resol els ids de curs clonat (`clone-<timestamp>`) a l'slug original via `localCourseService.getById().originalSlug` abans de cridar el servei.
 

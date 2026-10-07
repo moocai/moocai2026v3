@@ -1,13 +1,25 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
-import { ChevronLeft, Zap, CircleCheck, CircleX,} from 'lucide-react';
+import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, IconButton, ButtonBase, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
+import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-export default function ExamPage() {
+const getProgressKey = () => {
+  let studentId = 'temp';
+  try {
+    const savedStudent = localStorage.getItem('currentStudent');
+    if (savedStudent) {
+      const parsedStudent = JSON.parse(savedStudent);
+      if (parsedStudent?.id) studentId = parsedStudent.id;
+    }
+  } catch { studentId = 'temp'; }
+  return `mooc_global_progress_${studentId}`;
+};
+
+export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -16,16 +28,13 @@ export default function ExamPage() {
   const [loading, setLoading] = useState(true);
   const [topicTests, setTopicTests] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
-  const [exam, setExam] = useState<any>(null);
+  const [topicTest, setTopicTest] = useState<any>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
 
-  const resultRef = useRef<HTMLDivElement>(null);
+  const [progress, setProgress] = useState<Record<string, any>>({});
 
-  const REVEAL_DELAY_MS = 3000;
-  const pendingRef = useRef<string[]>([]);
-  const [revealDeadline, setRevealDeadline] = useState<number | null>(null);
-  const [revealMsLeft, setRevealMsLeft] = useState(0);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const lang = i18n.language?.split('-')[0] || 'ca';
 
@@ -34,6 +43,16 @@ export default function ExamPage() {
     if (typeof field === 'string') return field;
     return field[lang] || field.ca || field.es || field.en || '';
   }, [lang]);
+
+  // Progrés dels tests (encertat / intentat) per pintar el navegador de preguntes
+  useEffect(() => {
+    const load = () => {
+      try { setProgress(JSON.parse(localStorage.getItem(getProgressKey()) || '{}')); } catch { setProgress({}); }
+    };
+    load();
+    window.addEventListener('lessonProgressUpdated', load);
+    return () => window.removeEventListener('lessonProgressUpdated', load);
+  }, []);
 
   // Fa scroll fins al feedback just després d'enviar
   useEffect(() => {
@@ -59,29 +78,28 @@ export default function ExamPage() {
     if (!courseId || !currentTestSlug || !course) return;
     let cancelled = false;
 
-    const loadExamData = async () => {
+    const loadTopicTest = async () => {
       try {
         setLoading(true);
         setResult(null);
-        setRevealDeadline(null);
         setSelectedAnswers([]);
 
         const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
         const problem = topic?.subTopics?.find((st: any) => st.problemSlug === currentTestSlug);
 
-        // Sense fallback: si el problema no és dins del tema, l'examen es mostra
+        // Sense fallback: si el problema no és dins del tema, el test es mostra
         // com a "no trobat". L'antiga crida amb `topic?.id || ''` construïa
         // `/topics//problems/<slug>/` (404) i acabava en el mateix resultat.
-        if (!cancelled) setExam(problem || null);
+        if (!cancelled) setTopicTest(problem || null);
       } catch (error) {
-        console.error('Error loading exam:', error);
-        if (!cancelled) setExam(null);
+        console.error('Error loading topic test:', error);
+        if (!cancelled) setTopicTest(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    loadExamData();
+    loadTopicTest();
     return () => { cancelled = true; };
   }, [courseId, currentTestSlug, course]);
 
@@ -91,7 +109,7 @@ export default function ExamPage() {
       (choices as any[]).filter((c: any) => c.is_correct).map((c: any) => String(c.id))
     );
     if (correctSet.size === 0) {
-      setResult({ error: t('exam.no_solution', "No es pot comprovar la resposta: l'examen no inclou la solució") });
+      setResult({ error: t('topic_test.no_solution', "No es pot comprovar la resposta: el test no inclou la solució") });
       return;
     }
 
@@ -99,16 +117,7 @@ export default function ExamPage() {
     setResult({ correct: passed });
 
     if (!courseId || !currentTestSlug) return;
-    let studentId = 'temp';
-    try {
-      const savedStudent = localStorage.getItem('currentStudent');
-      if (savedStudent) {
-        const parsedStudent = JSON.parse(savedStudent);
-        if (parsedStudent?.id) studentId = parsedStudent.id;
-      }
-    } catch { studentId = 'temp'; }
-
-    const progressKey = `mooc_global_progress_${studentId}`;
+    const progressKey = getProgressKey();
     let progress: Record<string, any> = {};
     try { progress = JSON.parse(localStorage.getItem(progressKey) || '{}'); } catch { progress = {}; }
 
@@ -120,67 +129,70 @@ export default function ExamPage() {
     window.dispatchEvent(new Event('lessonProgressUpdated'));
   };
 
-  // ---- Revelació diferida: 3 s després de la darrera selecció ----
-  useEffect(() => {
-    if (revealDeadline === null) return;
-    const id = window.setInterval(() => {
-      const left = Math.max(0, revealDeadline - Date.now());
-      setRevealMsLeft(left);
-      if (left === 0) {
-        window.clearInterval(id);
-        setRevealDeadline(null);
-        evaluate(pendingRef.current);
-      }
-    }, 100);
-    return () => window.clearInterval(id);
-  }, [revealDeadline]);
-
-  const armReveal = (answers: string[]) => {
-    pendingRef.current = answers;
-    setRevealMsLeft(REVEAL_DELAY_MS);
-    setRevealDeadline(Date.now() + REVEAL_DELAY_MS);
-  };
-
-  // Selecció múltiple: s'avalua quan s'han marcat tantes opcions com respostes correctes hi ha
   const handleCheckboxChange = (value: string, checked: boolean) => {
     if (answered) return;
-    const next = checked
-      ? (selectedAnswers.includes(value) ? selectedAnswers : [...selectedAnswers, value])
-      : selectedAnswers.filter((answer) => answer !== value);
-    setSelectedAnswers(next);
-    if (next.length >= correctCount) armReveal(next);
-    else setRevealDeadline(null);
+    setSelectedAnswers((prev) => checked
+      ? (prev.includes(value) ? prev : [...prev, value])
+      : prev.filter((answer) => answer !== value));
   };
 
-  // Elecció única: en marcar una opció, el feedback surt 3 s després
   const handleRadioChange = (value: string) => {
     if (answered) return;
     setSelectedAnswers([value]);
-    armReveal([value]);
+  };
+
+  // L'alumne decideix quan enviar: cal haver marcat almenys una opció
+  const handleSubmit = () => {
+    if (answered || selectedAnswers.length === 0) return;
+    evaluate(selectedAnswers);
   };
 
   const handleRetry = () => {
-    setRevealDeadline(null);
     setResult(null);
     setSelectedAnswers([]);
   };
 
-  if (loading && !exam) {
+  const goTo = (idx: number) => {
+    if (idx < 0 || idx >= topicTests.length || idx === currentIdx) return;
+    setCurrentIdx(idx);
+    window.scrollTo({ top: 0 });
+  };
+
+  // Dreceres de teclat: ←/→ canvien de test, Enter envia (o torna-ho a provar)
+  const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  keyHandlerRef.current = (e: KeyboardEvent) => {
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+    const target = e.target as HTMLElement | null;
+    if (target && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) && (target as HTMLInputElement).type !== 'radio' && (target as HTMLInputElement).type !== 'checkbox')) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentIdx - 1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentIdx + 1); }
+    else if (e.key === 'Enter' && !target?.closest('button, a')) {
+      if (answered) { e.preventDefault(); handleRetry(); }
+      else if (selectedAnswers.length > 0) { e.preventDefault(); handleSubmit(); }
+    }
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => keyHandlerRef.current(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  if (loading && !topicTest) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
   }
 
-  if (!exam) {
-    return <Box sx={{ p: 4, textAlign: 'center' }}><Typography>{t('lesson.course_not_found', 'Examen no trobat')}</Typography></Box>;
+  if (!topicTest) {
+    return <Box sx={{ p: 4, textAlign: 'center' }}><Typography>{t('topic_test.not_found', 'Test no trobat')}</Typography></Box>;
   }
 
-  const title = exam.title || exam.name || getText(exam.subtitle) || currentTestSlug;
-  const statement = exam.statement_ca || exam.statement || exam.description || getText(exam.text) || '';
-  const examData = (window as any).EXAM_DATA?.[currentTestSlug || ''];
-  const rawChoices = examData?.options || exam.choices || [];
+  const title = topicTest.title || topicTest.name || getText(topicTest.subtitle) || currentTestSlug;
+  const statement = topicTest.statement_ca || topicTest.statement || topicTest.description || getText(topicTest.text) || '';
+  const fixtureData = (window as any).EXAM_DATA?.[currentTestSlug || ''];
+  const rawChoices = fixtureData?.options || topicTest.choices || [];
 
-  const choices = examData ? rawChoices.map((option: any) => ({
+  const choices = fixtureData ? rawChoices.map((option: any) => ({
     id: option.id,
-    is_correct: option.id === examData.correctAnswerId,
+    is_correct: option.id === fixtureData.correctAnswerId,
     textHtml: `<p>${option.text}</p>`,
   })) : rawChoices;
 
@@ -224,8 +236,8 @@ export default function ExamPage() {
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 4, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, color: state === 'correct' ? 'success.main' : 'error.main' }}>
         {state === 'correct' ? <CircleCheck size={14} /> : <CircleX size={14} />}
         {state === 'correct'
-          ? (isSel ? t('exam.your_correct', 'Has encertat!') : t('exam.was_correct', 'Era la resposta correcta'))
-          : t('exam.your_wrong', 'La teva resposta')}
+          ? (isSel ? t('topic_test.your_correct', 'Has encertat!') : t('topic_test.was_correct', 'Era la resposta correcta'))
+          : t('topic_test.your_wrong', 'La teva resposta')}
       </Box>
     );
   };
@@ -240,6 +252,43 @@ export default function ExamPage() {
           </Button>
         </Box>
 
+        {/* Navegador de tests: posició fixa (no depèn del nombre d'opcions) */}
+        {topicTests.length > 1 && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+            <IconButton aria-label={t('topic_test.prev', 'Anterior')} title={`${t('topic_test.prev', 'Anterior')} (←)`} onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} size="small" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <ChevronLeft size={18} />
+            </IconButton>
+            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
+              {topicTests.map((st: any, idx: number) => {
+                const status = progress[`${courseId}_${st.problemSlug}`];
+                const isCurrent = idx === currentIdx;
+                const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
+                return (
+                  <ButtonBase
+                    key={st.problemSlug}
+                    onClick={() => goTo(idx)}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    title={st.title || st.name || getText(st.subtitle) || st.problemSlug}
+                    sx={{
+                      minWidth: 32, height: 32, px: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800,
+                      border: isCurrent ? '2px solid #8400ff' : '1px solid',
+                      borderColor: isCurrent ? '#8400ff' : (color ?? 'divider'),
+                      bgcolor: color ? alpha(color, 0.15) : 'transparent',
+                      color: color ?? 'text.primary',
+                    }}
+                  >
+                    {idx + 1}
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.secondary' }}>{currentIdx + 1} / {topicTests.length}</Typography>
+            <IconButton aria-label={t('topic_test.next_short', 'Següent')} title={`${t('topic_test.next_short', 'Següent')} (→)`} onClick={() => goTo(currentIdx + 1)} disabled={currentIdx >= topicTests.length - 1} size="small" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+              <ChevronRight size={18} />
+            </IconButton>
+          </Box>
+        )}
+
         {/* Títol principal */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
           <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' }, flex: 1 }}>{title}</Typography>
@@ -248,7 +297,7 @@ export default function ExamPage() {
         {/* Contingut amb scroll vertical natural */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3, mb: 3 }}>
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('exam.statement', 'Enunciat')}</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('topic_test.statement', 'Enunciat')}</Typography>
             <Box sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{statement}</ReactMarkdown>
             </Box>
@@ -257,11 +306,11 @@ export default function ExamPage() {
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
-                {isMultiChoice ? t('exam.multi_choice', 'Test de selecció múltiple') : t('exam.choose_answer', "Test d'elecció única")}
+                {isMultiChoice ? t('topic_test.multi_choice', 'Test de selecció múltiple') : t('topic_test.choose_answer', "Test d'elecció única")}
               </Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: exam.difficulty === 'hard' ? 'error.main' : exam.difficulty === 'medium' ? 'warning.main' : 'success.main' }}>
-                <Zap size={16} fill={exam.difficulty === 'hard' ? 'error.main' : exam.difficulty === 'medium' ? 'warning.main' : 'success.main'} />
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700 }}>{exam.difficulty}</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: topicTest.difficulty === 'hard' ? 'error.main' : topicTest.difficulty === 'medium' ? 'warning.main' : 'success.main' }}>
+                <Zap size={16} fill={topicTest.difficulty === 'hard' ? 'error.main' : topicTest.difficulty === 'medium' ? 'warning.main' : 'success.main'} />
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 700 }}>{topicTest.difficulty}</Typography>
               </Box>
             </Box>
 
@@ -310,44 +359,25 @@ export default function ExamPage() {
               )}
             </FormControl>
 
-            {revealDeadline !== null && (
-              <Typography sx={{ mt: 2, fontSize: '0.8rem', color: 'text.secondary', textAlign: 'right' }}>
-                {t('exam.reveal_in', "Resposta correcta d'aquí a")} {Math.ceil(revealMsLeft / 1000)} s
+            {/* Enviament */}
+            <Box ref={resultRef} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', mt: 3, gap: 1.5 }}>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: answered ? (result.correct ? 'success.main' : 'error.main') : 'text.secondary' }}>
+                {answered
+                  ? (result.correct ? t('topic_test.result_correct', 'Correcte!') : t('topic_test.result_wrong', 'Incorrecte'))
+                  : isMultiChoice
+                    ? `${t('topic_test.pick_n', 'Tria {{count}} opcions', { count: correctCount })} (${selectedAnswers.length}/${correctCount})`
+                    : ''}
+                {result?.error && <Box component="span" sx={{ color: 'error.main' }}>{result.error}</Box>}
               </Typography>
-            )}
-
-            {/* Botons de navegació i enviament */}
-            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', mt: 3, gap: 2 }}>
-              <Box sx={{ display: 'flex', gap: 1, width: { xs: '100%', sm: 'auto' } }}>
-                {currentIdx > 0 && (
-                  <Button variant="outlined" onClick={() => setCurrentIdx(currentIdx - 1)} sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2, color: 'white', flex: { xs: 1, sm: 'initial' } }}>
-                    {`← `}{t('exam.prev', 'Anterior')}
-                  </Button>
-                )}
-                {currentIdx < topicTests.length - 1 && (
-                  <Button variant="outlined" onClick={() => setCurrentIdx(currentIdx + 1)} sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2, color: 'white', flex: { xs: 1, sm: 'initial' } }}>
-                    {t('exam.next', 'Següent →')}
-                  </Button>
-                )}
-              </Box>
-
-              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: { xs: 'stretch', sm: 'flex-end' }, gap: 0.5, width: { xs: '100%', sm: 'auto' } }}>
-                {answered ? (
-                  <Button
-                    variant="outlined"
-                    onClick={handleRetry}
-                    sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2, width: { xs: '100%', sm: 'auto' } }}
-                  >
-                    {t('exam.retry', 'Torna-ho a provar')}
-                  </Button>
-                ) : (
-                  isMultiChoice && (
-                    <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', textAlign: { xs: 'center', sm: 'right' } }}>
-                      {t('exam.pick_n', 'Tria {{count}} opcions', { count: correctCount })} ({selectedAnswers.length}/{correctCount})
-                    </Typography>
-                  )
-                )}
-              </Box>
+              {answered ? (
+                <Button variant="outlined" onClick={handleRetry} sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2 }}>
+                  {t('topic_test.retry', 'Torna-ho a provar')}
+                </Button>
+              ) : (
+                <Button variant="contained" onClick={handleSubmit} disabled={selectedAnswers.length === 0} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
+                  {t('topic_test.submit', 'Envia')}
+                </Button>
+              )}
             </Box>
           </Paper>
         </Box>

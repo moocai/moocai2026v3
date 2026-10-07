@@ -290,7 +290,6 @@ export default {
     tab_theory: "Theory",
     tab_exercises: "Programming",
     tab_tests: "Tests",
-    tab_exams: "Exams",
     tab_files: "Files",
     tab_prev: "Previous tab",
     tab_next: "Next tab",

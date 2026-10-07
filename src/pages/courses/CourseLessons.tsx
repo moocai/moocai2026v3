@@ -453,7 +453,7 @@ export default function CourseLessons() {
                 key: `${active.id}-${type}-${targetSlug}`,
                 icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], emoji)}</Typography>,
                 label: getText(sub.subtitle || sub.title),
-                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/exam/${targetSlug}`,
+                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/test/${targetSlug}`,
                 right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
               });
             })}

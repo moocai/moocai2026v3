@@ -354,11 +354,11 @@ export default function LessonPage() {
 
 
   // Els problemes de tipus "test" no es resolen amb codi: es respon amb `answers`
-  // a ExamPage. Si arribem aqui (URL directa o "seguent" des d'un exercici),
+  // a TopicTestPage. Si arribem aqui (URL directa o "seguent" des d'un exercici),
   // redirigim per evitar un POST amb `code` que el backend rebutja amb 400.
   useEffect(() => {
     if (currentProblem?.type === 'test') {
-      navigate(`/courses/${courseId}/exam/${lessonId}`, { replace: true });
+      navigate(`/courses/${courseId}/test/${lessonId}`, { replace: true });
     }
   }, [currentProblem?.type, courseId, lessonId, navigate]);
 
@@ -368,7 +368,7 @@ export default function LessonPage() {
     const slug = problem?.problemSlug || problem?.slug;
     if (!slug) return null;
     return problem.type === 'test'
-      ? `/courses/${courseId}/exam/${slug}`
+      ? `/courses/${courseId}/test/${slug}`
       : `/courses/${courseId}/${slug}`;
   };
 
@@ -548,7 +548,7 @@ export default function LessonPage() {
 
   const handleRunTests = async () => {
     if (currentProblem?.type === 'test') {
-      navigate(`/courses/${courseId}/exam/${lessonId}`, { replace: true });
+      navigate(`/courses/${courseId}/test/${lessonId}`, { replace: true });
       return;
     }
     // Validació: la resposta ha de tenir relació amb l'enunciat; si no, no s'envia
