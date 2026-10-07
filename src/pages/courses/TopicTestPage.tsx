@@ -7,40 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { resolveSlug } from '../../hooks/useCourse';
 import { courseService, mapProblem } from '../../services/courseService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
+import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-
-const getStudentId = () => {
-  let studentId = 'temp';
-  try {
-    const savedStudent = localStorage.getItem('currentStudent');
-    if (savedStudent) {
-      const parsedStudent = JSON.parse(savedStudent);
-      if (parsedStudent?.id) studentId = parsedStudent.id;
-    }
-  } catch { studentId = 'temp'; }
-  return studentId;
-};
-
-const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
-// Respostes enviades per test, per usuari: { answers, correct, choices }.
-// Com que només hi ha un intent, una resposta desada no canvia mai: si hi és, no cal
-// preguntar al servidor. Per a usuaris sense sessió és l'única còpia (el servidor no
-// desa res seu en cursos públics).
-const getAnswersKey = () => `mooc_test_answers_${getStudentId()}`;
-const readSavedAnswer = (key: string) => {
-  const saved = readJson(getAnswersKey())[key];
-  return saved && Array.isArray(saved.answers) ? saved : null;
-};
-const writeSavedAnswers = (entries: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }>) => {
-  const answersKey = getAnswersKey();
-  localStorage.setItem(answersKey, JSON.stringify({ ...readJson(answersKey), ...entries }));
-};
-const isLoggedIn = () => !!localStorage.getItem('token');
-
-const readJson = (key: string): Record<string, any> => {
-  try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
-};
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
@@ -77,7 +46,7 @@ export default function TopicTestPage() {
   }, [lang]);
 
   useEffect(() => {
-    const load = () => setSavedAnswers(readJson(getAnswersKey()));
+    const load = () => setSavedAnswers(readAllSavedAnswers());
     load();
     window.addEventListener('lessonProgressUpdated', load);
     return () => window.removeEventListener('lessonProgressUpdated', load);
@@ -129,7 +98,7 @@ export default function TopicTestPage() {
         const idx = tests.findIndex((p: any) => p.slug === challengeSlug);
         if (idx === -1) { setNotFound(true); return; }
 
-        await syncAnswersFromServer(tSlug, tests);
+        await syncTopicAnswers(courseId, courseSlug, tSlug, tests);
         if (cancelled) return;
         setTopicSlug(tSlug);
         setTopicTests(tests.map(mapProblem));
@@ -144,89 +113,42 @@ export default function TopicTestPage() {
     return () => { cancelled = true; };
   }, [courseId, challengeSlug, topicParam]);
 
-  // Només amb sessió. Un alumne rep `is_correct` d'un test només quan ja l'ha respost, així que
-  // només cal demanar la resposta (GET submissions) dels tests respostos que no tenim desats.
-  // Com que hi ha un sol intent, una resposta desada no canvia mai i no cal tornar-la a demanar.
-  async function syncAnswersFromServer(tSlug: string, tests: any[]) {
-    if (!isLoggedIn() || !courseId) return;
-    const toFetch = tests.filter((p: any) =>
-      !readSavedAnswer(`${courseId}_${p.slug}`) && (p.choices || []).some((c: any) => typeof c.is_correct === 'boolean'));
-    if (toFetch.length === 0) return;
-    const subs = await Promise.all(toFetch.map((p: any) =>
-      courseService.getChallengeSubmissions(courseSlug, tSlug, p.slug).catch(() => [] as any[])));
-    const found: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }> = {};
-    const progressKey = getProgressKey();
-    const localProgress = readJson(progressKey);
-    toFetch.forEach((p: any, i: number) => {
-      const own = (subs[i] || []).find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0);
-      if (!own) return; // p. ex. un professor, que sempre rep `is_correct`
-      const answers = own.choices.map(String);
-      const correctIds = (p.choices || []).filter((c: any) => c.is_correct).map((c: any) => String(c.id));
-      const correct = correctIds.length === answers.length && answers.every((id: string) => correctIds.includes(id));
-      const key = `${courseId}_${p.slug}`;
-      found[key] = { answers, correct, choices: p.choices };
-      localProgress[key] = correct ? true : 'attempted';
-    });
-    writeSavedAnswers(found);
-    localStorage.setItem(progressKey, JSON.stringify(localProgress));
-    window.dispatchEvent(new Event('lessonProgressUpdated'));
-  }
-
   const topicTest = topicTests[currentIdx] || null;
   const currentTestSlug = topicTest?.problemSlug || challengeSlug;
 
   // En canviar de test: es restaura la resposta desada (si n'hi ha) — sense cap petició
   useEffect(() => {
     setSubmitError(null);
-    const saved = topicTest ? readSavedAnswer(`${courseId}_${topicTest.problemSlug}`) : null;
+    const saved = topicTest && courseId ? readSavedAnswer(answerKey(courseId, topicTest.problemSlug), topicTest.choices) : null;
     setSelectedAnswers(saved ? saved.answers.map(String) : []);
     setResult(saved ? { correct: saved.correct, choices: saved.choices || [] } : null);
   }, [topicTest, courseId]);
 
-  const saveProgress = (key: string, passed: boolean) => {
-    const progressKey = getProgressKey();
-    const progress = readJson(progressKey);
-    progress[key] = passed ? true : 'attempted';
-    localStorage.setItem(progressKey, JSON.stringify(progress));
-    window.dispatchEvent(new Event('lessonProgressUpdated'));
-  };
-
   // Envia la resposta al servidor, que la corregeix i retorna totes les opcions amb la correcció
   const submitAnswers = async (answers: string[]) => {
-    if (!courseId || !currentTestSlug) return;
-    const key = `${courseId}_${currentTestSlug}`;
+    if (!courseId || !currentTestSlug || !topicSlug) return;
     let correct: boolean;
     let review: any[];
-
-    if (fixtureData) {
-      // Fixture local antic (window.EXAM_DATA): es corregeix aquí mateix
-      const correctIds = choices.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
-      correct = correctIds.length === answers.length && answers.every((a) => correctIds.includes(a));
-      review = choices;
-    } else {
-      if (!topicSlug) return;
-      setSubmitting(true);
-      setSubmitError(null);
-      try {
-        const res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
-          answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
-        });
-        correct = !!res?.correct;
-        review = Array.isArray(res?.choices) ? res.choices : [];
-      } catch (error: any) {
-        const status = error?.response?.status;
-        setSubmitError(status === 429 || status === 503
-          ? t('topic_test.submit_busy', 'El servidor està ocupat. Torna-ho a provar d\'aquí a una estona.')
-          : t('topic_test.submit_error', "No s'ha pogut enviar la resposta."));
-        return;
-      } finally {
-        setSubmitting(false);
-      }
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
+        answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
+      });
+      correct = !!res?.correct;
+      review = Array.isArray(res?.choices) ? res.choices : [];
+    } catch (error: any) {
+      const status = error?.response?.status;
+      setSubmitError(status === 429 || status === 503
+        ? t('topic_test.submit_busy', 'El servidor està ocupat. Torna-ho a provar d\'aquí a una estona.')
+        : t('topic_test.submit_error', "No s'ha pogut enviar la resposta."));
+      return;
+    } finally {
+      setSubmitting(false);
     }
 
     setResult({ correct, choices: review, fresh: true });
-    writeSavedAnswers({ [key]: { answers, correct, choices: review } });
-    saveProgress(key, correct);
+    saveAnswers({ [answerKey(courseId, currentTestSlug)]: { answers, correct, choices: review } });
     if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0);
   };
 
@@ -288,14 +210,7 @@ export default function TopicTestPage() {
 
   const title = topicTest.title || topicTest.name || getText(topicTest.subtitle) || currentTestSlug;
   const statement = topicTest.statement_ca || topicTest.statement || topicTest.description || getText(topicTest.text) || '';
-  const fixtureData = (window as any).EXAM_DATA?.[currentTestSlug || ''];
-  const rawChoices = fixtureData?.options || topicTest.choices || [];
-
-  const choices = fixtureData ? rawChoices.map((option: any) => ({
-    id: option.id,
-    is_correct: option.id === fixtureData.correctAnswerId,
-    textHtml: `<p>${option.text}</p>`,
-  })) : rawChoices;
+  const choices: any[] = topicTest.choices || [];
 
   const isMultiChoice = topicTest.choiceType
     ? topicTest.choiceType === 'multi'

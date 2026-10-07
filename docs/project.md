@@ -53,7 +53,7 @@ Versions reals de `package.json`:
 
 ```
 moocai2026/
-├── index.html                        # lang="es", carrega /data.js, /src/main.tsx
+├── index.html                        # lang="es", carrega /src/main.tsx
 ├── package.json                      # scripts: dev / build (tsc -b && vite build) / preview
 ├── vite.config.ts                    # alias @→./src, proxy /api→algorien.com, port 5173, polling
 ├── tsconfig.json                     # strict + noUnusedLocals + noUnusedParameters, jsx react-jsx
@@ -62,7 +62,6 @@ moocai2026/
 ├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3, fix1, fix2)
 │
 ├── public/
-│   ├── data.js                       # Fixture global antic (window.EXAM_DATA), 569 B
 │   └── img/                          # logo.webp, favicon.png, Python.svg, React.svg, SB.svg, ml.svg
 │
 └── src/
