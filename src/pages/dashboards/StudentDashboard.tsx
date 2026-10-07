@@ -1,6 +1,6 @@
-import {useState, useEffect, useMemo, useCallback, useRef, type FormEvent} from 'react';
+import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {useQueryClient, useQueries} from '@tanstack/react-query';
+import {useQueryClient} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
 import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, AccessTime as AccessTimeIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
@@ -10,7 +10,7 @@ import {useNotifications} from '../../contexts/NotificationContext';
 import {Login} from '../../features/student/Login';
 import {Student, Topic, Course} from '../../features/student/types';
 import { courseService } from '../../services/courseService';
-import { useAllCourses, usePublicCourses, ALL_COURSES_KEY, PUBLIC_COURSES_KEY } from '../../hooks/useCourses';
+import { useAllCourses, usePublicCourses, useCourseDetail, ALL_COURSES_KEY, PUBLIC_COURSES_KEY } from '../../hooks/useCourses';
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import ProtectedAvatar from '../../components/ProtectedAvatar';
@@ -82,6 +82,10 @@ function readLastCourse(): { slug?: string; scope?: string } | null {
   } catch { return null; }
 }
 
+function savedScope(saved: { scope?: string } | null): CourseScope {
+  return saved?.scope === 'private' || saved?.scope === 'assigned' ? saved.scope : 'public';
+}
+
 function writeLastCourse(slug: string | undefined, scope: string) {
   try { localStorage.setItem(LAST_COURSE_KEY, JSON.stringify({ slug, scope })); } catch { /* mode privat */ }
 }
@@ -125,55 +129,47 @@ export default function StudentDashboard() {
   const [loginError, setLoginError] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [courseTabIndex, setCourseTabIndex] = useState(0);
-  const [scope, setScope] = useState<CourseScope>('public');
+  // L'àmbit es recupera de seguida (sense esperar les llistes): així només es
+  // demana la llista de cursos públics si realment és la que es veu.
+  const [scope, setScope] = useState<CourseScope>(() => savedScope(readLastCourse()));
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
-  const restoredRef = useRef(false);
+  const [restored, setRestored] = useState(false);
   const queryClient = useQueryClient();
 
-  // Cursos (llistes i detalls) llegits de la cache de React Query: la mateixa
-  // queryKey que el prefetch del MainLayout i que CourseLessons → una única
-  // petició per curs encara que s'obri des de llocs diferents.
-  const assignedQuery = useAllCourses();
-  const publicQuery = usePublicCourses();
+  // Cursos llegits de la cache de React Query (mateixes queryKey que CourseLessons).
+  // Res no es demana sense sessió: la pantalla de login no en mostra cap.
+  //  - «Els meus cursos»: sempre amb sessió (també decideix si es pot veure el rànquing).
+  //  - Públics: només si és l'àmbit actiu o si s'obre el menú d'àmbits (hi surten els recomptes).
+  //  - Detall (temes + problemes): NOMÉS del curs seleccionat, no de tots els cursos.
+  const isLoggedIn = selectedStudent != null;
+  const assignedQuery = useAllCourses(isLoggedIn);
+  const publicQuery = usePublicCourses(isLoggedIn && (scope === 'public' || scopeAnchor != null));
 
-  const detailSlugs = useMemo(() => {
-    const seen = new Set<string>();
-    for (const c of assignedQuery.data ?? []) if (c.slug) seen.add(c.slug);
-    for (const c of publicQuery.data ?? []) if (c.slug) seen.add(c.slug);
-    return [...seen];
-  }, [assignedQuery.data, publicQuery.data]);
+  const assignedList = assignedQuery.data ?? [];
+  const publicList = publicQuery.data ?? [];
+  const scopeSource = scope === 'public' ? publicList : assignedList;
 
-  const detailResults = useQueries({
-    queries: detailSlugs.map((slug) => ({
-      queryKey: ['course', slug],
-      queryFn: () => courseService.getFullCourseDetail(slug),
-      staleTime: 30 * 60 * 1000,
-      gcTime: 60 * 60 * 1000,
-      retry: 1,
-    })),
-  });
+  const visibleCourses = useMemo(
+    () => filterByScope(scopeSource, scope),
+    [scopeSource, scope],
+  );
 
-  // «loadedDetailCount» és el senyal estable que fa recomputar la relació
-  // slug → detall només quan arriba un detall (evita bucles de re-render).
-  const loadedDetailCount = detailResults.reduce((n, d) => n + (d.isLoading ? 0 : 1), 0);
+  const currentSlug = visibleCourses[courseTabIndex]?.slug;
+  // Fins que no s'ha restaurat el curs recordat no es demana cap detall
+  // (evita baixar el del primer tab i tot seguit el del curs bo).
+  const detailQuery = useCourseDetail(restored ? currentSlug : undefined);
 
-  const detailBySlug = useMemo(() => {
-    const map = new Map<string, any>();
-    detailSlugs.forEach((slug, i) => {
-      const data = detailResults[i]?.data;
-      if (data) map.set(slug, data);
-    });
-    return map;
-  }, [detailSlugs, loadedDetailCount]);
+  const [firstDetailShown, setFirstDetailShown] = useState(false);
+  useEffect(() => { if (detailQuery.data) setFirstDetailShown(true); }, [detailQuery.data]);
 
   const assignedCourses = useMemo(
-    () => (assignedQuery.data ?? []).map((c) => withCourseDetail(c, detailBySlug.get(String(c.slug)))),
-    [assignedQuery.data, detailBySlug],
+    () => assignedList.map((c) => (c.slug === currentSlug ? withCourseDetail(c, detailQuery.data) : c)),
+    [assignedList, currentSlug, detailQuery.data],
   );
   const publicCourses = useMemo(
-    () => (publicQuery.data ?? []).map((c) => withCourseDetail(c, detailBySlug.get(String(c.slug)))),
-    [publicQuery.data, detailBySlug],
+    () => publicList.map((c) => (c.slug === currentSlug ? withCourseDetail(c, detailQuery.data) : c)),
+    [publicList, currentSlug, detailQuery.data],
   );
 
 const isMdUp = useMediaQuery('(max-height:900px)');
@@ -371,12 +367,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return { topics: all.slice(0, budget), hidden: Math.max(0, all.length - budget) };
   };
 
-  const scopeSource = scope === 'public' ? publicCourses : assignedCourses;
-
-  const visibleCourses = useMemo(
-    () => filterByScope(scopeSource, scope),
-    [scopeSource, scope],
-  );
+  const currentCourses = scope === 'public' ? publicCourses : assignedCourses;
+  const currentCourseWithDetail = filterByScope(currentCourses, scope)[courseTabIndex] || null;
 
   const persistSelection = (course: Course | undefined, nextScope: CourseScope) => {
     writeLastCourse(course?.slug, nextScope);
@@ -390,22 +382,17 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     persistSelection(filterByScope(source, nextScope)[0], nextScope);
   };
 
+  // Restaura el curs recordat quan arriba la llista de l'àmbit actiu
   useEffect(() => {
-    if (restoredRef.current || assignedCourses.length + publicCourses.length === 0) return;
+    if (restored) return;
+    const query = scope === 'public' ? publicQuery : assignedQuery;
+    if (!query.isFetched) return;
     const saved = readLastCourse();
-    if (!saved) { restoredRef.current = true; return; }
-    const savedScope: CourseScope =
-      saved.scope === 'private' || saved.scope === 'assigned' ? saved.scope : 'public';
-    const source = savedScope === 'public' ? publicCourses : assignedCourses;
-    const list = filterByScope(source, savedScope);
-    if (list.length === 0) return;
-    restoredRef.current = true;
-    setScope(savedScope);
-    const idx = list.findIndex((c) => c.slug === saved.slug);
+    const idx = saved ? visibleCourses.findIndex((c) => c.slug === saved.slug) : -1;
     if (idx >= 0) setCourseTabIndex(idx);
-  }, [assignedCourses, publicCourses]);
+    setRestored(true);
+  }, [restored, scope, visibleCourses, publicQuery.isFetched, assignedQuery.isFetched]);
 
-  const currentSlug = visibleCourses[courseTabIndex]?.slug;
   const selectedStudentId = selectedStudent?.id;
 
   const loadRanking = useCallback(async () => {
@@ -495,7 +482,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
   const stats = useMemo(() => {
     const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
-    const course = visibleCourses[courseTabIndex] || null;
+    const course = currentCourseWithDetail;
     if (!course || !selectedStudent) return empty;
 
     const lessons = getFlatLessons(course);
@@ -517,12 +504,14 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     const streak = raw ? parseInt(raw, 10) || 0 : 0;
 
     return { streak, successRate, remainingHours, codeDone, codeTotal, testRate };
-  }, [visibleCourses, courseTabIndex, selectedStudent, dbProgress]);
+  }, [currentCourseWithDetail, selectedStudent, dbProgress]);
 
   const loading =
     assignedQuery.isLoading ||
-    publicQuery.isLoading ||
-    (detailSlugs.length > 0 && loadedDetailCount < detailSlugs.length);
+    (scope === 'public' && publicQuery.isLoading) ||
+    // Pantalla de càrrega només per al primer detall; en canviar de curs el
+    // panell s'omple quan arriba (sense tornar a tapar tota la pàgina).
+    (detailQuery.isLoading && !firstDetailShown);
 
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: mode === 'fancy' ? 'transparent' : 'background.default', zIndex: 9999 }}>
@@ -530,7 +519,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     </Box>
   );
 
-  const currentCourse = visibleCourses[courseTabIndex] || null;
+  const currentCourse = currentCourseWithDetail;
   const currentProgress = currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
   const progressData = selectedStudent ? getProgress(selectedStudent.id) : {};
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];

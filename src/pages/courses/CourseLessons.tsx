@@ -11,8 +11,9 @@ import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { courseService } from '../../services/courseService';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { resolveSlug } from '../../hooks/useCourse';
+import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
 type I18nField = { ca: string; es: string; en: string };
@@ -46,19 +47,23 @@ export default function CourseLessons() {
   const isTallScreen = useMediaQuery('(min-height: 900px)');
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const { data: course, isLoading: loading } = useCourse(courseId);TAB_ITEMS
+  const { data: course, isLoading: loading } = useCourse(courseId);
 
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [publicCourses, setPublicCourses] = useState<any[]>([]);
-  const [assignedCourses, setAssignedCourses] = useState<any[]>([]);
 
-  useEffect(() => {
-    courseService.getPublicCourses().then(setPublicCourses).catch(() => {});
-    courseService.getAllCourses().then(setAssignedCourses).catch(() => {});
-  }, []);
+  // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
+  // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
+  // és públic, es demanen les dues per deduir-ho.
+  const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
+  const scopeKnown = typeof publicFlag === 'boolean';
+  const switcherOpen = scopeAnchor != null;
+  const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
+  const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
+  const publicCourses: any[] = publicQuery.data ?? [];
+  const assignedCourses: any[] = assignedQuery.data ?? [];
 
   const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
     if (currentScope === 'public') return list.filter(c => c.isPublic);
@@ -67,13 +72,12 @@ export default function CourseLessons() {
   }, []);
 
   const scope: ScopeType = useMemo(() => {
-    const flag = course?.is_public ?? course?.isPublic;
-    if (typeof flag === 'boolean') return flag ? 'public' : 'private';
+    if (scopeKnown) return publicFlag ? 'public' : 'private';
     const listed = [...publicCourses, ...assignedCourses].find(
       (c) => c.id === courseId || c.slug === courseId
     );
     return listed?.isPublic ? 'public' : 'private';
-  }, [course, courseId, publicCourses, assignedCourses]);
+  }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
 
   const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
 
@@ -113,18 +117,6 @@ export default function CourseLessons() {
     window.addEventListener('lessonProgressUpdated', reSyncProgress);
     return () => window.removeEventListener('lessonProgressUpdated', reSyncProgress);
   }, [reSyncProgress]);
-
-  const [theoryMap, setTheoryMap] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!course || !course.content) return;
-    course.content.forEach((lesson: any) => {
-      courseService.getTopicBySlug(course.id, lesson.id)
-        .then(data => {const markdownValue = data?.theory_md || ''; setTheoryMap(prev => ({ ...prev, [lesson.id]: markdownValue }));})
-        .catch(() => {setTheoryMap(prev => ({ ...prev, [lesson.id]: '' }));
-        });
-    });
-  }, [course]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -294,6 +286,17 @@ export default function CourseLessons() {
   const syncTopicId = mainTab === 2 && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
+  // Teoria: només la del tema obert a la pestanya Teoria (abans es demanava la de tots els temes)
+  const theoryTopicId: string | undefined = mainTab === 0 && course?.content?.length
+    ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
+    : undefined;
+  const theoryQuery = useQuery<string>({
+    queryKey: ['topic-theory', course?.id, theoryTopicId, lang],
+    queryFn: () => courseService.getTopicBySlug(course!.id, theoryTopicId!).then((d) => d?.theory_md || '').catch(() => ''),
+    enabled: !!course?.id && !!theoryTopicId,
+    staleTime: 30 * 60 * 1000,
+  });
+
   useEffect(() => {
     if (!courseId || !syncTopicId || !isLoggedIn()) return;
     const courseSlug = resolveSlug(courseId);
@@ -419,7 +422,7 @@ export default function CourseLessons() {
     if (allLessons.length === 0) {return (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>);}
     const activeLesson = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const isDone = isTheoryDone(activeLesson.id);
-    const markdown = theoryMap[activeLesson.id];
+    const markdown = theoryQuery.data;
 
     return renderMasterDetail(topicItems, activeTopicId, (
       <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>

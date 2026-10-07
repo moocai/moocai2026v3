@@ -51,12 +51,3 @@ export function useCourse(courseId: string | undefined) {
     retry: 1,
   });
 }
-
-export function prefetchCourse(queryClient: any, courseId: string) {
-  return queryClient.prefetchQuery({
-    queryKey: ['course', courseId],
-    queryFn: () => courseService.getFullCourseDetail(resolveSlug(courseId)),
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-  });
-}
