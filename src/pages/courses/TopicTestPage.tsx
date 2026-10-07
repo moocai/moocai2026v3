@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import { useParams, useSearchParams, Link as RouterLink } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, ButtonBase, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
 import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useCourse } from '../../hooks/useCourse';
-import { courseService } from '../../services/courseService';
+import { resolveSlug } from '../../hooks/useCourse';
+import { courseService, mapProblem } from '../../services/courseService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -43,14 +44,18 @@ const readJson = (key: string): Record<string, any> => {
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
+  const [searchParams] = useSearchParams();
+  const topicParam = searchParams.get('topic');
+  const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
-  const { data: course } = useCourse(courseId);
 
   const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [courseTitle, setCourseTitle] = useState<any>(null);
+  const [topicSlug, setTopicSlug] = useState<string | null>(null);
   const [topicTests, setTopicTests] = useState<any[]>([]);
   const [currentIdx, setCurrentIdx] = useState<number>(0);
-  const [topicTest, setTopicTest] = useState<any>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -59,12 +64,11 @@ export default function TopicTestPage() {
   // Respostes desades d'aquest usuari: pinten el navegador de preguntes (mateixa font que les opcions)
   const [savedAnswers, setSavedAnswers] = useState<Record<string, any>>({});
 
-  // false mentre es demanen al servidor les respostes que no hi ha desades localment
-  const [serverReady, setServerReady] = useState(false);
-
   const resultRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const lang = i18n.language?.split('-')[0] || 'ca';
+  const courseSlug = courseId ? resolveSlug(courseId) : '';
 
   const getText = useCallback((field: any): string => {
     if (!field) return '';
@@ -79,109 +83,105 @@ export default function TopicTestPage() {
     return () => window.removeEventListener('lessonProgressUpdated', load);
   }, []);
 
-  // Fa scroll fins al feedback just després d'enviar (no quan es restaura un test ja respost)
+  // Fa scroll fins al resultat just després d'enviar (no quan es restaura un test ja respost)
   useEffect(() => {
     if (result?.fresh) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [result]);
 
+  // Càrrega mínima: el títol del curs i els problemes d'UN sol tema (no tot el curs).
+  // El tema ve a la URL (?topic=); si no hi és, es treu del detall del curs en cache
+  // (p. ex. si venim de LessonPage) i, com a últim recurs, es carrega el detall complet.
   useEffect(() => {
-    if (!courseId || !challengeSlug || !course) return;
-
-    const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === challengeSlug));
-    const tests = topic?.subTopics?.filter((st: any) => st.type === 'test') || [];
-    setTopicTests(tests);
-    loadTopicAnswers(topic?.id, tests);
-
-    const initialIdx = tests.findIndex((st: any) => st.problemSlug === challengeSlug);
-    if (initialIdx !== -1) {
-      setCurrentIdx(initialIdx);
-    }
-  }, [courseId, challengeSlug, course]);
-
-  const currentTestSlug = topicTests[currentIdx]?.problemSlug || challengeSlug;
-
-  // Estat de tots els tests del tema, perquè el navegador de preguntes es pinti bé en
-  // qualsevol dispositiu. Primer es mira què hi ha desat per a aquest usuari; només dels
-  // tests sense resposta desada es pregunta al servidor (una petició per test, perquè l'API
-  // no té endpoint per tema, més la llista de problemes fresca, que un cop respost inclou
-  // `is_correct`).
-  const topicLoadRef = useRef(0);
-  function loadTopicAnswers(topicSlug: string | undefined, tests: any[]) {
-    const run = ++topicLoadRef.current;
-    const missing = tests.filter((st: any) => !readSavedAnswer(`${courseId}_${st.problemSlug}`));
-    if (!isLoggedIn() || !courseId || !topicSlug || missing.length === 0) { setServerReady(true); return; }
-    setServerReady(false);
-    (async () => {
-      const [problems, ...subs] = await Promise.all([
-        courseService.getTopicProblems(courseId, topicSlug).catch(() => [] as any[]),
-        ...missing.map((st: any) => courseService.getChallengeSubmissions(courseId, topicSlug, st.problemSlug).catch(() => [] as any[])),
-      ]);
-      if (run !== topicLoadRef.current) return;
-      const found: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }> = {};
-      const progressKey = getProgressKey();
-      const localProgress = readJson(progressKey);
-      missing.forEach((st: any, i: number) => {
-        const own = (subs[i] || []).find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0);
-        if (!own) return;
-        const answers = own.choices.map(String);
-        const choices = (problems as any[]).find((p: any) => p.slug === st.problemSlug)?.choices || [];
-        const correctIds = choices.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
-        const correct = correctIds.length > 0
-          ? correctIds.length === answers.length && answers.every((id: string) => correctIds.includes(id))
-          : null;
-        const key = `${courseId}_${st.problemSlug}`;
-        // Sense correcció (no hauria de passar) no es desa: així es torna a demanar
-        if (correct === null) return;
-        found[key] = { answers, correct, choices };
-        localProgress[key] = correct ? true : 'attempted';
-      });
-      writeSavedAnswers(found);
-      localStorage.setItem(progressKey, JSON.stringify(localProgress));
-      window.dispatchEvent(new Event('lessonProgressUpdated'));
-      setServerReady(true);
-    })();
-  }
-
-  useEffect(() => {
-    if (!courseId || !currentTestSlug || !course) return;
+    if (!courseId || !challengeSlug) return;
     let cancelled = false;
-
-    const loadTopicTest = async () => {
+    (async () => {
+      setLoading(true);
+      setNotFound(false);
       try {
-        setLoading(true);
-        setResult(null);
-        setSubmitError(null);
-        setSelectedAnswers([]);
+        const cached: any = queryClient.getQueryData(['course', courseId]);
+        if (cached?.title) setCourseTitle(cached.title);
+        else queryClient.fetchQuery({
+          queryKey: ['course-info', courseSlug],
+          queryFn: () => courseService.getCourseBySlug(courseSlug),
+          staleTime: 30 * 60 * 1000,
+        }).then((c: any) => { if (!cancelled) setCourseTitle(c?.name ?? null); }).catch(() => {});
 
-        const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
-        const problem = topic?.subTopics?.find((st: any) => st.problemSlug === currentTestSlug);
-
-        // Sense fallback: si el problema no és dins del tema, el test es mostra
-        // com a "no trobat". L'antiga crida amb `topic?.id || ''` construïa
-        // `/topics//problems/<slug>/` (404) i acabava en el mateix resultat.
-        if (cancelled) return;
-        setTopicTest(problem || null);
-        if (!problem || !topic) return;
-
-        // Si ja s'havia respost, es mostra la resposta i la correcció (només hi ha un intent).
-        // Amb sessió cal esperar l'estat del servidor (loadTopicAnswers).
-        if (isLoggedIn() && !serverReady) return;
-        const saved = readSavedAnswer(`${courseId}_${currentTestSlug}`);
-        if (saved) {
-          setSelectedAnswers(saved.answers.map(String));
-          setResult({ correct: saved.correct, choices: saved.choices || [] });
+        let tSlug = topicParam;
+        if (!tSlug) {
+          const detail: any = cached ?? await queryClient.fetchQuery({
+            queryKey: ['course', courseId],
+            queryFn: () => courseService.getFullCourseDetail(courseSlug),
+            staleTime: 30 * 60 * 1000,
+          });
+          tSlug = detail?.content?.find((tp: any) => (tp.subTopics || []).some((st: any) => st.problemSlug === challengeSlug))?.id ?? null;
         }
+        if (!tSlug) { if (!cancelled) setNotFound(true); return; }
+
+        // Sempre fresca: un cop respost un test, la llista inclou `is_correct` de les seves opcions
+        // (fetchQuery amb staleTime 0: sempre fresca, però fusiona peticions simultànies)
+        const problems: any[] = await queryClient.fetchQuery({
+          queryKey: ['topic-problems', courseSlug, tSlug],
+          queryFn: () => courseService.getTopicProblems(courseSlug, tSlug!),
+          staleTime: 0,
+        });
+        if (cancelled) return;
+        const tests = problems.filter((p: any) => p.type === 'test');
+        const idx = tests.findIndex((p: any) => p.slug === challengeSlug);
+        if (idx === -1) { setNotFound(true); return; }
+
+        await syncAnswersFromServer(tSlug, tests);
+        if (cancelled) return;
+        setTopicSlug(tSlug);
+        setTopicTests(tests.map(mapProblem));
+        setCurrentIdx(idx);
       } catch (error) {
         console.error('Error loading topic test:', error);
-        if (!cancelled) setTopicTest(null);
+        if (!cancelled) setNotFound(true);
       } finally {
-        if (!cancelled) setLoading(isLoggedIn() && !serverReady);
+        if (!cancelled) setLoading(false);
       }
-    };
-
-    loadTopicTest();
+    })();
     return () => { cancelled = true; };
-  }, [courseId, currentTestSlug, course, serverReady]);
+  }, [courseId, challengeSlug, topicParam]);
+
+  // Només amb sessió. Un alumne rep `is_correct` d'un test només quan ja l'ha respost, així que
+  // només cal demanar la resposta (GET submissions) dels tests respostos que no tenim desats.
+  // Com que hi ha un sol intent, una resposta desada no canvia mai i no cal tornar-la a demanar.
+  async function syncAnswersFromServer(tSlug: string, tests: any[]) {
+    if (!isLoggedIn() || !courseId) return;
+    const toFetch = tests.filter((p: any) =>
+      !readSavedAnswer(`${courseId}_${p.slug}`) && (p.choices || []).some((c: any) => typeof c.is_correct === 'boolean'));
+    if (toFetch.length === 0) return;
+    const subs = await Promise.all(toFetch.map((p: any) =>
+      courseService.getChallengeSubmissions(courseSlug, tSlug, p.slug).catch(() => [] as any[])));
+    const found: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }> = {};
+    const progressKey = getProgressKey();
+    const localProgress = readJson(progressKey);
+    toFetch.forEach((p: any, i: number) => {
+      const own = (subs[i] || []).find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0);
+      if (!own) return; // p. ex. un professor, que sempre rep `is_correct`
+      const answers = own.choices.map(String);
+      const correctIds = (p.choices || []).filter((c: any) => c.is_correct).map((c: any) => String(c.id));
+      const correct = correctIds.length === answers.length && answers.every((id: string) => correctIds.includes(id));
+      const key = `${courseId}_${p.slug}`;
+      found[key] = { answers, correct, choices: p.choices };
+      localProgress[key] = correct ? true : 'attempted';
+    });
+    writeSavedAnswers(found);
+    localStorage.setItem(progressKey, JSON.stringify(localProgress));
+    window.dispatchEvent(new Event('lessonProgressUpdated'));
+  }
+
+  const topicTest = topicTests[currentIdx] || null;
+  const currentTestSlug = topicTest?.problemSlug || challengeSlug;
+
+  // En canviar de test: es restaura la resposta desada (si n'hi ha) — sense cap petició
+  useEffect(() => {
+    setSubmitError(null);
+    const saved = topicTest ? readSavedAnswer(`${courseId}_${topicTest.problemSlug}`) : null;
+    setSelectedAnswers(saved ? saved.answers.map(String) : []);
+    setResult(saved ? { correct: saved.correct, choices: saved.choices || [] } : null);
+  }, [topicTest, courseId]);
 
   const saveProgress = (key: string, passed: boolean) => {
     const progressKey = getProgressKey();
@@ -204,12 +204,11 @@ export default function TopicTestPage() {
       correct = correctIds.length === answers.length && answers.every((a) => correctIds.includes(a));
       review = choices;
     } else {
-      const topic = course?.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
-      if (!topic) return;
+      if (!topicSlug) return;
       setSubmitting(true);
       setSubmitError(null);
       try {
-        const res = await courseService.submitChallenge(courseId, topic.id, currentTestSlug, {
+        const res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
           answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
         });
         correct = !!res?.correct;
@@ -228,7 +227,7 @@ export default function TopicTestPage() {
     setResult({ correct, choices: review, fresh: true });
     writeSavedAnswers({ [key]: { answers, correct, choices: review } });
     saveProgress(key, correct);
-    if (isLoggedIn()) void refreshCoursePoints(course?.slug || courseId, correct ? 4 : 0);
+    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0);
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {
@@ -252,7 +251,12 @@ export default function TopicTestPage() {
   const goTo = (idx: number) => {
     if (idx < 0 || idx >= topicTests.length || idx === currentIdx) return;
     setCurrentIdx(idx);
-    window.scrollTo({ top: 0 });
+    scrollRef.current?.scrollTo({ top: 0 });
+    // La URL segueix el test actual (per recarregar o compartir) sense tornar a carregar la pàgina
+    const slug = topicTests[idx]?.problemSlug;
+    if (slug && courseId && topicSlug) {
+      window.history.replaceState(window.history.state, '', `/courses/${courseId}/test/${slug}?topic=${encodeURIComponent(topicSlug)}`);
+    }
   };
 
   // Dreceres de teclat: ←/→ canvien de test, Enter envia (o passa al següent si ja s'ha respost)
@@ -274,11 +278,11 @@ export default function TopicTestPage() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
-  if (loading && !topicTest) {
+  if (loading) {
     return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress /></Box>;
   }
 
-  if (!topicTest) {
+  if (notFound || !topicTest) {
     return <Box sx={{ p: 4, textAlign: 'center' }}><Typography>{t('topic_test.not_found', 'Test no trobat')}</Typography></Box>;
   }
 
@@ -349,12 +353,12 @@ export default function TopicTestPage() {
 
   return (
     // El MainLayout dona una alçada fixa amb overflow ocult: el scroll ha de ser aquí dins
-    <Box sx={{ width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <Box ref={scrollRef} sx={{ width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
         {/* Botó de tornar enrere */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
           <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
-            {course ? (typeof course.title === 'string' ? course.title : getText(course.title) || '') : t('lesson.back', 'Tornar')}
+            {getText(courseTitle) || t('lesson.back', 'Tornar')}
           </Button>
         </Box>
 
@@ -419,8 +423,17 @@ export default function TopicTestPage() {
               </Box>
             )}
 
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-              <Typography variant="h6" sx={{ fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+            <Box ref={resultRef} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+              <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
+                {/* Resultat global del test: icona al costat del títol, sense línies extra */}
+                {answered && result.correct !== null && (
+                  <Box component="span" role="img"
+                    aria-label={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}
+                    title={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}
+                    sx={{ display: 'flex', color: result.correct ? 'success.main' : 'error.main' }}>
+                    {result.correct ? <CircleCheck size={26} /> : <CircleX size={26} />}
+                  </Box>
+                )}
                 {isMultiChoice ? t('topic_test.multi_choice', 'Test de selecció múltiple') : t('topic_test.choose_answer', "Test d'elecció única")}
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: topicTest.difficulty === 'hard' ? 'error.main' : topicTest.difficulty === 'medium' ? 'warning.main' : 'success.main' }}>
@@ -428,28 +441,6 @@ export default function TopicTestPage() {
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 700 }}>{topicTest.difficulty}</Typography>
               </Box>
             </Box>
-
-            {/* Resultat del test: ben visible, abans de les opcions */}
-            {answered && result.correct !== null && (
-              <Box ref={resultRef} role="status" sx={{
-                display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, p: 1.5, borderRadius: 1.5, border: '2px solid',
-                borderColor: result.correct ? 'success.main' : 'error.main',
-                bgcolor: alpha(result.correct ? theme.palette.success.main : theme.palette.error.main, 0.12),
-                color: result.correct ? 'success.main' : 'error.main',
-              }}>
-                {result.correct ? <CircleCheck size={32} /> : <CircleX size={32} />}
-                <Box>
-                  <Typography sx={{ fontWeight: 900, fontSize: '1.1rem', lineHeight: 1.2 }}>
-                    {result.correct ? t('topic_test.result_correct_title', 'Resposta correcta') : t('topic_test.result_wrong_title', 'Resposta incorrecta')}
-                  </Typography>
-                  <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
-                    {result.correct
-                      ? t('topic_test.result_correct_text', 'Has encertat aquest test.')
-                      : t('topic_test.result_wrong_text', 'Les opcions correctes estan marcades en verd.')}
-                  </Typography>
-                </Box>
-              </Box>
-            )}
 
             <FormControl disabled={answered || loading} fullWidth>
               {isMultiChoice ? (

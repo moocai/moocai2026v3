@@ -29,6 +29,20 @@ function toCourses(data: unknown): Course[] {
   }));
 }
 
+/** Problema de l'API → forma de `subTopics` que fan servir les pàgines */
+export const mapProblem = (p: any) => ({
+  subtitle: p.title,
+  text: p.statement_ca || p.statementHtml || '',
+  problemSlug: p.slug,
+  type: p.type,
+  precode: p.precode,
+  solution: p.system_solution?.code || '',
+  score: p.score,
+  difficulty: p.difficulty,
+  choices: p.choices,
+  choiceType: p.choice_type,
+});
+
 export const courseService = {
   
   /**
@@ -145,18 +159,7 @@ export const courseService = {
           return {
             id: topic.slug,
             title: topic.name,
-            subTopics: Array.isArray(problems) ? problems.map((p: any) => ({
-              subtitle: p.title,
-              text: p.statement_ca || p.statementHtml || '',
-              problemSlug: p.slug,
-              type: p.type,
-              precode: p.precode,
-              solution: p.system_solution?.code || '',
-              score: p.score,
-              difficulty: p.difficulty,
-              choices: p.choices,
-              choiceType: p.choice_type,
-            })) : [],
+            subTopics: Array.isArray(problems) ? problems.map(mapProblem) : [],
           };
         })
       );

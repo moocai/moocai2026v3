@@ -356,9 +356,15 @@ export default function LessonPage() {
   // Els problemes de tipus "test" no es resolen amb codi: es respon amb `answers`
   // a TopicTestPage. Si arribem aqui (URL directa o "seguent" des d'un exercici),
   // redirigim per evitar un POST amb `code` que el backend rebutja amb 400.
+  // Ruta d'un test amb el seu tema (?topic=): així TopicTestPage només carrega aquell tema
+  const testPath = (slug: string) => {
+    const topicSlug = course?.content?.find((tp: any) => (tp.subTopics || []).some((st: any) => st.problemSlug === slug))?.id;
+    return `/courses/${courseId}/test/${slug}${topicSlug ? `?topic=${encodeURIComponent(topicSlug)}` : ''}`;
+  };
+
   useEffect(() => {
     if (currentProblem?.type === 'test') {
-      navigate(`/courses/${courseId}/test/${lessonId}`, { replace: true });
+      navigate(testPath(lessonId!), { replace: true });
     }
   }, [currentProblem?.type, courseId, lessonId, navigate]);
 
@@ -368,7 +374,7 @@ export default function LessonPage() {
     const slug = problem?.problemSlug || problem?.slug;
     if (!slug) return null;
     return problem.type === 'test'
-      ? `/courses/${courseId}/test/${slug}`
+      ? testPath(slug)
       : `/courses/${courseId}/${slug}`;
   };
 
@@ -548,7 +554,7 @@ export default function LessonPage() {
 
   const handleRunTests = async () => {
     if (currentProblem?.type === 'test') {
-      navigate(`/courses/${courseId}/test/${lessonId}`, { replace: true });
+      navigate(testPath(lessonId!), { replace: true });
       return;
     }
     // Validació: la resposta ha de tenir relació amb l'enunciat; si no, no s'envia
