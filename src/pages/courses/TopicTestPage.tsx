@@ -4,6 +4,8 @@ import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radi
 import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
+import { courseService } from '../../services/courseService';
+import { refreshCoursePoints } from '../../utils/pointsSync';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -20,8 +22,10 @@ const getStudentId = () => {
 };
 
 const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
-// Respostes enviades per test: només hi ha un intent, així que es guarden per tornar-les a mostrar
+// Còpia local de les respostes: només per a usuaris sense sessió, perquè el servidor
+// no desa res seu en cursos públics (amb sessió, la font de veritat és el servidor)
 const getAnswersKey = () => `mooc_test_answers_${getStudentId()}`;
+const isLoggedIn = () => !!localStorage.getItem('token');
 
 const readJson = (key: string): Record<string, any> => {
   try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
@@ -39,6 +43,8 @@ export default function TopicTestPage() {
   const [topicTest, setTopicTest] = useState<any>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<string[]>([]);
   const [result, setResult] = useState<any>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [progress, setProgress] = useState<Record<string, any>>({});
 
@@ -90,6 +96,7 @@ export default function TopicTestPage() {
       try {
         setLoading(true);
         setResult(null);
+        setSubmitError(null);
         setSelectedAnswers([]);
 
         const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
@@ -100,17 +107,35 @@ export default function TopicTestPage() {
         // `/topics//problems/<slug>/` (404) i acabava en el mateix resultat.
         if (cancelled) return;
         setTopicTest(problem || null);
+        if (!problem || !topic) return;
 
-        // Si ja s'havia respost, es mostra la resposta i la correcció (sense reintents)
+        // Si ja s'havia respost, es mostra la resposta i la correcció (només hi ha un intent)
         const key = `${courseId}_${currentTestSlug}`;
-        const saved = readJson(getAnswersKey())[key];
-        const status = readJson(getProgressKey())[key];
-        if (Array.isArray(saved)) {
-          setSelectedAnswers(saved.map(String));
-          setResult({ correct: status === true });
-        } else if (status === true || status === 'attempted') {
-          // Respost amb la versió anterior, que no desava la selecció
-          setResult({ correct: status === true, legacy: true });
+        if (isLoggedIn()) {
+          let own: any = null;
+          try {
+            const subs = await courseService.getChallengeSubmissions(courseId, topic.id, currentTestSlug);
+            own = subs.find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0) || null;
+          } catch { own = null; } // 404: encara no s'ha respost
+          if (cancelled || !own) return;
+          const selected = own.choices.map(String);
+          // La llista del curs pot ser d'abans de respondre (sense `is_correct`): es demana el detall
+          let review: any[] = [];
+          try { review = (await courseService.getChallenge(courseId, topic.id, currentTestSlug))?.choices || []; } catch { review = []; }
+          if (cancelled) return;
+          const correctIds = review.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
+          const correct = correctIds.length > 0
+            ? correctIds.length === selected.length && selected.every((id: string) => correctIds.includes(id))
+            : null;
+          setSelectedAnswers(selected);
+          setResult({ correct, choices: review });
+          if (correct !== null) saveProgress(key, correct);
+        } else {
+          const saved = readJson(getAnswersKey())[key];
+          if (saved && Array.isArray(saved.answers)) {
+            setSelectedAnswers(saved.answers.map(String));
+            setResult({ correct: !!saved.correct, choices: saved.choices || [] });
+          }
         }
       } catch (error) {
         console.error('Error loading topic test:', error);
@@ -124,33 +149,58 @@ export default function TopicTestPage() {
     return () => { cancelled = true; };
   }, [courseId, currentTestSlug, course]);
 
-  // Comprova la resposta al moment, sense enviar res al backend
-  const evaluate = (answers: string[]) => {
-    const correctSet = new Set<string>(
-      (choices as any[]).filter((c: any) => c.is_correct).map((c: any) => String(c.id))
-    );
-    if (correctSet.size === 0) {
-      setResult({ error: t('topic_test.no_solution', "No es pot comprovar la resposta: el test no inclou la solució") });
-      return;
-    }
-
-    const passed = answers.length === correctSet.size && answers.every((a) => correctSet.has(a));
-    setResult({ correct: passed, fresh: true });
-
-    if (!courseId || !currentTestSlug) return;
-    const challengeKey = `${courseId}_${currentTestSlug}`;
-
+  const saveProgress = (key: string, passed: boolean) => {
     const progressKey = getProgressKey();
     const progress = readJson(progressKey);
-    progress[challengeKey] = passed ? true : 'attempted';
+    progress[key] = passed ? true : 'attempted';
     localStorage.setItem(progressKey, JSON.stringify(progress));
-
-    const answersKey = getAnswersKey();
-    const savedAnswers = readJson(answersKey);
-    savedAnswers[challengeKey] = answers;
-    localStorage.setItem(answersKey, JSON.stringify(savedAnswers));
-
     window.dispatchEvent(new Event('lessonProgressUpdated'));
+  };
+
+  // Envia la resposta al servidor, que la corregeix i retorna totes les opcions amb la correcció
+  const submitAnswers = async (answers: string[]) => {
+    if (!courseId || !currentTestSlug) return;
+    const key = `${courseId}_${currentTestSlug}`;
+    let correct: boolean;
+    let review: any[];
+
+    if (fixtureData) {
+      // Fixture local antic (window.EXAM_DATA): es corregeix aquí mateix
+      const correctIds = choices.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
+      correct = correctIds.length === answers.length && answers.every((a) => correctIds.includes(a));
+      review = choices;
+    } else {
+      const topic = course?.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === currentTestSlug));
+      if (!topic) return;
+      setSubmitting(true);
+      setSubmitError(null);
+      try {
+        const res = await courseService.submitChallenge(courseId, topic.id, currentTestSlug, {
+          answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
+        });
+        correct = !!res?.correct;
+        review = Array.isArray(res?.choices) ? res.choices : [];
+      } catch (error: any) {
+        const status = error?.response?.status;
+        setSubmitError(status === 429 || status === 503
+          ? t('topic_test.submit_busy', 'El servidor està ocupat. Torna-ho a provar d\'aquí a una estona.')
+          : t('topic_test.submit_error', "No s'ha pogut enviar la resposta."));
+        return;
+      } finally {
+        setSubmitting(false);
+      }
+    }
+
+    setResult({ correct, choices: review, fresh: true });
+    saveProgress(key, correct);
+    if (!isLoggedIn()) {
+      const answersKey = getAnswersKey();
+      const savedAnswers = readJson(answersKey);
+      savedAnswers[key] = { answers, correct, choices: review };
+      localStorage.setItem(answersKey, JSON.stringify(savedAnswers));
+    } else {
+      void refreshCoursePoints(course?.slug || courseId, correct ? 4 : 0);
+    }
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {
@@ -167,8 +217,8 @@ export default function TopicTestPage() {
 
   // L'alumne decideix quan enviar: cal haver marcat almenys una opció
   const handleSubmit = () => {
-    if (answered || selectedAnswers.length === 0) return;
-    evaluate(selectedAnswers);
+    if (answered || submitting || loading || selectedAnswers.length === 0) return;
+    void submitAnswers(selectedAnswers);
   };
 
   const goTo = (idx: number) => {
@@ -215,11 +265,12 @@ export default function TopicTestPage() {
     textHtml: `<p>${option.text}</p>`,
   })) : rawChoices;
 
-  const correctCount = choices.filter((choice: any) => choice.is_correct).length;
-  const isMultiChoice = correctCount > 1;
+  const isMultiChoice = topicTest.choiceType
+    ? topicTest.choiceType === 'multi'
+    : choices.filter((choice: any) => choice.is_correct).length > 1;
 
   // ---- Feedback just després d'enviar ----
-  const answered = !!result && !result.error;
+  const answered = !!result;
 
   // Si el backend retorna result.choices el fem servir; si no, caiem a les opcions locals
   const reviewChoices: any[] = Array.isArray(result?.choices) ? result.choices : [];
@@ -249,15 +300,21 @@ export default function TopicTestPage() {
 
   const choiceBadge = (value: string) => {
     const state = choiceState(value);
-    if (!state) return null;
+    const review = reviewChoices.find((c: any) => String(c.id) === value);
+    const explanation = review?.explanation_html || review?.explanationHtml || '';
     const isSel = selectedAnswers.includes(value);
     return (
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 4, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, color: state === 'correct' ? 'success.main' : 'error.main' }}>
+      <>
+      {state && <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 4, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, color: state === 'correct' ? 'success.main' : 'error.main' }}>
         {state === 'correct' ? <CircleCheck size={14} /> : <CircleX size={14} />}
         {state === 'correct'
           ? (isSel ? t('topic_test.your_correct', 'Has encertat!') : t('topic_test.was_correct', 'Era la resposta correcta'))
           : t('topic_test.your_wrong', 'La teva resposta')}
-      </Box>
+      </Box>}
+      {answered && explanation && (
+        <Box sx={{ ml: 4, mr: 1, mb: 1, fontSize: '0.85rem', color: 'text.secondary', '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: explanation }} />
+      )}
+      </>
     );
   };
 
@@ -341,7 +398,7 @@ export default function TopicTestPage() {
               </Box>
             </Box>
 
-            <FormControl disabled={answered} fullWidth>
+            <FormControl disabled={answered || loading} fullWidth>
               {isMultiChoice ? (
                 <FormGroup>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: choices.length > 6 ? '1fr 1fr' : '1fr' }, gap: 1 }}>
@@ -388,16 +445,11 @@ export default function TopicTestPage() {
 
             {/* Enviament */}
             <Box ref={resultRef} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', mt: 3, gap: 1.5 }}>
-              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: answered ? (result.correct ? 'success.main' : 'error.main') : 'text.secondary' }}>
-                {answered
-                  ? (result.correct ? t('topic_test.result_correct', 'Correcte!') : t('topic_test.result_wrong', 'Incorrecte'))
-                  : ''}
-                {result?.error && <Box component="span" sx={{ color: 'error.main' }}>{result.error}</Box>}
-                {result?.legacy && (
-                  <Box component="span" sx={{ display: 'block', fontWeight: 500, color: 'text.secondary' }}>
-                    {t('topic_test.legacy_answer', "Ja l'havies respost, però no es va desar quina opció vas triar.")}
-                  </Box>
-                )}
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: submitError ? 'error.main' : answered && result.correct !== null ? (result.correct ? 'success.main' : 'error.main') : 'text.secondary' }}>
+                {submitError
+                  ?? (answered && result.correct !== null
+                    ? (result.correct ? t('topic_test.result_correct', 'Correcte!') : t('topic_test.result_wrong', 'Incorrecte'))
+                    : '')}
               </Typography>
               {answered ? (
                 currentIdx < topicTests.length - 1 && (
@@ -406,7 +458,7 @@ export default function TopicTestPage() {
                   </Button>
                 )
               ) : (
-                <Button variant="contained" onClick={handleSubmit} disabled={selectedAnswers.length === 0} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
+                <Button variant="contained" onClick={handleSubmit} disabled={selectedAnswers.length === 0 || submitting || loading} startIcon={submitting ? <CircularProgress size={14} color="inherit" /> : undefined} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
                   {t('topic_test.submit', 'Envia')}
                 </Button>
               )}

@@ -152,6 +152,7 @@ export const courseService = {
               score: p.score,
               difficulty: p.difficulty,
               choices: p.choices,
+              choiceType: p.choice_type,
             })) : [],
           };
         })
