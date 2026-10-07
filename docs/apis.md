@@ -32,15 +32,16 @@ Aquest document recull **totes les APIs REST** que consumeix l'aplicació fronte
 
 | Mètode | Endpoint | Descripció | Auth | Servei |
 |--------|----------|------------|------|--------|
-| POST | `/users/auth/login/` | Login. Body JSON `{ username, password }`. Desa `token`. | No | `authService.login` |
-| POST | `/users/auth/logout/` | Tanca sessió al servidor. Sense body. Es **revoca el token**: es llegeix abans de netejar la sessió i s'envia com a `Authorization` explícit (`5000 ms`). | Token (explícit) | `authService.logout` |
-| GET | `/users/register/` | Dades prèvies al registre (organitzacions, avatar per defecte). | No | `register.loadRegistrationData` |
-| POST | `/users/register/` | Crea compte. Body **FormData**: `first_name`, `last_name`, `email`, `username`, `password1`, `password2`, `organization?`, `default_avatar?`, `avatar?`. Desa `token` si el retorn en porta. | No | `register.registerUser` |
+| POST | `/auth/login/` | Login. Body JSON `{ username, password }`. Desa `token`. | No | `authService.login` |
+| POST | `/auth/logout/` | Tanca sessió al servidor. Sense body. Es **revoca el token**: es llegeix abans de netejar la sessió i s'envia com a `Authorization` explícit (`5000 ms`). | Token (explícit) | `authService.logout` |
+| GET | `/auth/register/options/` | Dades prèvies al registre (organitzacions, avatar per defecte). | No | `register.loadRegistrationData` |
+| POST | `/auth/register/` | Crea compte. Body **FormData**: `first_name`, `last_name`, `email`, `username`, `password1`, `password2`, `organization?`, `default_avatar?`, `avatar?`. Desa `token` si el retorn en porta. | No | `register.registerUser` |
 | GET | `/users/me/settings/` | Perfil de l'usuari autenticat. | Token | `profileService.fetchProfile` |
 | PATCH | `/users/me/settings/` | Actualitza perfil. Body JSON `{ first_name, last_name, email, current_password?, new_password1?, new_password2? }`. `username` no és editable. | Token | `profileService.updateProfile` |
 | GET | `/orgs/` | Llista d'organitzacions. Accepta array o `{ results }`. | Token | `profileService.fetchOrganizations` |
 | GET | `/users/me/avatar/` | Avatar de l'usuari (string o `{ avatar }`). Es llegeix com a imatge via `avatarCache` (`myAvatarUrl`/`preloadImage`), no amb una crida de servei. | Token | `avatarCache` |
 | PATCH | `/users/me/avatar/` | Puja avatar. Body **FormData** `avatar`. Respon **204** → `Promise<void>`; la imatge es torna a carregar amb `avatarCache`. | Token | `profileService.updateMyAvatar` |
+| GET | `/courses/{slug}/members/{username}/avatar/` | Avatar d'un altre membre del curs (rànquing). `slug` i `username` es codifiquen amb `encodeURIComponent`. Es llegeix com a imatge via `avatarCache` (`userAvatarUrl`). | Token | `avatarCache` |
 | POST | `/users/invite/` | Convida un usuari per correu. Body JSON `{ email }`. | Token | `api.inviteUser` |
 
 ---
@@ -113,10 +114,10 @@ Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldr
 
 | # | Mètode | Endpoint | Servei | Testejat? |
 |---|--------|----------|--------|-----------|
-| 1 | POST | `/api/v1/users/auth/login/` | authService | ✅ |
-| 2 | POST | `/api/v1/users/auth/logout/` | authService | ✅ |
-| 3 | GET | `/api/v1/users/register/` | register | ✅ |
-| 4 | POST | `/api/v1/users/register/` | register | ✅ |
+| 1 | POST | `/api/v1/auth/login/` | authService | ✅ |
+| 2 | POST | `/api/v1/auth/logout/` | authService | ✅ |
+| 3 | GET | `/api/v1/auth/register/options/` | register | ✅ |
+| 4 | POST | `/api/v1/auth/register/` | register | ✅ |
 | 5 | GET | `/api/v1/users/me/settings/` | profileService | ❌ |
 | 6 | PATCH | `/api/v1/users/me/settings/` | profileService | ❌ |
 | 7 | GET | `/api/v1/orgs/` | profileService | ❌ |
@@ -151,3 +152,13 @@ Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldr
 - **`clearCache(slug?)`** neteja `fullCourseCache` i `allCoursesCache` quan no rep slug, però **mai no neteja `publicCoursesCache`** ⚠️.
 - **Login de l'aplicació:** tot i que existeix `AuthContext`, el flux real és `StudentDashboard.handleLogin` → `authService.login()` directament. `Student.code` ja **no** es desa a `currentStudent` (fix2) i `Student.code` és opcional.
 - **401 caducat:** un 401 amb el token actual tanca la sessió local i dispara `auth-state-change` (vegeu `httpClient.ts`); un 401 d'un token antic en vol s'ignora.
+
+---
+
+## Forma dels errors
+
+Totes les respostes d'error de l'API (4xx i 5xx) tenen la forma
+`{ "detail": "...", "code": "...", "errors": { "camp": ["missatge"] } }`.
+`apiErrorMessages()` (`httpClient.ts`) en treu els missatges de `errors` i, si no n'hi ha,
+el `detail`; el fan servir registre, perfil, enviament de codi i invitacions.
+Login i registre ja no retornen `user.id`: `currentStudent.id` és el `username`.

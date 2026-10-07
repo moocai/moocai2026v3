@@ -169,7 +169,7 @@ moocai2026/
     │   ├── localCourseService.ts     # Cursos locals (mooc_local_courses), sense HTTP
     │   ├── profileService.ts         # Perfil, avatars, orgs · apiClient (timeout 100000)
     │   ├── statsService.ts           # GET /public/stats/ — gated per env, resilient (number | null)
-    │   ├── register.ts               # GET+POST /users/register/ (FormData) · publicClient
+    │   ├── register.ts               # GET /auth/register/options/ + POST /auth/register/ (FormData) · publicClient
     │   └── teacherService.ts         # ⚠️ BUID (0 bytes), importat enlloc
     │
     ├── theme/
@@ -318,8 +318,8 @@ Usa l'`apiClient` de `httpClient.ts` (`Authorization: Token <token>`, **`timeout
 
 ### `authService.ts` — login real de l'alumne
 Usa el `publicClient` de `httpClient.ts` (sense token automàtic).
-- `login(username, password)` → **POST** `/users/auth/login/` (JSON `{ username, password }`); desa `token`.
-- `logout()` → llegeix el `token` **abans** de netejar, buida `token` + `currentStudent` de seguida i després envia **POST** `/users/auth/logout/` (sense body, `Authorization: Token <token>` **explícit**, `timeout: 5000 ms`) per **revocar-lo**. Mai no llança (`catch` buit).
+- `login(username, password)` → **POST** `/auth/login/` (JSON `{ username, password }`); desa `token`.
+- `logout()` → llegeix el `token` **abans** de netejar, buida `token` + `currentStudent` de seguida i després envia **POST** `/auth/logout/` (sense body, `Authorization: Token <token>` **explícit**, `timeout: 5000 ms`) per **revocar-lo**. Mai no llança (`catch` buit).
 - `register(payload)` → delega a `register.ts`.
 - `getToken()`.
 
@@ -349,7 +349,7 @@ Clau `mooc_local_courses`: `getAll`, `getById`, `save`, `remove`, `cloneFrom`.
 Usa l'`apiClient` de `httpClient.ts` (sense cap header manual). `fetchProfile()` GET `/users/me/settings/` · `updateProfile()` **PATCH** (mateixa URL) · `fetchOrganizations()` GET `/orgs/` · `updateMyAvatar(file)` **PATCH** `/users/me/avatar/` (FormData `avatar`, respon **204** → `Promise<void>`; la imatge es torna a carregar amb `avatarCache`) · `extractProfileErrors()`.
 
 ### `register.ts` — alta d'usuari
-Usa el `publicClient` de `httpClient.ts` (sense token). `loadRegistrationData()` GET `/users/register/` (sense auth) · `registerUser(payload)` **POST** `/users/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.
+Usa el `publicClient` de `httpClient.ts` (sense token). `loadRegistrationData()` GET `/auth/register/options/` (sense auth) · `registerUser(payload)` **POST** `/auth/register/` amb **FormData** (`first_name`, `last_name`, `email`, `username`, `password1`, `password2`; opcionals `organization`, `default_avatar`, `avatar`). Desa `token` si el retorn en porta.
 
 ### `statsService.ts` — comptador públic d'alumnes
 `getStudentCount()` **GET** `/public/stats/` → `{ students: number }`, sobre el client compartit de `api.ts`. Retorna `number | null` (null si falla o si `students` no és un nombre finit), sense llançar. ⚠️ **L'endpoint encara no existeix** al backend: la crida només s'activa quan `VITE_ENABLE_PUBLIC_STATS=true|'1'`, controlat per `usePublicStats`.
@@ -362,7 +362,7 @@ Usa el `publicClient` de `httpClient.ts` (sense token). `loadRegistrationData()`
 
 1. **`AuthContext`** (`AuthProvider` + `useAuth()`): llegeix `currentStudent` i `token` de localStorage; exposa `login`/`logout`. ⚠️ `useAuth()` **no es consumeix enlloc** i `AuthContext.login` no omple `user`, de manera que `isAuthenticated` no s'activa mai per aquesta via.
 2. **Flux real**: `StudentDashboard.handleLogin` crida `authService.login()` directament i desa `currentStudent` a localStorage (ja **no** hi posa `code`; fix2). El `Header` llegeix `token`/`currentStudent` de localStorage directament.
-3. **Capa HTTP** (`src/services/httpClient.ts`, nou a fix2): `apiClient` afegeix `Authorization: Token` a cada petició i, si rep un **401 amb el token actual**, neteja `token` + `currentStudent` i dispara `auth-state-change` (un 401 d'un token antic en vol s'ignora). `publicClient` no envia token i el fan servir login i registre. `authService.logout()` llegeix el token **abans** de netejar-lo, el neteja de seguida i després el revoca amb `POST /users/auth/logout/` (`Authorization` explícit, 5000 ms), sense llençar mai.
+3. **Capa HTTP** (`src/services/httpClient.ts`, nou a fix2): `apiClient` afegeix `Authorization: Token` a cada petició i, si rep un **401 amb el token actual**, neteja `token` + `currentStudent` i dispara `auth-state-change` (un 401 d'un token antic en vol s'ignora). `publicClient` no envia token i el fan servir login i registre. `authService.logout()` llegeix el token **abans** de netejar-lo, el neteja de seguida i després el revoca amb `POST /auth/logout/` (`Authorization` explícit, 5000 ms), sense llençar mai.
 
 La navegació a `/teacher` es fa des del commutador de rol del `Header` (`mooc_role`). **No hi ha validació real del token** en engegar.
 
