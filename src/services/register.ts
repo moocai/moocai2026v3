@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { publicClient } from './httpClient';
+import { clearSavedTestAnswers } from './testAnswerStorage';
 
 export const REGISTER_URL = '/users/register/';
 
@@ -55,6 +56,9 @@ export async function registerUser(payload: RegisterPayload) {
 
   const data = response.data as { token?: string } | undefined;
   if (data?.token) {
+    // Sessió nova: res de l'alumne anterior (ni el seu id ni les seves respostes dels tests)
+    localStorage.removeItem('currentStudent');
+    clearSavedTestAnswers();
     localStorage.setItem('token', data.token);
   }
 

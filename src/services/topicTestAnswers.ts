@@ -1,4 +1,5 @@
 import { courseService } from './courseService';
+import { TEST_ANSWERS_PREFIX } from './testAnswerStorage';
 
 // Respostes dels tests de tema, compartides entre TopicTestPage i la llista de tests de
 // CourseLessons. Es desen per usuari: { answers, correct, choices }. Com que només hi ha un
@@ -22,11 +23,17 @@ export const readJson = (key: string): Record<string, any> => {
 };
 
 export const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
-const getAnswersKey = () => `mooc_test_answers_${getStudentId()}`;
+const getAnswersKey = () => `${TEST_ANSWERS_PREFIX}${getStudentId()}`;
+// Amb sessió però sense id d'alumne (p. ex. just després de registrar-se, abans d'iniciar sessió)
+// les respostes es guarden només en memòria: si no, anirien al calaix anònim ('temp'),
+// compartit per tothom qui faci servir aquest navegador sense sessió.
+const canCache = () => !(isLoggedIn() && getStudentId() === 'temp');
+let memoryAnswers: Record<string, SavedAnswer> = {};
+if (typeof window !== 'undefined') window.addEventListener('auth-state-change', () => { memoryAnswers = {}; });
 
 export const answerKey = (courseId: string, problemSlug: string) => `${courseId}_${problemSlug}`;
 
-export const readAllSavedAnswers = (): Record<string, SavedAnswer> => readJson(getAnswersKey());
+export const readAllSavedAnswers = (): Record<string, SavedAnswer> => (canCache() ? readJson(getAnswersKey()) : memoryAnswers);
 
 /**
  * Resposta desada d'un test. Si es passen les opcions actuals del test, la resposta només
@@ -48,6 +55,11 @@ const notify = () => window.dispatchEvent(new Event('lessonProgressUpdated'));
 /** Desa respostes i manté el progrés global (true = correcte, 'attempted' = incorrecte). */
 export const saveAnswers = (entries: Record<string, SavedAnswer>) => {
   if (Object.keys(entries).length === 0) return;
+  if (!canCache()) {
+    memoryAnswers = { ...memoryAnswers, ...entries };
+    notify();
+    return;
+  }
   const answersKey = getAnswersKey();
   localStorage.setItem(answersKey, JSON.stringify({ ...readJson(answersKey), ...entries }));
   const progressKey = getProgressKey();
