@@ -101,7 +101,10 @@ export const courseService = {
 
   async getChallengeSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`);
-    return Array.isArray(data) ? data : (data.results || []);
+    // L'esquema diu llista, però és la submission pròpia: s'accepta també un objecte sol
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return data && typeof data === 'object' ? [data] : [];
   },
 
   async getPeerSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {

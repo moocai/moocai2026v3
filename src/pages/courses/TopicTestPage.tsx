@@ -56,7 +56,8 @@ export default function TopicTestPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const [progress, setProgress] = useState<Record<string, any>>({});
+  // Respostes desades d'aquest usuari: pinten el navegador de preguntes (mateixa font que les opcions)
+  const [savedAnswers, setSavedAnswers] = useState<Record<string, any>>({});
 
   // false mentre es demanen al servidor les respostes que no hi ha desades localment
   const [serverReady, setServerReady] = useState(false);
@@ -71,11 +72,8 @@ export default function TopicTestPage() {
     return field[lang] || field.ca || field.es || field.en || '';
   }, [lang]);
 
-  // Progrés dels tests (encertat / intentat) per pintar el navegador de preguntes
   useEffect(() => {
-    const load = () => {
-      setProgress(readJson(getProgressKey()));
-    };
+    const load = () => setSavedAnswers(readJson(getAnswersKey()));
     load();
     window.addEventListener('lessonProgressUpdated', load);
     return () => window.removeEventListener('lessonProgressUpdated', load);
@@ -83,7 +81,7 @@ export default function TopicTestPage() {
 
   // Fa scroll fins al feedback just després d'enviar (no quan es restaura un test ja respost)
   useEffect(() => {
-    if (result?.fresh) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (result?.fresh) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [result]);
 
   useEffect(() => {
@@ -228,8 +226,8 @@ export default function TopicTestPage() {
     }
 
     setResult({ correct, choices: review, fresh: true });
-    saveProgress(key, correct);
     writeSavedAnswers({ [key]: { answers, correct, choices: review } });
+    saveProgress(key, correct);
     if (isLoggedIn()) void refreshCoursePoints(course?.slug || courseId, correct ? 4 : 0);
   };
 
@@ -328,28 +326,30 @@ export default function TopicTestPage() {
     };
   };
 
-  const choiceBadge = (value: string) => {
+  // Icona a la dreta de l'opció (sense línia de text extra): ✓ correcta, ✗ triada i incorrecta
+  const choiceIcon = (value: string) => {
     const state = choiceState(value);
-    const review = reviewChoices.find((c: any) => String(c.id) === value);
-    const explanation = review?.explanation_html || review?.explanationHtml || '';
-    const isSel = selectedAnswers.includes(value);
+    if (!state) return null;
     return (
-      <>
-      {state && <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, ml: 4, mb: 0.5, fontSize: '0.75rem', fontWeight: 700, color: state === 'correct' ? 'success.main' : 'error.main' }}>
-        {state === 'correct' ? <CircleCheck size={14} /> : <CircleX size={14} />}
-        {state === 'correct'
-          ? (isSel ? t('topic_test.your_correct', 'Has encertat!') : t('topic_test.was_correct', 'Era la resposta correcta'))
-          : t('topic_test.your_wrong', 'La teva resposta')}
-      </Box>}
-      {answered && explanation && (
-        <Box sx={{ ml: 4, mr: 1, mb: 1, fontSize: '0.85rem', color: 'text.secondary', '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: explanation }} />
-      )}
-      </>
+      <Box sx={{ display: 'flex', alignItems: 'center', pr: 1.5, color: state === 'correct' ? 'success.main' : 'error.main', flexShrink: 0 }}
+        aria-label={state === 'correct' ? t('topic_test.correct_option', 'Opció correcta') : t('topic_test.wrong_option', 'Opció incorrecta')}>
+        {state === 'correct' ? <CircleCheck size={22} /> : <CircleX size={22} />}
+      </Box>
     );
   };
 
+  // Explicació del professor (si n'hi ha), un cop respost
+  const choiceExplanation = (value: string) => {
+    if (!answered) return null;
+    const review = reviewChoices.find((c: any) => String(c.id) === value);
+    const explanation = review?.explanation_html || review?.explanationHtml || '';
+    if (!explanation) return null;
+    return <Box sx={{ ml: 5.5, mr: 2, mb: 1, fontSize: '0.85rem', color: 'text.secondary', '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: explanation }} />;
+  };
+
   return (
-    <Box sx={{ width: '100%', minHeight: '100vh', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    // El MainLayout dona una alçada fixa amb overflow ocult: el scroll ha de ser aquí dins
+    <Box sx={{ width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
         {/* Botó de tornar enrere */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -389,7 +389,8 @@ export default function TopicTestPage() {
                 </Box>
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {topicTests.map((st: any, idx: number) => {
-                    const status = progress[`${courseId}_${st.problemSlug}`];
+                    const saved = savedAnswers[`${courseId}_${st.problemSlug}`];
+                    const status = saved?.correct === true ? true : saved?.correct === false ? 'attempted' : null;
                     const isCurrent = idx === currentIdx;
                     const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
                     const statusLabel = status === true ? t('topic_test.status_correct', 'encertada')
@@ -428,6 +429,28 @@ export default function TopicTestPage() {
               </Box>
             </Box>
 
+            {/* Resultat del test: ben visible, abans de les opcions */}
+            {answered && result.correct !== null && (
+              <Box ref={resultRef} role="status" sx={{
+                display: 'flex', alignItems: 'center', gap: 1.5, mb: 2, p: 1.5, borderRadius: 1.5, border: '2px solid',
+                borderColor: result.correct ? 'success.main' : 'error.main',
+                bgcolor: alpha(result.correct ? theme.palette.success.main : theme.palette.error.main, 0.12),
+                color: result.correct ? 'success.main' : 'error.main',
+              }}>
+                {result.correct ? <CircleCheck size={32} /> : <CircleX size={32} />}
+                <Box>
+                  <Typography sx={{ fontWeight: 900, fontSize: '1.1rem', lineHeight: 1.2 }}>
+                    {result.correct ? t('topic_test.result_correct_title', 'Resposta correcta') : t('topic_test.result_wrong_title', 'Resposta incorrecta')}
+                  </Typography>
+                  <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+                    {result.correct
+                      ? t('topic_test.result_correct_text', 'Has encertat aquest test.')
+                      : t('topic_test.result_wrong_text', 'Les opcions correctes estan marcades en verd.')}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+
             <FormControl disabled={answered || loading} fullWidth>
               {isMultiChoice ? (
                 <FormGroup>
@@ -438,12 +461,15 @@ export default function TopicTestPage() {
                       const checked = selectedAnswers.includes(value);
                       return (
                         <Paper key={value} variant="outlined" sx={choiceSx(value, checked)}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <FormControlLabel
                             control={<Checkbox checked={checked} onChange={(event) => handleCheckboxChange(value, event.target.checked)} sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
                             label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
-                            sx={{ mx: 1, width: '100%', mr: 0 }}
+                            sx={{ mx: 1, mr: 0, flex: 1 }}
                           />
-                          {choiceBadge(value)}
+                          {choiceIcon(value)}
+                          </Box>
+                          {choiceExplanation(value)}
                         </Paper>
                       );
                     })}
@@ -458,13 +484,16 @@ export default function TopicTestPage() {
                       const checked = selectedAnswers[0] === value;
                       return (
                         <Paper key={value} variant="outlined" sx={choiceSx(value, checked)}>
+                          <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <FormControlLabel
                             value={value}
                             control={<Radio sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
                             label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
-                            sx={{ mx: 1, width: '100%', mr: 0 }}
+                            sx={{ mx: 1, mr: 0, flex: 1 }}
                           />
-                          {choiceBadge(value)}
+                          {choiceIcon(value)}
+                          </Box>
+                          {choiceExplanation(value)}
                         </Paper>
                       );
                     })}
@@ -474,13 +503,8 @@ export default function TopicTestPage() {
             </FormControl>
 
             {/* Enviament */}
-            <Box ref={resultRef} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', mt: 3, gap: 1.5 }}>
-              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: submitError ? 'error.main' : answered && result.correct !== null ? (result.correct ? 'success.main' : 'error.main') : 'text.secondary' }}>
-                {submitError
-                  ?? (answered && result.correct !== null
-                    ? (result.correct ? t('topic_test.result_correct', 'Correcte!') : t('topic_test.result_wrong', 'Incorrecte'))
-                    : '')}
-              </Typography>
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, justifyContent: 'space-between', mt: 3, gap: 1.5 }}>
+              <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'error.main' }}>{submitError ?? ''}</Typography>
               {answered ? (
                 currentIdx < topicTests.length - 1 && (
                   <Button variant="contained" onClick={() => goTo(currentIdx + 1)} endIcon={<ChevronRight size={16} />} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
