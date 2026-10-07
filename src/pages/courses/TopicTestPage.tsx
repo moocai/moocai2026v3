@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, IconButton, ButtonBase, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
+import { Box, Typography, Button, CircularProgress, useTheme, alpha, Paper, Radio, Checkbox, ButtonBase, RadioGroup, FormControlLabel, FormControl, FormGroup } from '@mui/material';
 import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const getProgressKey = () => {
+const getStudentId = () => {
   let studentId = 'temp';
   try {
     const savedStudent = localStorage.getItem('currentStudent');
@@ -16,7 +16,15 @@ const getProgressKey = () => {
       if (parsedStudent?.id) studentId = parsedStudent.id;
     }
   } catch { studentId = 'temp'; }
-  return `mooc_global_progress_${studentId}`;
+  return studentId;
+};
+
+const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
+// Respostes enviades per test: només hi ha un intent, així que es guarden per tornar-les a mostrar
+const getAnswersKey = () => `mooc_test_answers_${getStudentId()}`;
+
+const readJson = (key: string): Record<string, any> => {
+  try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
 };
 
 export default function TopicTestPage() {
@@ -47,16 +55,16 @@ export default function TopicTestPage() {
   // Progrés dels tests (encertat / intentat) per pintar el navegador de preguntes
   useEffect(() => {
     const load = () => {
-      try { setProgress(JSON.parse(localStorage.getItem(getProgressKey()) || '{}')); } catch { setProgress({}); }
+      setProgress(readJson(getProgressKey()));
     };
     load();
     window.addEventListener('lessonProgressUpdated', load);
     return () => window.removeEventListener('lessonProgressUpdated', load);
   }, []);
 
-  // Fa scroll fins al feedback just després d'enviar
+  // Fa scroll fins al feedback just després d'enviar (no quan es restaura un test ja respost)
   useEffect(() => {
-    if (result) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (result?.fresh) resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [result]);
 
   useEffect(() => {
@@ -90,7 +98,20 @@ export default function TopicTestPage() {
         // Sense fallback: si el problema no és dins del tema, el test es mostra
         // com a "no trobat". L'antiga crida amb `topic?.id || ''` construïa
         // `/topics//problems/<slug>/` (404) i acabava en el mateix resultat.
-        if (!cancelled) setTopicTest(problem || null);
+        if (cancelled) return;
+        setTopicTest(problem || null);
+
+        // Si ja s'havia respost, es mostra la resposta i la correcció (sense reintents)
+        const key = `${courseId}_${currentTestSlug}`;
+        const saved = readJson(getAnswersKey())[key];
+        const status = readJson(getProgressKey())[key];
+        if (Array.isArray(saved)) {
+          setSelectedAnswers(saved.map(String));
+          setResult({ correct: status === true });
+        } else if (status === true || status === 'attempted') {
+          // Respost amb la versió anterior, que no desava la selecció
+          setResult({ correct: status === true, legacy: true });
+        }
       } catch (error) {
         console.error('Error loading topic test:', error);
         if (!cancelled) setTopicTest(null);
@@ -114,18 +135,21 @@ export default function TopicTestPage() {
     }
 
     const passed = answers.length === correctSet.size && answers.every((a) => correctSet.has(a));
-    setResult({ correct: passed });
+    setResult({ correct: passed, fresh: true });
 
     if (!courseId || !currentTestSlug) return;
-    const progressKey = getProgressKey();
-    let progress: Record<string, any> = {};
-    try { progress = JSON.parse(localStorage.getItem(progressKey) || '{}'); } catch { progress = {}; }
-
     const challengeKey = `${courseId}_${currentTestSlug}`;
-    if (passed) progress[challengeKey] = true;
-    else if (progress[challengeKey] !== true) progress[challengeKey] = 'attempted';
 
+    const progressKey = getProgressKey();
+    const progress = readJson(progressKey);
+    progress[challengeKey] = passed ? true : 'attempted';
     localStorage.setItem(progressKey, JSON.stringify(progress));
+
+    const answersKey = getAnswersKey();
+    const savedAnswers = readJson(answersKey);
+    savedAnswers[challengeKey] = answers;
+    localStorage.setItem(answersKey, JSON.stringify(savedAnswers));
+
     window.dispatchEvent(new Event('lessonProgressUpdated'));
   };
 
@@ -147,18 +171,13 @@ export default function TopicTestPage() {
     evaluate(selectedAnswers);
   };
 
-  const handleRetry = () => {
-    setResult(null);
-    setSelectedAnswers([]);
-  };
-
   const goTo = (idx: number) => {
     if (idx < 0 || idx >= topicTests.length || idx === currentIdx) return;
     setCurrentIdx(idx);
     window.scrollTo({ top: 0 });
   };
 
-  // Dreceres de teclat: ←/→ canvien de test, Enter envia (o torna-ho a provar)
+  // Dreceres de teclat: ←/→ canvien de test, Enter envia (o passa al següent si ja s'ha respost)
   const keyHandlerRef = useRef<(e: KeyboardEvent) => void>(() => {});
   keyHandlerRef.current = (e: KeyboardEvent) => {
     if (e.altKey || e.ctrlKey || e.metaKey) return;
@@ -167,7 +186,7 @@ export default function TopicTestPage() {
     if (e.key === 'ArrowLeft') { e.preventDefault(); goTo(currentIdx - 1); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); goTo(currentIdx + 1); }
     else if (e.key === 'Enter' && !target?.closest('button, a')) {
-      if (answered) { e.preventDefault(); handleRetry(); }
+      if (answered) { e.preventDefault(); goTo(currentIdx + 1); }
       else if (selectedAnswers.length > 0) { e.preventDefault(); handleSubmit(); }
     }
   };
@@ -252,43 +271,6 @@ export default function TopicTestPage() {
           </Button>
         </Box>
 
-        {/* Navegador de tests: posició fixa (no depèn del nombre d'opcions) */}
-        {topicTests.length > 1 && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-            <IconButton aria-label={t('topic_test.prev', 'Anterior')} title={`${t('topic_test.prev', 'Anterior')} (←)`} onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} size="small" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-              <ChevronLeft size={18} />
-            </IconButton>
-            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap', flex: 1, minWidth: 0 }}>
-              {topicTests.map((st: any, idx: number) => {
-                const status = progress[`${courseId}_${st.problemSlug}`];
-                const isCurrent = idx === currentIdx;
-                const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
-                return (
-                  <ButtonBase
-                    key={st.problemSlug}
-                    onClick={() => goTo(idx)}
-                    aria-current={isCurrent ? 'step' : undefined}
-                    title={st.title || st.name || getText(st.subtitle) || st.problemSlug}
-                    sx={{
-                      minWidth: 32, height: 32, px: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800,
-                      border: isCurrent ? '2px solid #8400ff' : '1px solid',
-                      borderColor: isCurrent ? '#8400ff' : (color ?? 'divider'),
-                      bgcolor: color ? alpha(color, 0.15) : 'transparent',
-                      color: color ?? 'text.primary',
-                    }}
-                  >
-                    {idx + 1}
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-            <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.secondary' }}>{currentIdx + 1} / {topicTests.length}</Typography>
-            <IconButton aria-label={t('topic_test.next_short', 'Següent')} title={`${t('topic_test.next_short', 'Següent')} (→)`} onClick={() => goTo(currentIdx + 1)} disabled={currentIdx >= topicTests.length - 1} size="small" sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-              <ChevronRight size={18} />
-            </IconButton>
-          </Box>
-        )}
-
         {/* Títol principal */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
           <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' }, flex: 1 }}>{title}</Typography>
@@ -304,6 +286,51 @@ export default function TopicTestPage() {
           </Paper>
 
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+            {/* Navegador de preguntes: a dalt de la targeta, posició fixa (no depèn del nombre d'opcions) */}
+            {topicTests.length > 1 && (
+              <Box sx={{ mb: 2, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <Typography sx={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: 'text.secondary' }}>
+                    {t('topic_test.question_n_of', 'Pregunta {{n}} de {{total}}', { n: currentIdx + 1, total: topicTests.length })}
+                  </Typography>
+                  <Button size="small" variant="outlined" startIcon={<ChevronLeft size={16} />} onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} title="←" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: 'text.primary', borderColor: 'divider' }}>
+                    {t('topic_test.prev', 'Anterior')}
+                  </Button>
+                  <Button size="small" variant="outlined" endIcon={<ChevronRight size={16} />} onClick={() => goTo(currentIdx + 1)} disabled={currentIdx >= topicTests.length - 1} title="→" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: 'text.primary', borderColor: 'divider' }}>
+                    {t('topic_test.next_short', 'Següent')}
+                  </Button>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                  {topicTests.map((st: any, idx: number) => {
+                    const status = progress[`${courseId}_${st.problemSlug}`];
+                    const isCurrent = idx === currentIdx;
+                    const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
+                    const statusLabel = status === true ? t('topic_test.status_correct', 'encertada')
+                      : status === 'attempted' ? t('topic_test.status_wrong', 'fallada')
+                      : t('topic_test.status_pending', 'pendent');
+                    return (
+                      <ButtonBase
+                        key={st.problemSlug}
+                        onClick={() => goTo(idx)}
+                        aria-current={isCurrent ? 'step' : undefined}
+                        aria-label={`${t('topic_test.question', 'Pregunta')} ${idx + 1}: ${statusLabel}`}
+                        title={`${idx + 1}. ${st.title || st.name || getText(st.subtitle) || st.problemSlug} (${statusLabel})`}
+                        sx={{
+                          minWidth: 30, height: 30, px: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800,
+                          border: isCurrent ? '2px solid #8400ff' : '1px solid',
+                          borderColor: isCurrent ? '#8400ff' : (color ?? 'divider'),
+                          bgcolor: color ? alpha(color, 0.15) : 'transparent',
+                          color: color ?? 'text.primary',
+                        }}
+                      >
+                        {idx + 1}
+                      </ButtonBase>
+                    );
+                  })}
+                </Box>
+              </Box>
+            )}
+
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                 {isMultiChoice ? t('topic_test.multi_choice', 'Test de selecció múltiple') : t('topic_test.choose_answer', "Test d'elecció única")}
@@ -364,15 +391,20 @@ export default function TopicTestPage() {
               <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: answered ? (result.correct ? 'success.main' : 'error.main') : 'text.secondary' }}>
                 {answered
                   ? (result.correct ? t('topic_test.result_correct', 'Correcte!') : t('topic_test.result_wrong', 'Incorrecte'))
-                  : isMultiChoice
-                    ? `${t('topic_test.pick_n', 'Tria {{count}} opcions', { count: correctCount })} (${selectedAnswers.length}/${correctCount})`
-                    : ''}
+                  : ''}
                 {result?.error && <Box component="span" sx={{ color: 'error.main' }}>{result.error}</Box>}
+                {result?.legacy && (
+                  <Box component="span" sx={{ display: 'block', fontWeight: 500, color: 'text.secondary' }}>
+                    {t('topic_test.legacy_answer', "Ja l'havies respost, però no es va desar quina opció vas triar.")}
+                  </Box>
+                )}
               </Typography>
               {answered ? (
-                <Button variant="outlined" onClick={handleRetry} sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 2 }}>
-                  {t('topic_test.retry', 'Torna-ho a provar')}
-                </Button>
+                currentIdx < topicTests.length - 1 && (
+                  <Button variant="contained" onClick={() => goTo(currentIdx + 1)} endIcon={<ChevronRight size={16} />} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
+                    {t('topic_test.next_question', 'Següent pregunta')}
+                  </Button>
+                )
               ) : (
                 <Button variant="contained" onClick={handleSubmit} disabled={selectedAnswers.length === 0} sx={{ fontWeight: 800, textTransform: 'none', borderRadius: 2, bgcolor: '#8400ff', color: '#fff', '&:hover': { bgcolor: '#6a00cc' } }}>
                   {t('topic_test.submit', 'Envia')}
