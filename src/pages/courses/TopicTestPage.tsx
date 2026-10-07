@@ -22,9 +22,19 @@ const getStudentId = () => {
 };
 
 const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
-// Còpia local de les respostes: només per a usuaris sense sessió, perquè el servidor
-// no desa res seu en cursos públics (amb sessió, la font de veritat és el servidor)
+// Respostes enviades per test, per usuari: { answers, correct, choices }.
+// Com que només hi ha un intent, una resposta desada no canvia mai: si hi és, no cal
+// preguntar al servidor. Per a usuaris sense sessió és l'única còpia (el servidor no
+// desa res seu en cursos públics).
 const getAnswersKey = () => `mooc_test_answers_${getStudentId()}`;
+const readSavedAnswer = (key: string) => {
+  const saved = readJson(getAnswersKey())[key];
+  return saved && Array.isArray(saved.answers) ? saved : null;
+};
+const writeSavedAnswers = (entries: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }>) => {
+  const answersKey = getAnswersKey();
+  localStorage.setItem(answersKey, JSON.stringify({ ...readJson(answersKey), ...entries }));
+};
 const isLoggedIn = () => !!localStorage.getItem('token');
 
 const readJson = (key: string): Record<string, any> => {
@@ -47,6 +57,9 @@ export default function TopicTestPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [progress, setProgress] = useState<Record<string, any>>({});
+
+  // false mentre es demanen al servidor les respostes que no hi ha desades localment
+  const [serverReady, setServerReady] = useState(false);
 
   const resultRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +92,7 @@ export default function TopicTestPage() {
     const topic = course.content?.find((t: any) => (t.subTopics || []).some((st: any) => st.problemSlug === challengeSlug));
     const tests = topic?.subTopics?.filter((st: any) => st.type === 'test') || [];
     setTopicTests(tests);
+    loadTopicAnswers(topic?.id, tests);
 
     const initialIdx = tests.findIndex((st: any) => st.problemSlug === challengeSlug);
     if (initialIdx !== -1) {
@@ -87,6 +101,48 @@ export default function TopicTestPage() {
   }, [courseId, challengeSlug, course]);
 
   const currentTestSlug = topicTests[currentIdx]?.problemSlug || challengeSlug;
+
+  // Estat de tots els tests del tema, perquè el navegador de preguntes es pinti bé en
+  // qualsevol dispositiu. Primer es mira què hi ha desat per a aquest usuari; només dels
+  // tests sense resposta desada es pregunta al servidor (una petició per test, perquè l'API
+  // no té endpoint per tema, més la llista de problemes fresca, que un cop respost inclou
+  // `is_correct`).
+  const topicLoadRef = useRef(0);
+  function loadTopicAnswers(topicSlug: string | undefined, tests: any[]) {
+    const run = ++topicLoadRef.current;
+    const missing = tests.filter((st: any) => !readSavedAnswer(`${courseId}_${st.problemSlug}`));
+    if (!isLoggedIn() || !courseId || !topicSlug || missing.length === 0) { setServerReady(true); return; }
+    setServerReady(false);
+    (async () => {
+      const [problems, ...subs] = await Promise.all([
+        courseService.getTopicProblems(courseId, topicSlug).catch(() => [] as any[]),
+        ...missing.map((st: any) => courseService.getChallengeSubmissions(courseId, topicSlug, st.problemSlug).catch(() => [] as any[])),
+      ]);
+      if (run !== topicLoadRef.current) return;
+      const found: Record<string, { answers: string[]; correct: boolean | null; choices: any[] }> = {};
+      const progressKey = getProgressKey();
+      const localProgress = readJson(progressKey);
+      missing.forEach((st: any, i: number) => {
+        const own = (subs[i] || []).find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0);
+        if (!own) return;
+        const answers = own.choices.map(String);
+        const choices = (problems as any[]).find((p: any) => p.slug === st.problemSlug)?.choices || [];
+        const correctIds = choices.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
+        const correct = correctIds.length > 0
+          ? correctIds.length === answers.length && answers.every((id: string) => correctIds.includes(id))
+          : null;
+        const key = `${courseId}_${st.problemSlug}`;
+        // Sense correcció (no hauria de passar) no es desa: així es torna a demanar
+        if (correct === null) return;
+        found[key] = { answers, correct, choices };
+        localProgress[key] = correct ? true : 'attempted';
+      });
+      writeSavedAnswers(found);
+      localStorage.setItem(progressKey, JSON.stringify(localProgress));
+      window.dispatchEvent(new Event('lessonProgressUpdated'));
+      setServerReady(true);
+    })();
+  }
 
   useEffect(() => {
     if (!courseId || !currentTestSlug || !course) return;
@@ -109,45 +165,25 @@ export default function TopicTestPage() {
         setTopicTest(problem || null);
         if (!problem || !topic) return;
 
-        // Si ja s'havia respost, es mostra la resposta i la correcció (només hi ha un intent)
-        const key = `${courseId}_${currentTestSlug}`;
-        if (isLoggedIn()) {
-          let own: any = null;
-          try {
-            const subs = await courseService.getChallengeSubmissions(courseId, topic.id, currentTestSlug);
-            own = subs.find((sub: any) => Array.isArray(sub?.choices) && sub.choices.length > 0) || null;
-          } catch { own = null; } // 404: encara no s'ha respost
-          if (cancelled || !own) return;
-          const selected = own.choices.map(String);
-          // La llista del curs pot ser d'abans de respondre (sense `is_correct`): es demana el detall
-          let review: any[] = [];
-          try { review = (await courseService.getChallenge(courseId, topic.id, currentTestSlug))?.choices || []; } catch { review = []; }
-          if (cancelled) return;
-          const correctIds = review.filter((c: any) => c.is_correct).map((c: any) => String(c.id));
-          const correct = correctIds.length > 0
-            ? correctIds.length === selected.length && selected.every((id: string) => correctIds.includes(id))
-            : null;
-          setSelectedAnswers(selected);
-          setResult({ correct, choices: review });
-          if (correct !== null) saveProgress(key, correct);
-        } else {
-          const saved = readJson(getAnswersKey())[key];
-          if (saved && Array.isArray(saved.answers)) {
-            setSelectedAnswers(saved.answers.map(String));
-            setResult({ correct: !!saved.correct, choices: saved.choices || [] });
-          }
+        // Si ja s'havia respost, es mostra la resposta i la correcció (només hi ha un intent).
+        // Amb sessió cal esperar l'estat del servidor (loadTopicAnswers).
+        if (isLoggedIn() && !serverReady) return;
+        const saved = readSavedAnswer(`${courseId}_${currentTestSlug}`);
+        if (saved) {
+          setSelectedAnswers(saved.answers.map(String));
+          setResult({ correct: saved.correct, choices: saved.choices || [] });
         }
       } catch (error) {
         console.error('Error loading topic test:', error);
         if (!cancelled) setTopicTest(null);
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setLoading(isLoggedIn() && !serverReady);
       }
     };
 
     loadTopicTest();
     return () => { cancelled = true; };
-  }, [courseId, currentTestSlug, course]);
+  }, [courseId, currentTestSlug, course, serverReady]);
 
   const saveProgress = (key: string, passed: boolean) => {
     const progressKey = getProgressKey();
@@ -193,14 +229,8 @@ export default function TopicTestPage() {
 
     setResult({ correct, choices: review, fresh: true });
     saveProgress(key, correct);
-    if (!isLoggedIn()) {
-      const answersKey = getAnswersKey();
-      const savedAnswers = readJson(answersKey);
-      savedAnswers[key] = { answers, correct, choices: review };
-      localStorage.setItem(answersKey, JSON.stringify(savedAnswers));
-    } else {
-      void refreshCoursePoints(course?.slug || courseId, correct ? 4 : 0);
-    }
+    writeSavedAnswers({ [key]: { answers, correct, choices: review } });
+    if (isLoggedIn()) void refreshCoursePoints(course?.slug || courseId, correct ? 4 : 0);
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {
