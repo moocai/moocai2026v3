@@ -1,5 +1,4 @@
-import axios from 'axios';
-import { apiClient } from './httpClient';
+import { apiClient, apiErrorMessages } from './httpClient';
 
 export const PROFILE_URL = '/users/me/settings/';
 export const ORGS_URL = '/orgs/';
@@ -64,22 +63,7 @@ export async function updateMyAvatar(file: File): Promise<void> {
 }
 
 export function extractProfileErrors(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as Record<string, unknown> | undefined;
-    if (data) {
-      const messages: string[] = [];
-      const collect = (value: unknown) => {
-        if (Array.isArray(value)) {
-          value.forEach(collect);
-        } else if (value && typeof value === 'object') {
-          Object.values(value as Record<string, unknown>).forEach(collect);
-        } else if (value !== null && value !== undefined && String(value).trim() !== '') {
-          messages.push(String(value));
-        }
-      };
-      collect(data);
-      if (messages.length > 0) return messages.join('. ');
-    }
-  }
+  const messages = apiErrorMessages(error);
+  if (messages.length > 0) return messages.join('. ');
   return "No s'ha pogut actualitzar el perfil. Revisa les dades.";
 }

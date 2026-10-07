@@ -240,8 +240,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     pruneAvatarCacheOnce();
     const lastCourseSlug = readLastCourse()?.slug;
     if (lastCourseSlug) void preloadImage(`/api/v1/courses/${lastCourseSlug}/avatar/`);
-    // Avatar propi: /users/me/avatar/. `currentStudent` desa l'id i la URL
-    // /users/<id>/avatar/ no existeix, així que abans tornava 404/403.
+    // Avatar propi: /users/me/avatar/.
     void preloadImage(myAvatarUrl() ?? undefined);
 
     const saved = localStorage.getItem('currentStudent');
@@ -294,7 +293,9 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       const data = await authService.login(username, password);
       const role = 'student';
       const student: Student = {
-        id: data?.user?.id != null ? String(data.user.id) : username,
+        // L'API ja no retorna l'id de l'usuari: el username és l'identificador.
+        id: data?.user?.username || username,
+        username: data?.user?.username || username,
         name: data?.user?.name || username,
         email: data?.user?.email || username,
         role,

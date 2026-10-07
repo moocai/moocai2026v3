@@ -1,7 +1,8 @@
-import axios from 'axios';
-import { publicClient } from './httpClient';
+import { apiErrorMessages, publicClient } from './httpClient';
 
-export const REGISTER_URL = '/users/register/';
+export const REGISTER_URL = '/auth/register/';
+/** Dades del formulari (organitzacions, avatar per defecte). Només `GET`. */
+export const REGISTER_OPTIONS_URL = '/auth/register/options/';
 
 export interface Organization {
   id: number;
@@ -27,7 +28,7 @@ export interface RegisterPayload {
 }
 
 export async function loadRegistrationData(): Promise<RegistrationInfo> {
-  const response = await publicClient.get<RegistrationInfo>(REGISTER_URL);
+  const response = await publicClient.get<RegistrationInfo>(REGISTER_OPTIONS_URL);
   return response.data;
 }
 
@@ -62,22 +63,7 @@ export async function registerUser(payload: RegisterPayload) {
 }
 
 export function extractRegisterErrors(error: unknown): string {
-  if (axios.isAxiosError(error)) {
-    const data = error.response?.data as Record<string, unknown> | undefined;
-    if (data) {
-      const messages: string[] = [];
-      const collect = (value: unknown) => {
-        if (Array.isArray(value)) {
-          value.forEach(collect);
-        } else if (value && typeof value === 'object') {
-          Object.values(value as Record<string, unknown>).forEach(collect);
-        } else if (value !== null && value !== undefined && String(value).trim() !== '') {
-          messages.push(String(value));
-        }
-      };
-      collect(data);
-      if (messages.length > 0) return messages.join('. ');
-    }
-  }
+  const messages = apiErrorMessages(error);
+  if (messages.length > 0) return messages.join('. ');
   return "No s'ha pogut crear el compte. Revisa les dades.";
 }

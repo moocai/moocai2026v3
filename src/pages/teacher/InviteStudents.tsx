@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Box, Typography, TextField, Button, Stack, Alert, CircularProgress } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { api } from '../../services/api';
+import { apiErrorMessages } from '../../services/httpClient';
 
 export default function InviteStudents() {
   const { t } = useTranslation();
@@ -23,7 +24,7 @@ export default function InviteStudents() {
       setSuccess(`Invitación enviada a ${email}`);
       setEmail('');
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || err.message || 'Error al enviar la invitación';
+      const errorMessage = apiErrorMessages(err).join('. ') || err.message || 'Error al enviar la invitación';
       setError(errorMessage);
     } finally {
       setLoading(false);

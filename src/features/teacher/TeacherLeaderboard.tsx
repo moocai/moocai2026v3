@@ -76,7 +76,7 @@ export function TeacherLeaderboard() {
       
       // Mapear datos de la API al formato StudentData
       const mapped: StudentData[] = list.map((item: any, idx: number) => ({
-        id: item.user_id || item.id || String(idx),
+        id: item.username || item.user_id || item.id || String(idx),
         name: item.full_name || item.username || item.name || `Estudiante ${idx + 1}`,
         email: item.email,
         username: item.username,

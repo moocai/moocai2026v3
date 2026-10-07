@@ -45,3 +45,29 @@ apiClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+/**
+ * Missatges d'un error de l'API. Tots els errors tenen la forma
+ * `{ detail, code, errors: { camp: [missatges] } }`: es retornen els missatges
+ * de `errors` i, si no n'hi ha, el `detail`.
+ */
+export function apiErrorMessages(error: unknown): string[] {
+  if (!axios.isAxiosError(error)) return [];
+  const data = error.response?.data as { detail?: unknown; errors?: unknown } | undefined;
+  if (!data || typeof data !== 'object') return [];
+  const messages: string[] = [];
+  const collect = (value: unknown) => {
+    if (Array.isArray(value)) {
+      value.forEach(collect);
+    } else if (value && typeof value === 'object') {
+      Object.values(value as Record<string, unknown>).forEach(collect);
+    } else if (value !== null && value !== undefined && String(value).trim() !== '') {
+      messages.push(String(value));
+    }
+  };
+  collect(data.errors);
+  if (messages.length === 0 && typeof data.detail === 'string' && data.detail.trim() !== '') {
+    messages.push(data.detail);
+  }
+  return [...new Set(messages)];
+}
