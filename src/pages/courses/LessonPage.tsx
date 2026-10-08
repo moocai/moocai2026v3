@@ -258,7 +258,7 @@ export default function LessonPage() {
   // === Multi-model: un sol editor, un model/fitxer per llenguatge ===
   const [selectedLanguage, setSelectedLanguage] = useState<EditorLang>('python');
   const [codeByLang, setCodeByLang] = useState<Record<EditorLang, string>>({ python: '', react: '' });
-  const [testedCode, setTestedCode] = useState<string | null>(null); // codi Python que ha passat Test Python
+  const [testedCode, setTestedCode] = useState<string | null>(null); // codi Python que ha passat «Executar»
   const userInput = codeByLang[selectedLanguage];
   const userInputRef = useRef(userInput); userInputRef.current = userInput;
   const codeStorageRef = useRef(codeByLang); codeStorageRef.current = codeByLang;
@@ -377,7 +377,7 @@ export default function LessonPage() {
     return a?.missing.length ? ` · falta: ${a.missing.join(', ')}` : '';
   })();
   const showOffTopicHint = userInput.trim().length > 0 && !isRelated;
-  // Python: Enviar només es desbloqueja si el codi actual té relació amb l'enunciat I s'ha provat amb "Test Python".
+  // Python: Enviar només es desbloqueja si el codi actual té relació amb l'enunciat I s'ha provat amb «Executar».
   // Si l'usuari canvia el codi després de provar-lo, es torna a bloquejar.
   const hasBeenTested = selectedLanguage !== 'python' || (testedCode !== null && testedCode === userInput);
   const canSubmit = isRelated && hasBeenTested;
@@ -389,7 +389,7 @@ export default function LessonPage() {
     ? t('lesson.submit_tooltip', 'Envia la teva solució al servidor')
     : !isRelated
       ? t('lesson.submit_blocked_off_topic', "Per enviar, el codi ha de tenir relació amb l'enunciat")
-      : t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar');
+      : t('lesson.test_first_hint', 'Executa el codi per poder enviar');
   const liveRenderTooltip = showLiveRender ? t('lesson.hide_live_render', 'Amaga la visualització') : t('lesson.show_live_render', 'Mostra la visualització');
 
 
@@ -630,7 +630,7 @@ export default function LessonPage() {
     const related = isRelatedToStatement(userInputRef.current, statementText, currentProblem?.precode, selectedLanguage, statementShown);
     console.debug('[Validació enunciat]', { related, input: userInputRef.current, statementShown, concepts: analyzePythonConcepts(userInputRef.current, statementShown) });
     if (related && selectedLanguage === 'python' && testedCode !== userInputRef.current) {
-      const msg = t('lesson.test_first_error', "Primer executa el codi amb «Test Python»: Enviar es desbloqueja quan el resultat és coherent amb l'activitat.");
+      const msg = t('lesson.test_first_error', "Primer executa el codi amb «Executar»: Enviar es desbloqueja quan el resultat és coherent amb l'activitat.");
       setConsoleOutput([`⚠️ ${msg}`]);
       addNotification(msg, 'error');
       return;
@@ -913,7 +913,7 @@ export default function LessonPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
+                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Executa el codi per poder enviar')}</Typography>)}
                 {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
                 {isReactCourse && (
                   <Tooltip title={liveRenderTooltip} arrow>
@@ -973,7 +973,7 @@ export default function LessonPage() {
             </Tooltip>
             {selectedLanguage === 'python' && (
               <Tooltip title={testTooltip} arrow>
-                <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>Test Python</Button>
+                <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>{t('lesson.run_button', 'Executar')}</Button>
               </Tooltip>
             )}
             <Tooltip title={submitTooltip} arrow>
@@ -1120,7 +1120,7 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
+                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Executa el codi per poder enviar')}</Typography>)}
                 {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -1132,7 +1132,7 @@ export default function LessonPage() {
                 {selectedLanguage === 'python' && (
                   <Tooltip title={testTooltip} arrow>
                     <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} fill="#fff"/>} sx={{ borderColor: '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                      Test Python
+                      {t('lesson.run_button', 'Executar')}
                     </Button>
                   </Tooltip>
                 )}

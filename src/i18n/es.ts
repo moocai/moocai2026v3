@@ -308,8 +308,10 @@ export default {
     test_tooltip: "Ejecuta el código aquí para comprobar el resultado (no se envía)",
     submit_tooltip: "Envía tu solución al servidor",
     submit_blocked_off_topic: "Para enviar, el código debe estar relacionado con el enunciado",
-    test_first_hint: "Prueba el código con Test Python para poder enviar",
+    test_first_hint: "Ejecuta el código para poder enviar",
     show_live_render: "Mostrar la visualización",
+    run_button: "Ejecutar",
+    test_first_error: "Primero ejecuta el código con «Ejecutar»: Enviar se desbloquea cuando el resultado es coherente con la actividad.",
     hide_live_render: "Ocultar la visualización"
   }
 };

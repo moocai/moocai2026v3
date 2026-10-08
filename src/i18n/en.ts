@@ -304,8 +304,10 @@ export default {
     test_tooltip: "Run the code here to check the result (it is not submitted)",
     submit_tooltip: "Submit your solution to the server",
     submit_blocked_off_topic: "To submit, your code must be related to the statement",
-    test_first_hint: "Test your code with Test Python before submitting",
+    test_first_hint: "Run your code before submitting",
     show_live_render: "Show the preview",
+    run_button: "Run",
+    test_first_error: "First run your code with «Run»: Submit unlocks once the result is consistent with the activity.",
     hide_live_render: "Hide the preview"
   }
 };

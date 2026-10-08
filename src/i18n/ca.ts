@@ -302,8 +302,10 @@ export default {
     test_tooltip: "Executa el codi aquí per comprovar-ne el resultat (no s'envia)",
     submit_tooltip: "Envia la teva solució al servidor",
     submit_blocked_off_topic: "Per enviar, el codi ha de tenir relació amb l'enunciat",
-    test_first_hint: "Prova el codi amb Test Python per poder enviar",
+    test_first_hint: "Executa el codi per poder enviar",
     show_live_render: "Mostra la visualització",
+    run_button: "Executar",
+    test_first_error: "Primer executa el codi amb «Executar»: Enviar es desbloqueja quan el resultat és coherent amb l'activitat.",
     hide_live_render: "Amaga la visualització"
   }
 };
