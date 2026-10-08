@@ -39,14 +39,33 @@ Mesurat amb Playwright i una API simulada (5 cursos, 5 temes per curs):
 | Obrir un curs (pestanya Teoria) | 15 | 9 |
 | Obrir un problema (càrrega directa) | 8 | 7 |
 
-## Fase 2 (proposta, cal backend): un endpoint d'esquema del curs
+## Fase 2: endpoints nous i modificats del backend
 
-El que queda (les 7–9 peticions d'un curs) és el mateix 2 + N: el frontend ha de recórrer tema per tema per saber quins problemes té. `LessonPage` en necessita l'esquema sencer (barra de progrés del curs, anterior/següent entre temes) i el dashboard el del curs seleccionat.
+PRs d'`algorien`: ibci/algorien#302 (`my_solution`), ibci/algorien#303 (resum per tema), ibci/algorien#304 (`my_role`, `course_score`), ibci/algorien#305 (`GET /courses/{c}/problems/`).
 
-Proposta a `algorien`: `GET /api/v1/courses/<slug>/outline/` → curs + temes + resum de problemes (`slug`, `title`, `type`, `difficulty`, `score`), **sense** enunciats, teoria ni opcions. Amb els mateixos permisos que `topics/` (temes ocults/bloquejats segons qui pregunta).
+| On | Abans | Ara |
+|----|-------|-----|
+| Estructura del curs (`getFullCourseDetail`) | curs + temes + **una llista de problemes per tema** (2 + N) | curs + temes + `GET /courses/{c}/problems/` (**3**, siguin quants siguin els temes) |
+| Progrés (curs, temes, tests) | només el de `localStorage` d'aquest navegador | `my_solution` de cada problema: es porta al magatzem local (el que llegeix la UI) en carregar l'estructura; mai rebaixa un estat local més nou |
+| Tests d'un tema (`syncTopicAnswers`) | un `GET …/submissions/` per test respost | cap: la resposta pròpia ve a `my_solution` |
+| Pestanya Tests del curs | tornava a demanar la llista del tema | res (ja ve amb l'estructura) |
+| `LessonPage` | l'enunciat venia dins del detall complet | `GET …/problems/{p}/` només del problema obert |
+| Punts després d'enviar | `GET /courses/` + leaderboard amb fins a 5 reintents | `course_score` de la resposta de l'enviament |
+| Punts al dashboard | es buscava l'alumne al leaderboard per nom | la fila `me` del leaderboard |
+| Rànquing del dashboard | només si el curs era a «els meus cursos» | segons `my_role` del curs |
+| Estadístiques (`RendimentDashboard`) | detall complet (2 + N) i la mitjana de la classe **inventada amb `Math.random`** | `GET …/statistics/` (mitjana real) + `GET …/topics/` (problemes i progrés per tema): 2 |
 
-Amb això:
+**Compatibilitat:** fins que no es despleguin els PRs, el frontend funciona igual amb el backend actual. Si `GET /courses/{c}/problems/` respon 404, torna a la càrrega per tema. Sense `my_solution`, sincronitza els tests com abans. Sense `course_score`, consulta el leaderboard com abans. Sense `my_role`, mira la llista de cursos propis.
 
-- `getFullCourseDetail` → 1 petició en lloc de 2 + N (dashboard, curs, problema).
-- L'enunciat i les opcions es demanen per problema (`GET .../problems/<slug>/`) o per tema (`.../problems/`) només quan s'obren.
-- `TopicTestPage` ja segueix aquest patró (només el tema del test).
+Mesurat amb Playwright contra un `algorien` local amb els 4 PRs (3 cursos de 5 temes, 3 problemes per tema):
+
+| Pas | Fase 1 | Fase 2 |
+|-----|------:|----:|
+| Fer login → dashboard | 11 | 6 |
+| Obrir un curs (càrrega directa) | 9 | 5 |
+| Pestanya Tests | 2 | 0 |
+| Obrir un problema (càrrega directa) | 7 | 4 |
+| Estadístiques | 7 | 2 |
+| Enviar un test | 3 | 1 |
+
+Amb el backend actual (sense els PRs) les mateixes pàgines funcionen, amb les peticions de la fase 1 més un 404 per càrrega de curs.

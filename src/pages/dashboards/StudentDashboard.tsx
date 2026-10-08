@@ -396,9 +396,13 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const selectedStudentId = selectedStudent?.id;
 
   const loadRanking = useCallback(async () => {
-    // El backend respon 403 als qui no estan matriculats al curs, així que el
-    // rànquing només es demana per als cursos propis (els de l'àmbit "assignats").
-    const isOwnCourse = (assignedQuery.data ?? []).some((c) => c.slug === currentSlug);
+    // El backend respon 403 als qui no estan matriculats al curs, així que el rànquing
+    // només es demana per als cursos propis: segons `my_role` del curs i, si l'API no
+    // l'envia, segons si és a la llista de cursos propis.
+    const current = visibleCourses.find((c) => c.slug === currentSlug);
+    const isOwnCourse = current?.myRole !== undefined
+      ? current.myRole != null
+      : (assignedQuery.data ?? []).some((c) => c.slug === currentSlug);
     if (!currentSlug || !selectedStudentId || !isOwnCourse) {
       // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
       setRanking([]);
@@ -408,7 +412,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       const res: any = await courseService.getCourseLeaderboard(currentSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
       console.debug('[Leaderboard] resposta del backend', { curs: currentSlug, files: list.length, mostra: JSON.stringify(list.slice(0, 3)) });
-      syncOwnPointsFromList(currentSlug, list); // header i leaderboard comparteixen els mateixos punts
+      syncOwnPointsFromList(currentSlug, list, Array.isArray(res) ? undefined : res?.me); // header i leaderboard comparteixen els mateixos punts
       const rankedList = toRanking(list);
       setRanking(rankedList);
 
@@ -422,7 +426,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     } catch {
       // Si falla la petició es conserva el rànquing anterior (no el buidem)
     }
-  }, [currentSlug, selectedStudentId, assignedQuery.data]);
+  }, [currentSlug, selectedStudentId, assignedQuery.data, visibleCourses]);
 
   useEffect(() => {
     void loadRanking();

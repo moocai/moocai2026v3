@@ -6,19 +6,7 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import RemoveIcon from '@mui/icons-material/Remove';
 import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
-import { Topic, Lesson } from './types';
-
-const TEST_TYPE_VALUES = ['test', 'quiz', 'exam', 'multiple_choice'];
-const isTestLesson = (l: Lesson) =>
-  TEST_TYPE_VALUES.includes(String(l?.type || '').toLowerCase()) ||
-  (Array.isArray((l as any).choices) && (l as any).choices.length > 0);
-const isCodeLesson = (l: Lesson) => !isTestLesson(l);
-
-const getProgress = (studentId: string): Record<string, boolean> => {
-  const perStudent = JSON.parse(localStorage.getItem(`mooc_global_progress_${studentId}`) || '{}');
-  const shared = JSON.parse(localStorage.getItem('mooc_shared_all_progress') || '{}');
-  return { ...(shared[studentId] || {}), ...perStudent };
-};
+import { resolveSlug } from '../../hooks/useCourse';
 
 interface TopicRow {
   topic: string;
@@ -179,60 +167,38 @@ export default function RendimentDashboard() {
   const [codeTopics, setCodeTopics] = useState<TopicRow[]>([]);
   const [testTopics, setTestTopics] = useState<TopicRow[]>([]);
 
+  // 2 peticions, siguin quants siguin els temes:
+  //  - `GET …/statistics/`: rendiment propi per tema i la mitjana REAL de la classe
+  //    (abans la mitjana s'inventava amb Math.random a partir del progrés local);
+  //  - `GET …/topics/`: problemes per tema i progrés propi (per saber si hi ha activitat).
   const fetchData = useCallback(async () => {
     if (!courseId) return;
     setLoading(true);
     try {
-      const saved = localStorage.getItem('currentStudent');
-      const studentId: string | null = saved ? JSON.parse(saved).id : null;
-      const progress = studentId ? getProgress(studentId) : {};
-
-      const detail = await courseService.getFullCourseDetail(courseId);
-      const topics: Topic[] = (detail.content || []).map((t: any) => ({
-        id: t.id ?? t.slug,
-        title: t.title,
-        lessons: (t.subTopics || []).map((st: any) => ({
-          id: st.problemSlug,
-          title: st.subtitle,
-          type: st.type,
-          choices: st.choices,
-          precode: st.precode,
-        })),
-      }));
-
-      const codeRows: TopicRow[] = [];
-      const testRows: TopicRow[] = [];
-
-      for (const topic of topics) {
-        const lessons = topic.lessons || [];
-        const codeLessons = lessons.filter(isCodeLesson);
-        const testLessons = lessons.filter(isTestLesson);
-
-        if (codeLessons.length > 0) {
-          const total = codeLessons.length;
-          const done = codeLessons.filter(l => progress[`${courseId}_${l.id}`] === true).length;
-          codeRows.push({
-            topic: (typeof topic.title === 'string' ? topic.title : topic.title?.ca || '') || 'Sense títol',
-            personal: Math.round((done / total) * 100),
-            avg: done > 0 ? Math.round((done / total) * 100) - Math.floor(Math.random() * 10) + 3 : 0,
-            total, done,
-          });
-        }
-
-        if (testLessons.length > 0) {
-          const total = testLessons.length;
-          const done = testLessons.filter(l => progress[`${courseId}_${l.id}`] === true).length;
-          testRows.push({
-            topic: (typeof topic.title === 'string' ? topic.title : topic.title?.ca || '') || 'Sense títol',
-            personal: Math.round((done / total) * 100),
-            avg: done > 0 ? Math.round((done / total) * 100) - Math.floor(Math.random() * 10) + 3 : 0,
-            total, done,
-          });
-        }
-      }
-
-      setCodeTopics(codeRows.length > 0 ? codeRows : [{ topic: '—', personal: 0, avg: 0, total: 0, done: 0 }]);
-      setTestTopics(testRows.length > 0 ? testRows : [{ topic: '—', personal: 0, avg: 0, total: 0, done: 0 }]);
+      const slug = resolveSlug(courseId);
+      const [stats, topics] = await Promise.all([
+        courseService.getCourseStatistics(slug),
+        courseService.getCourseTopics(slug).catch(() => [] as any[]),
+      ]);
+      const topicByName = new Map<string, any>(topics.map((t: any) => [t.name, t]));
+      const toRows = (rows: any[], kind: 'coding' | 'test'): TopicRow[] => (rows || []).map((r: any) => {
+        const topic = topicByName.get(r.topic);
+        const progress = topic?.my_progress;
+        const personal = Math.round(Number(r.user_performance) || 0);
+        return {
+          topic: r.topic || 'Sense títol',
+          personal,
+          avg: Math.round(Number(r.class_average) || 0),
+          total: topic?.problem_counts?.[kind] ?? 0,
+          // Sense el progrés del servidor (backend antic), el rendiment propi indica si n'hi ha
+          done: progress ? (kind === 'coding' ? progress.coding_accepted : progress.tests_answered) : (personal > 0 ? 1 : 0),
+        };
+      });
+      const empty = [{ topic: '—', personal: 0, avg: 0, total: 0, done: 0 }];
+      const codeRows = toRows(stats?.coding_data, 'coding');
+      const testRows = toRows(stats?.test_data, 'test');
+      setCodeTopics(codeRows.length > 0 ? codeRows : empty);
+      setTestTopics(testRows.length > 0 ? testRows : empty);
     } catch (err) {
       console.error('Error carregant dades de rendiment:', err);
       setCodeTopics([{ topic: '—', personal: 0, avg: 0, total: 0, done: 0 }]);

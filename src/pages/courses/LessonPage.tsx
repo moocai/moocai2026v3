@@ -11,9 +11,10 @@ import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel } from '../../components/ConsolePanel';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useCourse } from '../../hooks/useCourse';
+import { useQuery } from '@tanstack/react-query';
+import { resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
-import { courseService } from '../../services/courseService';
+import { courseService, mapProblem } from '../../services/courseService';
 import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
@@ -331,10 +332,23 @@ export default function LessonPage() {
     return field[lang] || field['ca'] || '';
   };
 
-  const currentProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+  const outlineProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
   // Slug real del tema que conté el problema (abans la revisió IA demanava "general").
   const currentTopicSlug: string =
     course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId))?.id ?? '';
+  // L'estructura del curs no porta enunciats: el problema obert es demana a part (1 petició).
+  // Els tests no cal: es redirigeixen a TopicTestPage.
+  const needsDetail = !!outlineProblem && outlineProblem.text === undefined && outlineProblem.type !== 'test';
+  const { data: problemDetail } = useQuery({
+    queryKey: ['problem', courseId, currentTopicSlug, lessonId],
+    queryFn: () => courseService.getChallenge(resolveSlug(courseId!), currentTopicSlug, lessonId!).then(mapProblem),
+    enabled: needsDetail && !!currentTopicSlug,
+    staleTime: 5 * 60 * 1000,
+  });
+  const currentProblem = useMemo(() => {
+    if (!outlineProblem || !needsDetail) return outlineProblem;
+    return problemDetail ? { ...outlineProblem, ...problemDetail } : undefined;
+  }, [outlineProblem, needsDetail, problemDetail]);
   // Sincronització editor <-> enunciat: es recalcula cada cop que l'usuari escriu
   const statementShown = [getText(currentProblem?.subtitle), typeof currentProblem?.text === 'string' ? currentProblem.text : getText(currentProblem?.text)].join(' ');
   const isRelated = useMemo(
@@ -364,10 +378,10 @@ export default function LessonPage() {
   };
 
   useEffect(() => {
-    if (currentProblem?.type === 'test') {
+    if (outlineProblem?.type === 'test') {
       navigate(testPath(lessonId!), { replace: true });
     }
-  }, [currentProblem?.type, courseId, lessonId, navigate]);
+  }, [outlineProblem?.type, courseId, lessonId, navigate]);
 
   const isCoding = (p: any) => p?.type !== 'test';
 
@@ -594,7 +608,7 @@ export default function LessonPage() {
 
       // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
-      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0).then(() => {
+      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0, 1000, result).then(() => {
         const st = getCurrentStudent();
         if (st) setConsoleOutput(p => [...p, `🏆 Punts totals: ${getTotalPoints(st.id)}`]);
       });

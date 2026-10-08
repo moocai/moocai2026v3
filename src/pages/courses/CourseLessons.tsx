@@ -297,8 +297,11 @@ export default function CourseLessons() {
     staleTime: 30 * 60 * 1000,
   });
 
+  // Amb el backend nou l'estructura del curs ja porta la resposta pròpia de cada test
+  // (`my_solution`, aplicada en carregar-la): no cal tornar a demanar el tema.
+  const outlineHasSolutions = !!course?.content?.some((l: any) => (l.subTopics || []).some((s: any) => s.mySolution !== undefined));
   useEffect(() => {
-    if (!courseId || !syncTopicId || !isLoggedIn()) return;
+    if (!courseId || !syncTopicId || !isLoggedIn() || outlineHasSolutions) return;
     const courseSlug = resolveSlug(courseId);
     queryClient.fetchQuery({
       queryKey: ['topic-problems', courseSlug, syncTopicId],
@@ -306,7 +309,7 @@ export default function CourseLessons() {
       staleTime: 0,
     }).then((problems: any[]) => syncTopicAnswers(courseId, courseSlug, syncTopicId, problems))
       .catch(() => {});
-  }, [courseId, syncTopicId, queryClient]);
+  }, [courseId, syncTopicId, queryClient, outlineHasSolutions]);
 
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999 }}>
