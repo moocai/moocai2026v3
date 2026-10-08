@@ -288,7 +288,6 @@ export default {
     tab_theory: "Teoria",
     tab_exercises: "Programació",
     tab_tests: "Tests",
-    tab_exams: "Exàmens",
     tab_files: "Fitxers",
     tab_prev: "Pestanya anterior",
     tab_next: "Pestanya següent",

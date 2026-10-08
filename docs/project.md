@@ -53,7 +53,7 @@ Versions reals de `package.json`:
 
 ```
 moocai2026/
-├── index.html                        # lang="es", carrega /data.js, /src/main.tsx
+├── index.html                        # lang="es", carrega /src/main.tsx
 ├── package.json                      # scripts: dev / build (tsc -b && vite build) / preview
 ├── vite.config.ts                    # alias @→./src, proxy /api→algorien.com, port 5173, polling
 ├── tsconfig.json                     # strict + noUnusedLocals + noUnusedParameters, jsx react-jsx
@@ -62,7 +62,6 @@ moocai2026/
 ├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3, fix1, fix2)
 │
 ├── public/
-│   ├── data.js                       # Fixture global antic (window.EXAM_DATA), 569 B
 │   └── img/                          # logo.webp, favicon.png, Python.svg, React.svg, SB.svg, ml.svg
 │
 └── src/
@@ -145,7 +144,7 @@ moocai2026/
     │   ├── courses/
     │   │   ├── CourseLessons.tsx     # Tabs Teoria/Programació/Tests/Fitxers + rail flotant
     │   │   ├── LessonPage.tsx        # Monaco + Solució Profe + preview React + panell IA
-    │   │   ├── ExamPage.tsx          # /courses/:courseId/exam/:challengeSlug
+    │   │   ├── TopicTestPage.tsx          # /courses/:courseId/test/:challengeSlug
     │   │   ├── AiHelpPanel.tsx       # Revisió IA via client compartit (api.get); usa topicSlug real
     │   │   └── ${courseId}/${lesson.id}/LessonTopic.tsx  # ⚠️ Path literal amb ${...}
     │   ├── dashboards/
@@ -218,7 +217,7 @@ StrictMode
 | 2 | `/courses/:courseId` | `CourseLessons` | `MainLayout` |
 | 3 | `/courses/:courseId/:lessonId` | `LessonPage` | `MainLayout` |
 | 4 | `/courses/:courseId/:lessonId/topic` | `LessonTopic` | `MainLayout` |
-| 5 | `/courses/:courseId/exam/:challengeSlug` | `ExamPage` | `MainLayout` |
+| 5 | `/courses/:courseId/test/:challengeSlug` | `TopicTestPage` | `MainLayout` |
 | 6 | `/courses/:courseId/stats` | `RendimentDashboard` | `MainLayout` |
 | 7 | `/dashboards/student` | `StudentDashboard` | `MainLayout` |
 | 8 | `/profile` | `ProfilePage` | `MainLayout` |
@@ -257,7 +256,7 @@ La pàgina central. Editor **Monaco** amb:
 
 Endpoints: `submitChallenge`, `getPeerSubmissions`, `getChallenge`, i `api.postProgress`.
 
-### `ExamPage` (`/courses/:courseId/exam/:challengeSlug`)
+### `TopicTestPage` (`/courses/:courseId/test/:challengeSlug`)
 Tests de resposta única o múltiple (`RadioGroup`/`FormGroup`). Carrega via `useCourse` o `getChallenge`, llegeix submissions prèvies i envia amb `submitChallenge({ answers })`. El panell de resultat deriva de `result.correct` i de la llista `choices`.
 
 ### `RendimentDashboard` (`/courses/:courseId/stats`)
@@ -484,7 +483,7 @@ npm run preview
 - Landing (Hero typewriter + stats amb `usePublicStats` + grid de cursos + features + Footer).
 - Navegador de curs de 4 pestanyes amb rail flotant i reordenació de lliçons completades.
 - **Editor Monaco** amb multi-fitxer (Python/React), temes propis, validació, **DiffEditor "Solució Profe"** i **preview React en viu**.
-- Tests (`ExamPage`) de resposta única/múltiple amb feedback i nota.
+- Tests (`TopicTestPage`) de resposta única/múltiple amb feedback i nota.
 - Rànquing d'alumne (`students/overview`) i dashboard amb 5 targetes.
 - Panell de rendiment per tema (`/stats`).
 - Perfil complet (avatar, contrasenya, idioma, organizacions visuals).
