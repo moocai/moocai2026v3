@@ -82,16 +82,16 @@ async function idbPrune() {
 }
 
 /**
- * URL de l'avatar d'un altre usuari en un curs. El slug del curs és obligatori:
- * `/users/<username>/avatar/` sense curs no existeix (404).
+ * URL de l'avatar d'un altre membre d'un curs:
+ * `/courses/<slug>/members/<user_id>/avatar/`. Els usuaris s'identifiquen per
+ * l'**id** (el `user_id` de les files del leaderboard), no pel username.
  */
-export function userAvatarUrl(username: string, slug: string): string {
-  return `/api/v1/users/${username}/avatar/${slug}/`;
+export function userAvatarUrl(userId: string, slug: string): string {
+  return `/api/v1/courses/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}/avatar/`;
 }
 
 /**
- * URL de l'avatar de l'usuari autenticat. `currentStudent` desa l'**id** i no
- * sempre hi ha username, així que es fa servir `/users/me/avatar/`.
+ * URL de l'avatar de l'usuari autenticat (`/users/me/avatar/`).
  * El `?u=<id>` no canvia la petició però sí la clau de la memòria cau, de manera
  * que un navegador compartit no mostra l'avatar de l'usuari anterior.
  */

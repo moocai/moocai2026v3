@@ -5,7 +5,7 @@ const LOGOUT_TIMEOUT = 5000;
 
 export const authService = {
   login: async (username: string, password: string) => {
-    const response = await publicClient.post('/users/auth/login/', { username, password });
+    const response = await publicClient.post('/auth/login/', { username, password });
     const data = response.data;
 
     if (data?.token) {localStorage.setItem('token', data.token);}
@@ -24,7 +24,7 @@ export const authService = {
 
     if (token) {
       void publicClient
-        .post('/users/auth/logout/', null, {
+        .post('/auth/logout/', null, {
           headers: { Authorization: `Token ${token}` },
           timeout: LOGOUT_TIMEOUT,
         })

@@ -14,6 +14,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
+import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
 
@@ -602,11 +603,8 @@ export default function LessonPage() {
         setSubmissionsRefreshKey(k => k + 1);
       }
     } catch (err: any) {
-      const detail = err?.response?.data;
       const message =
-        (typeof detail === 'string' ? detail : null) ||
-        (Array.isArray(detail) ? detail.map((d: any) => (typeof d === 'string' ? d : Object.values(d).flat().join(' '))).join(' ') : null) ||
-        (detail && typeof detail === 'object' ? Object.values(detail).flat().join(' ') : null) ||
+        apiErrorMessages(err).join(' ') ||
         err?.message ||
         t('lesson.submit_error', 'Error en enviar la resposta');
       console.error('Error en enviar la submissió:', err);
