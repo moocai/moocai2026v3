@@ -248,9 +248,10 @@ Tabs `Teoria | Programació | Tests | Fitxers` (font única `TAB_ITEMS`) amb bar
 
 ### `LessonPage` (`/courses/:courseId/:lessonId`)
 La pàgina central. Editor **Monaco** amb:
-- **Multi-model** per llenguatge: fitxers `python.py` i `React.tsx` (`file:///lesson/<curs>/<lliço>/...`), tabs de fitxer.
+- **Multi-model** per llenguatge: fitxers `python.py` i `React.tsx` (`file:///lesson/<curs>/<lliço>/...`). Només es mostra el fitxer del llenguatge del curs (`language`/`programming_language` del curs; si no en té, Python).
+- **Executar (Python real)**: `services/pythonRunner.ts` executa el codi amb **Pyodide** (CPython en WebAssembly) dins d'un Web Worker (`workers/pythonRunner.worker.ts`): sortida i tracebacks de Python, botó **Atura** i límit de 15 s per als bucles infinits, i quadre **Entrada** (una línia per `input()`) quan el codi en fa servir. Els fitxers de Pyodide se serveixen des de l'app a `/pyodide/v<versió>/` (vegeu `vite.config.ts`). Enviar ja no depèn de cap validació local: corregeix el servidor.
 - **Solució Profe**: pestanya bloquejada fins que l'alumne supera l'exercici; llavors es mostra un **`DiffEditor`** entre `teacherSolution` i el codi de l'alumne (colze a colze a desktop, unificat a mòbil).
-- **Preview React en viu** (`ReactLivePreview`): transpila el TSX amb el worker de TypeScript de Monaco (`getEmitOutput`) i el renderitza amb `createRoot`.
+- **Preview React en viu** (`ReactLivePreview`, només als cursos de React; Python fa servir tota l'amplada per a l'editor): transpila el TSX amb el worker de TypeScript de Monaco (`getEmitOutput`) i el renderitza amb `createRoot`.
 - Tabs `Enunciat | Professor | Alumnes | IA`; `AiHelpPanel` per revisió IA.
 - `ConsolePanel`, badge de diagnòstics (`onValidate`), confetti, autoguardat i `mooc_last_session`.
 

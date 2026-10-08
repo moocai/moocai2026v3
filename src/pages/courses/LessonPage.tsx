@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import { api } from '../../services/api';
 import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
 import { ReactLivePreview } from '../../components/ReactLivePreview';
-import { ConsolePanel } from '../../components/ConsolePanel';
+import { ConsolePanel, type ConsoleLine } from '../../components/ConsolePanel';
+import { DEFAULT_PYTHON_TIMEOUT_MS, isPythonReady, preloadPython, runPython, stopPython } from '../../services/pythonRunner';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useQuery } from '@tanstack/react-query';
@@ -128,99 +129,30 @@ function BackToCourseButton({ label, onClick, fontSize = 11 }: { label: string; 
   );
 }
 
-// === Validació de rellevància: el que escriu l'usuari ha de tenir a veure amb l'enunciat ===
-const STOPWORDS = new Set((
-  // català
-  'aquest aquesta aquests aquestes aixo això amb per com que són sou som has han hem heu una uns unes els les del dels pel pels mes més molt molta tot tota tots totes seu seva seus seves nostre vostre fer fem fet fins entre sobre sota cada quan quin quina mentre doncs perque perquè també tambe sense dins fora ' +
-  // castellà
-  'este esta estos estas eso esto con por como los las del una unos unas para pero mas más muy todo toda todos todas sus nuestro vuestro hacer hace hecho hasta entre sobre cada cuando cual mientras entonces porque tambien también sin dentro fuera ' +
-  // anglès
-  'the and for are but not you all any can had her was one our out has have this that with from they will what when your into than then them these those there their been were which while would could should about each make like just over also'
-).split(/\s+/).filter(Boolean));
+// === Execució de Python (botó "Executar") ===
+// Límit de línies a la consola: un print dins d'un bucle llarg no ha de penjar la pàgina
+const MAX_CONSOLE_LINES = 1000;
+// El quadre "Entrada" només apareix si el codi fa servir input()
+const usesInput = (code: string) => /\binput\s*\(/.test(code);
 
-const normalizeText = (s: string) =>
-  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-const extractKeywords = (s: string): Set<string> => {
-  const out = new Set<string>();
-  normalizeText(s).split(/[^a-z0-9]+/).forEach((w) => {
-    if (w.length >= 3 && !STOPWORDS.has(w) && !/^\d+$/.test(w)) out.add(w);
-  });
-  return out;
-};
-
-// Dues paraules "coincideixen" si són iguals o comparteixen l'arrel (primers 5 caràcters)
-const sameWord = (a: string, b: string) =>
-  a === b || (a.length >= 5 && b.length >= 5 && a.slice(0, 5) === b.slice(0, 5));
-
-// Recull recursivament tots els textos de l'activitat (qualsevol idioma/camp), excepte metadades
-const STATEMENT_SKIP_KEYS = new Set(['id', 'slug', 'problemSlug', 'type', 'precode', 'image', 'img', 'url', 'icon', 'order', 'points']);
-function collectStatementStrings(node: any, extraSkip?: Set<string>, depth = 0): string[] {
-  if (node == null || depth > 5) return [];
-  if (typeof node === 'string') return [node];
-  if (Array.isArray(node)) return node.flatMap((n) => collectStatementStrings(n, extraSkip, depth + 1));
-  if (typeof node === 'object') {
-    return Object.entries(node).flatMap(([k, v]) => (STATEMENT_SKIP_KEYS.has(k) || extraSkip?.has(k) ? [] : collectStatementStrings(v, extraSkip, depth + 1)));
-  }
-  return [];
-}
-
-
-const PY_CONCEPTS: Array<{ label: string; words: string[]; test: RegExp }> = [
-  { label: 'print()', words: ['imprim', 'print', 'mostr', 'escriu', 'escrib', 'output', 'sortida', 'salida'], test: /\bprint\s*\(/ },
-  { label: 'assignació de variable', words: ['variabl', 'assign', 'asign'], test: /^\s*[A-Za-z_]\w*\s*(?:[+\-*/%]?=)(?!=)/m },
-  { label: 'enter', words: ['enter', 'entero', 'integer'], test: /\b\d+\b|\bint\s*\(/ },
-  { label: 'decimal', words: ['decimal', 'float', 'flotant'], test: /\d+\.\d+|\bfloat\s*\(/ },
-  { label: 'cadena de text', words: ['cadena', 'string', 'caracter'], test: /["']/ },
-  { label: 'llista', words: ['llista', 'lista', 'list'], test: /\[|\blist\s*\(/ },
-  { label: 'diccionari', words: ['diccionari', 'diccionario', 'dict'], test: /\{|\bdict\s*\(/ },
-  { label: 'for/while', words: ['bucle', 'repeteix', 'repite', 'loop', 'mentre', 'while', 'iter'], test: /\bfor\b|\bwhile\b/ },
-  { label: 'if', words: ['condicion', 'condition', 'else', 'altrament', 'sino'], test: /\bif\b/ },
-  { label: 'def', words: ['funci', 'function', 'defin'], test: /\bdef\b|\blambda\b/ },
-  { label: 'operació', words: ['suma', 'resta', 'multiplic', 'divid', 'operaci', 'calcul'], test: /[+\-*/%]|\bsum\s*\(/ },
-  { label: 'input()', words: ['demana', 'pregunta', 'input', 'entrada', 'teclat'], test: /\binput\s*\(/ },
-  { label: 'return', words: ['retorn', 'return', 'devuelve'], test: /\breturn\b/ },
-  { label: 'import', words: ['import'], test: /\bimport\b|\bfrom\b/ },
-];
-
-// Analitza el codi segons els conceptes que demana l'enunciat. Retorna null si no n'activa cap.
-function analyzePythonConcepts(code: string, statementOnly: string): { active: string[]; missing: string[]; pass: boolean } | null {
-  const words = Array.from(extractKeywords(statementOnly));
-  const active = PY_CONCEPTS.filter((c) => words.some((w) => c.words.some((p) => w.startsWith(p))));
-  if (active.length === 0) return null;
-  const cleanCode = code.split('\n').map((l) => l.replace(/#.*$/, '')).join('\n');
-  const missing = active.filter((c) => !c.test.test(cleanCode)).map((c) => c.label);
-  const required = active.length <= 2 ? active.length : Math.ceil(active.length * 0.75);
-  return { active: active.map((c) => c.label), missing, pass: active.length - missing.length >= required };
-}
-
-// Retorna true si la resposta té relació amb l'enunciat de l'activitat.
-// Ignora el codi inicial (precode) perquè no compti com a coincidència.
-function isRelatedToStatement(userText: string, statementParts: Array<string | undefined>, precode?: string, language: string = 'python', statementOnly: string = ''): boolean {
-  let cleaned = userText || '';
-  if (precode) {
-    const pre = new Set(precode.split('\n').map((l) => l.trim()).filter(Boolean));
-    cleaned = cleaned.split('\n').filter((l) => !pre.has(l.trim())).join('\n');
-  }
-  if (!cleaned.trim()) return false;
-  // 1) Codi Python: valida per conceptes (print, assignació, bucle...) segons el que demana l'enunciat
-  if (language === 'python') {
-    const byConcepts = analyzePythonConcepts(cleaned, statementOnly);
-    if (byConcepts?.pass) return true;
-  }
-  // 2) Resposta en llenguatge natural: coincidència de paraules clau amb l'enunciat
-  const userWords = extractKeywords(cleaned);
-  if (userWords.size === 0) return false;
-  const statementWords = Array.from(extractKeywords(statementParts.filter(Boolean).join(' ')));
-  // Si no hem pogut llegir cap paraula clau de l'enunciat, NO enviem (mai obrim la porta per defecte)
-  if (statementWords.length === 0) return false;
-  let matches = 0;
-  userWords.forEach((w) => { if (statementWords.some((sw) => sameWord(w, sw))) matches++; });
-  const required = Math.min(2, statementWords.length);
-  // Cal un mínim de coincidències I que la majoria del que s'ha escrit sigui del tema
-  // (així no val barrejar 2 paraules bones amb text sense sentit)
-  const ratio = matches / userWords.size;
-  return matches >= required && ratio >= 0.5;
+function StdinBox({ value, onChange, label, placeholder, rows }: { value: string; onChange: (v: string) => void; label: string; placeholder: string; rows: number }) {
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, bgcolor: '#111' }}>
+      <Box sx={{ height: 30, px: 1.5, bgcolor: '#000', display: 'flex', alignItems: 'center', borderBottom: '1px solid #333', flexShrink: 0 }}>
+        <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900, textTransform: 'uppercase' }}>{label}</Typography>
+      </Box>
+      <Box
+        component="textarea"
+        value={value}
+        rows={rows}
+        spellCheck={false}
+        placeholder={placeholder}
+        aria-label={label}
+        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
+        sx={{ flex: 1, minHeight: 0, resize: 'none', border: 'none', outline: 'none', p: 1.5, bgcolor: 'transparent', color: '#e5e7eb', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.45, '&::placeholder': { color: '#6b7280' } }}
+      />
+    </Box>
+  );
 }
 
 // El servidor NO corregeix les activitats: una resposta 2xx vol dir "rebut".
@@ -245,7 +177,9 @@ export default function LessonPage() {
   const { addNotification } = useNotifications();
   const { data: course, isLoading: loading } = useCourse(courseId);
   const [currentUser] = useState<Student | null>(() => {const saved = localStorage.getItem('currentStudent'); return saved ? JSON.parse(saved) : null;  });
-  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
+  const [isRunning, setIsRunning] = useState(false);
+  const [stdinText, setStdinText] = useState('');
   const [status, setStatus] = useState<'idle' | 'pass' | 'fail'>('idle');
   const [, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -258,7 +192,6 @@ export default function LessonPage() {
   // === Multi-model: un sol editor, un model/fitxer per llenguatge ===
   const [selectedLanguage, setSelectedLanguage] = useState<EditorLang>('python');
   const [codeByLang, setCodeByLang] = useState<Record<EditorLang, string>>({ python: '', react: '' });
-  const [testedCode, setTestedCode] = useState<string | null>(null); // codi Python que ha passat «Executar»
   const userInput = codeByLang[selectedLanguage];
   const userInputRef = useRef(userInput); userInputRef.current = userInput;
   const codeStorageRef = useRef(codeByLang); codeStorageRef.current = codeByLang;
@@ -296,6 +229,20 @@ export default function LessonPage() {
       .catch((err) => console.error('No s\'ha pogut carregar l\'editor:', err));
     return () => { cancelled = true; };
   }, [!!course, isReactCourse]);
+
+  // Python (Pyodide) es carrega en segon pla quan el navegador està lliure, perquè el
+  // primer "Executar" no hagi d'esperar la descàrrega.
+  useEffect(() => {
+    if (!course || isReactCourse) return;
+    const start = () => { void preloadPython().catch(() => { /* es reintentarà en executar */ }); };
+    const ric = (window as any).requestIdleCallback;
+    const handle = typeof ric === 'function' ? ric(start, { timeout: 3000 }) : setTimeout(start, 500);
+    return () => { if (typeof ric === 'function') (window as any).cancelIdleCallback?.(handle); else clearTimeout(handle); };
+  }, [!!course, isReactCourse]);
+  // En canviar de problema o sortir de la pàgina, s'atura el programa que s'estigui executant
+  // (i la seva sortida ja no s'escriu a la consola del problema nou)
+  const runLessonRef = useRef(0);
+  useEffect(() => () => { runLessonRef.current++; stopPython(); setIsRunning(false); }, [courseId, lessonId]);
 
   // Manté el tema de Monaco sincronitzat amb el mode de l'aplicació
   useEffect(() => {
@@ -365,31 +312,21 @@ export default function LessonPage() {
     if (!outlineProblem || !needsDetail) return outlineProblem;
     return problemDetail ? { ...outlineProblem, ...problemDetail } : undefined;
   }, [outlineProblem, needsDetail, problemDetail]);
-  // Sincronització editor <-> enunciat: es recalcula cada cop que l'usuari escriu
-  const statementShown = [getText(currentProblem?.subtitle), typeof currentProblem?.text === 'string' ? currentProblem.text : getText(currentProblem?.text)].join(' ');
-  const isRelated = useMemo(
-    () => !!currentProblem && isRelatedToStatement(userInput, collectStatementStrings(currentProblem), currentProblem?.precode, selectedLanguage, statementShown),
-    [userInput, currentProblem, selectedLanguage, statementShown]
-  );
-  const missingHint = (() => {
-    if (isRelated || selectedLanguage !== 'python' || !userInput.trim()) return '';
-    const a = analyzePythonConcepts(userInput.split('\n').filter((l) => l.trim() !== '').join('\n'), statementShown);
-    return a?.missing.length ? ` · falta: ${a.missing.join(', ')}` : '';
-  })();
-  const showOffTopicHint = userInput.trim().length > 0 && !isRelated;
-  // Python: Enviar només es desbloqueja si el codi actual té relació amb l'enunciat I s'ha provat amb «Executar».
-  // Si l'usuari canvia el codi després de provar-lo, es torna a bloquejar.
-  const hasBeenTested = selectedLanguage !== 'python' || (testedCode !== null && testedCode === userInput);
-  const canSubmit = isRelated && hasBeenTested;
-  const showTestHint = selectedLanguage === 'python' && userInput.trim().length > 0 && isRelated && !hasBeenTested;
+  // Enviar: el servidor decideix si la solució és correcta; aquí només cal que hi hagi codi
+  const canSubmit = userInput.trim().length > 0 && !isRunning;
+  const showStdin = selectedLanguage === 'python' && usesInput(userInput);
   // Textos d'ajuda en passar el ratolí pels botons de l'editor
   const resetTooltip = t('lesson.reset_tooltip', 'Torna a començar: recupera el codi inicial');
-  const testTooltip = t('lesson.test_tooltip', "Executa el codi aquí per comprovar-ne el resultat (no s'envia)");
-  const submitTooltip = canSubmit
-    ? t('lesson.submit_tooltip', 'Envia la teva solució al servidor')
-    : !isRelated
-      ? t('lesson.submit_blocked_off_topic', "Per enviar, el codi ha de tenir relació amb l'enunciat")
-      : t('lesson.test_first_hint', 'Executa el codi per poder enviar');
+  const testTooltip = isRunning
+    ? t('lesson.stop_tooltip', "Atura el programa (p. ex. si s'ha quedat en un bucle infinit)")
+    : t('lesson.test_tooltip', "Executa el codi amb Python al navegador (no s'envia)");
+  const submitTooltip = isRunning
+    ? t('lesson.submit_blocked_running', 'Espera que acabi el programa per enviar')
+    : canSubmit
+      ? t('lesson.submit_tooltip', 'Envia la teva solució al servidor')
+      : t('lesson.submit_blocked_empty', 'Escriu codi per poder enviar');
+  const stdinLabel = t('lesson.stdin_label', 'Entrada');
+  const stdinPlaceholder = t('lesson.stdin_placeholder', 'Una línia per a cada input()');
   const liveRenderTooltip = showLiveRender ? t('lesson.hide_live_render', 'Amaga la visualització') : t('lesson.show_live_render', 'Mostra la visualització');
 
 
@@ -510,7 +447,7 @@ export default function LessonPage() {
         react: saved?.react || '',
       });
       setDiagnostics([]);
-      setTestedCode(null);
+      setStdinText('');
       // Recupera l'estat de vista (cursor/selecció/scroll) desat per a aquesta lliçó
       try {
         const rawView = localStorage.getItem(`${codeStorageKey}_view`);
@@ -625,23 +562,6 @@ export default function LessonPage() {
       navigate(testPath(lessonId!), { replace: true });
       return;
     }
-    // Validació: la resposta ha de tenir relació amb l'enunciat; si no, no s'envia
-    const statementText = collectStatementStrings(currentProblem);
-    const related = isRelatedToStatement(userInputRef.current, statementText, currentProblem?.precode, selectedLanguage, statementShown);
-    console.debug('[Validació enunciat]', { related, input: userInputRef.current, statementShown, concepts: analyzePythonConcepts(userInputRef.current, statementShown) });
-    if (related && selectedLanguage === 'python' && testedCode !== userInputRef.current) {
-      const msg = t('lesson.test_first_error', "Primer executa el codi amb «Executar»: Enviar es desbloqueja quan el resultat és coherent amb l'activitat.");
-      setConsoleOutput([`⚠️ ${msg}`]);
-      addNotification(msg, 'error');
-      return;
-    }
-    if (!related) {
-      const offTopicMsg = t('lesson.off_topic_error', "El que has escrit no té relació amb l'enunciat de l'activitat. Revisa'l i torna-ho a provar.");
-      setConsoleOutput([`⚠️ ${offTopicMsg}${missingHint}`]);
-      setStatus('fail');
-      addNotification(offTopicMsg, 'error');
-      return;
-    }
     setConsoleOutput(["[SISTEMA]: Executant..."]);
     setStatus('idle');
     try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, "📤 Enviat al servidor..."]);
@@ -688,133 +608,58 @@ export default function LessonPage() {
     setIsDirty(true);
   };
 
-  const handleLocalRun = () => {if (selectedLanguage !== 'python') {setConsoleOutput([`[LOCAL RUN]: Execució local finalitzada.`]); return;}
-    // Consola sincronitzada amb editor + enunciat (només Python): si no té relació, no s'executa
-    if (!isRelated) {
-      const msg = t('lesson.off_topic_error', "El que has escrit no té relació amb l'enunciat de l'activitat. Revisa'l i torna-ho a provar.") + missingHint;
-      setConsoleOutput([`⚠️ ${msg}`]);
-      setTestedCode(null);
-      addNotification(msg, 'error');
-      return;
+  // "Executar": Python real (Pyodide) en un worker. La sortida apareix a la consola a mesura
+  // que el programa l'escriu; tornar-hi a clicar mentre s'executa l'atura.
+  const handleLocalRun = async () => {
+    if (isRunning) { stopPython(); return; }
+    if (selectedLanguage !== 'python') return;
+    const code = userInputRef.current;
+    if (!code.trim()) return;
+    setIsRunning(true);
+    setStatus('idle');
+    const lesson = runLessonRef.current;
+    const lines: ConsoleLine[] = [];
+    let truncated = false;
+    const show = () => { if (runLessonRef.current === lesson) setConsoleOutput([...lines]); };
+    // Avís de càrrega: es treu en arribar la primera sortida o en acabar
+    let loadingShown = false;
+    const clearLoading = () => { if (loadingShown) { lines.shift(); loadingShown = false; } };
+    if (!isPythonReady()) {
+      lines.push({ kind: 'info', text: t('lesson.python_loading', 'Carregant Python… (la primera vegada pot trigar uns segons)') });
+      loadingShown = true;
+      show();
     }
-    const source = userInputRef.current .split('\n') .map(l => l.replace(/#.*$/, '').replace(/\s+$/, '')) .filter(l => l.trim().length > 0) .map(l => ({ indent: l.match(/^\s*/)![0].length, text: l.trim() }));
-    const variables: Record<string, any> = {};
-    const outputs: string[] = [];
-    const evalExpr = (expr: string): any => {
-      let e = expr;
-      e = e.replace(/range\(([^)]*)\)/g, (_, a) => {
-        const n = Number(evalExpr(a.trim()));
-        return '[' + Array.from({ length: Math.max(0, n) }, (_, k) => k).join(',') + ']';
-      });
-      Object.keys(variables).forEach(v => {
-        e = e.replace(new RegExp(`\\b${v}\\b`, 'g'), JSON.stringify(variables[v]));
-      });
-      try {
-        return Function(`'use strict'; return (${e})`)();
-      } catch {
-        return expr.replace(/^["']|["']$/g, '');
-      }
-    };
-
-    const run = (lines: { indent: number; text: string }[], vars: Record<string, any>, outs: string[]) => {
-      let idx = 0;
-      while (idx < lines.length) {
-        const { indent, text } = lines[idx];
-        const collectBody = (i: number) => {
-          const body: { indent: number; text: string }[] = [];
-          let j = i;
-          while (j < lines.length && lines[j].indent > indent) body.push(lines[j++]);
-          return { body, end: j };
-        };
-
-        const forMatch = text.match(/^for\s+([\w.]+)\s+in\s+(.+):$/);
-        if (forMatch) {
-          const varName = forMatch[1].trim();
-          const iterable = evalExpr(forMatch[2].trim());
-          const { body, end } = collectBody(idx + 1);
-          const items = Array.isArray(iterable) ? iterable : [iterable];
-          items.forEach(item => { vars[varName] = item; run(body, vars, outs); });
-          idx = end;
-          continue;
-        }
-
-        const whileMatch = text.match(/^while\s+(.+):$/);
-        if (whileMatch) {
-          const { body, end } = collectBody(idx + 1);
-          let guard = 0;
-          while (evalExpr(whileMatch[1].trim()) && guard < 100000) { run(body, vars, outs); guard++; }
-          idx = end;
-          continue;
-        }
-
-        const condMatch = text.match(/^(if|elif)\s+(.+):$/);
-        if (condMatch) {
-          const { body, end } = collectBody(idx + 1);
-          let elseEnd = end;
-          if (end < lines.length && /^else:/.test(lines[end].text)) {
-            const { body: eb, end: ee } = collectBody(end + 1);
-            if (evalExpr(condMatch[2].trim())) run(body, vars, outs); else run(eb, vars, outs);
-            elseEnd = ee;
-          } else if (evalExpr(condMatch[2].trim())) {
-            run(body, vars, outs);
+    let sawEOF = false;
+    const result = await runPython(code, {
+      stdin: usesInput(code) ? stdinText : '',
+      onOutput: (chunks) => {
+        clearLoading();
+        for (const { stream, text } of chunks) {
+          if (stream === 'stderr' && /\bEOFError\b/.test(text)) sawEOF = true;
+          for (const line of text.split('\n')) {
+            if (lines.length >= MAX_CONSOLE_LINES) { truncated = true; break; }
+            lines.push({ kind: stream, text: line });
           }
-          idx = elseEnd;
-          continue;
         }
-
-        const augMatch = text.match(/^([\w.]+)\s*(\+=|-=|\*=|\/=)\s*(.+)$/);
-        if (augMatch) {
-          const cur = vars[augMatch[1]] ?? 0;
-          vars[augMatch[1]] = evalExpr(`${cur} ${augMatch[2][0]} (${augMatch[3]})`);
-          idx += 1;
-          continue;
-        }
-
-        if (text.includes('=') && !/^print\b|^return\b/.test(text)) {
-          const eqIdx = text.indexOf('=');
-          const varName = text.slice(0, eqIdx).trim();
-          const varVal = text.slice(eqIdx + 1).trim();
-          if (varName && !varName.includes(' ') && !varName.includes('=') && varVal) {
-            vars[varName] = evalExpr(varVal);
-          }
-          idx += 1;
-          continue;
-        }
-
-        const printMatch = text.match(/^print\s*\((.*)\)$/s);
-        if (printMatch) {
-          let expr = printMatch[1].trim();
-          try {
-            const val = Function(`'use strict'; return (${evalExpr(expr)})`)();
-            outs.push(String(val));
-          } catch {
-            outs.push(expr.replace(/^["']|["']$/g, ''));
-          }
-          idx += 1;
-          continue;
-        }
-        idx += 1;
-      }
-    };
-    try {
-      run(source, variables, outputs);
-    } catch (err: any) {
-      setConsoleOutput([`⚠️ Error d'execució: ${err?.message || err}`]);
-      setTestedCode(null);
-      return;
+        show();
+      },
+    });
+    clearLoading();
+    if (truncated) lines.push({ kind: 'info', text: t('lesson.output_truncated', 'Sortida retallada: només es mostren les primeres {{count}} línies.', { count: MAX_CONSOLE_LINES }) });
+    if (sawEOF) lines.push({ kind: 'info', text: t('lesson.stdin_eof_hint', "El programa demana més dades amb input() de les que hi ha a «Entrada»: escriu-hi una línia per a cada input().") });
+    if (result === 'ok') {
+      if (!lines.length) lines.push({ kind: 'info', text: t('lesson.run_no_output', "El programa s'ha executat sense mostrar res. Per veure un resultat, fes servir print().") });
+      lines.push({ kind: 'info', text: t('lesson.run_finished', 'Execució finalitzada.') });
+    } else if (result === 'stopped') {
+      lines.push({ kind: 'info', text: t('lesson.run_stopped', 'Execució aturada.') });
+    } else if (result === 'timeout') {
+      lines.push({ kind: 'stderr', text: t('lesson.run_timeout', 'Aturat: ha trigat més de {{seconds}} s. Potser hi ha un bucle infinit?', { seconds: DEFAULT_PYTHON_TIMEOUT_MS / 1000 }) });
+    } else if (result === 'load-error') {
+      lines.push({ kind: 'stderr', text: t('lesson.python_load_error', "No s'ha pogut carregar Python. Comprova la connexió i torna-ho a provar.") });
     }
-    // Si l'enunciat demana imprimir, cal que s'hagi imprès alguna cosa; si no, n'hi ha prou amb que el codi s'executi
-    const needsPrint = !!analyzePythonConcepts(userInputRef.current, statementShown)?.active.includes('print()');
-    if (outputs.length > 0) {
-      setConsoleOutput([...outputs, '', "✅ El resultat té relació amb l'activitat: ja pots enviar."]);
-      setTestedCode(userInputRef.current);
-    } else if (needsPrint) {
-      setConsoleOutput(["⚠️ L'enunciat demana imprimir un resultat, però el codi no imprimeix res (usa print(...)).", "Enviar continua bloquejat."]);
-      setTestedCode(null);
-    } else {
-      setConsoleOutput(["[LOCAL RUN]: Codi executat correctament.", "✅ Codi relacionat amb l'activitat: ja pots enviar."]);
-      setTestedCode(userInputRef.current);
-    }
+    if (runLessonRef.current !== lesson) return;
+    show();
+    setIsRunning(false);
   };
 
   const loadPeerSolutions = async () => {
@@ -913,8 +758,6 @@ export default function LessonPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Executa el codi per poder enviar')}</Typography>)}
-                {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
                 {isReactCourse && (
                   <Tooltip title={liveRenderTooltip} arrow>
                     <IconButton size="small" aria-label={liveRenderTooltip} onClick={() => setShowLiveRender(v => !v)} sx={{ p: 0.5 }}>
@@ -924,9 +767,10 @@ export default function LessonPage() {
                 )}
               </Box>
             </Box>
-            <Box sx={{ flex: 1, position: 'relative' }}>
+            <Box sx={{ flex: 1, minHeight: 0, position: 'relative' }}>
               {monaco ? (
-                <div className="h-full">
+                // Absolut: el contenidor flex no té alçada fixa, i amb height: 100% Monaco quedava a 0 px
+                <Box sx={{ position: 'absolute', inset: 0 }}>
                   <Editor
                     height="100%"
                     path={getFile(selectedLanguage).path}
@@ -938,7 +782,7 @@ export default function LessonPage() {
                       onChange={(value: string | undefined) => { setCodeByLang(prev => ({ ...prev, [selectedLanguage]: value || '' })); setIsDirty(true); setWasSavedInSession(false); if (!value || value.trim().length === 0) setConsoleOutput([]); }}
                     options={getMonacoEditorOptions(false)}
                   />
-                </div>
+                </Box>
               ) : (
                 <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress size={22} /></Box>
               )}
@@ -958,6 +802,11 @@ export default function LessonPage() {
           )}
         </Box>
 
+        {showStdin && (
+          <Box sx={{ flexShrink: 0, height: 96, display: 'flex', flexDirection: 'column' }}>
+            <StdinBox value={stdinText} onChange={setStdinText} label={stdinLabel} placeholder={stdinPlaceholder} rows={2} />
+          </Box>
+        )}
         <ConsolePanel 
           output={consoleOutput}
           emptyMessage={t('lesson.waiting_execution')}
@@ -973,7 +822,7 @@ export default function LessonPage() {
             </Tooltip>
             {selectedLanguage === 'python' && (
               <Tooltip title={testTooltip} arrow>
-                <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>{t('lesson.run_button', 'Executar')}</Button>
+                <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="currentColor" /> : <Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>{isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}</Button>
               </Tooltip>
             )}
             <Tooltip title={submitTooltip} arrow>
@@ -1120,8 +969,6 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-                {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Executa el codi per poder enviar')}</Typography>)}
-                {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                 <Tooltip title={resetTooltip} arrow>
@@ -1131,8 +978,8 @@ export default function LessonPage() {
                 </Tooltip>
                 {selectedLanguage === 'python' && (
                   <Tooltip title={testTooltip} arrow>
-                    <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} fill="#fff"/>} sx={{ borderColor: '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                      {t('lesson.run_button', 'Executar')}
+                    <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                      {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
                     </Button>
                   </Tooltip>
                 )}
@@ -1181,11 +1028,18 @@ export default function LessonPage() {
           </Box>
 
           {/* CONSOLA */}
-          <Box sx={{ height: 180, flexShrink: 0 }}>
-            <ConsolePanel 
-              output={consoleOutput}
-              emptyMessage={t('lesson.waiting_execution', "Esperant l'execució del codi...")}
-            />
+          <Box sx={{ height: 180, flexShrink: 0, display: 'flex' }}>
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
+              <ConsolePanel 
+                output={consoleOutput}
+                emptyMessage={t('lesson.waiting_execution', "Esperant l'execució del codi...")}
+              />
+            </Box>
+            {showStdin && (
+              <Box sx={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid #333', borderTop: '1px solid', borderTopColor: mode === 'light' ? '#000' : 'divider' }}>
+                <StdinBox value={stdinText} onChange={setStdinText} label={stdinLabel} placeholder={stdinPlaceholder} rows={6} />
+              </Box>
+            )}
           </Box>
         </Box>
       </Box>
