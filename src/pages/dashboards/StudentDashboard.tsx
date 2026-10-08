@@ -27,6 +27,8 @@ const getProgress = (studentId: string): Record<string, boolean> => {
   return { ...(shared[studentId] || {}), ...perStudent };
 };
 
+const NO_COURSES: Course[] = [];
+
 /** Les tres llistes de cursos que es poden veure als tabs. */
 export type CourseScope = 'public' | 'private' | 'assigned';
 
@@ -146,8 +148,10 @@ export default function StudentDashboard() {
   const assignedQuery = useAllCourses(isLoggedIn);
   const publicQuery = usePublicCourses(isLoggedIn && (scope === 'public' || scopeAnchor != null));
 
-  const assignedList = assignedQuery.data ?? [];
-  const publicList = publicQuery.data ?? [];
+  // Mateixa referència mentre no hi ha dades: un `[]` nou a cada render canviaria les
+  // dependències dels memos i efectes de sota a cada render (bucle de renders sense sessió).
+  const assignedList = assignedQuery.data ?? NO_COURSES;
+  const publicList = publicQuery.data ?? NO_COURSES;
   const scopeSource = scope === 'public' ? publicList : assignedList;
 
   const visibleCourses = useMemo(
@@ -405,7 +409,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       : (assignedQuery.data ?? []).some((c) => c.slug === currentSlug);
     if (!currentSlug || !selectedStudentId || !isOwnCourse) {
       // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
-      setRanking([]);
+      setRanking((prev) => (prev.length ? [] : prev));
       return;
     }
     try {
