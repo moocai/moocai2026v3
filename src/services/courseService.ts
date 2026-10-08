@@ -29,6 +29,20 @@ function toCourses(data: unknown): Course[] {
   }));
 }
 
+/** Problema de l'API → forma de `subTopics` que fan servir les pàgines */
+export const mapProblem = (p: any) => ({
+  subtitle: p.title,
+  text: p.statement_ca || p.statementHtml || '',
+  problemSlug: p.slug,
+  type: p.type,
+  precode: p.precode,
+  solution: p.system_solution?.code || '',
+  score: p.score,
+  difficulty: p.difficulty,
+  choices: p.choices,
+  choiceType: p.choice_type,
+});
+
 export const courseService = {
   
   /**
@@ -101,7 +115,10 @@ export const courseService = {
 
   async getChallengeSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`);
-    return Array.isArray(data) ? data : (data.results || []);
+    // L'esquema diu llista, però és la submission pròpia: s'accepta també un objecte sol
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.results)) return data.results;
+    return data && typeof data === 'object' ? [data] : [];
   },
 
   async getPeerSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
@@ -142,17 +159,7 @@ export const courseService = {
           return {
             id: topic.slug,
             title: topic.name,
-            subTopics: Array.isArray(problems) ? problems.map((p: any) => ({
-              subtitle: p.title,
-              text: p.statement_ca || p.statementHtml || '',
-              problemSlug: p.slug,
-              type: p.type,
-              precode: p.precode,
-              solution: p.system_solution?.code || '',
-              score: p.score,
-              difficulty: p.difficulty,
-              choices: p.choices,
-            })) : [],
+            subTopics: Array.isArray(problems) ? problems.map(mapProblem) : [],
           };
         })
       );

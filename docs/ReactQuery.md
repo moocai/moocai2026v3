@@ -66,16 +66,16 @@ new QueryClient({
 |---|---|
 | `src/main.tsx` | `QueryClient` + `QueryClientProvider` (defaults globals) |
 | `src/hooks/useCourse.ts` | `useCourse(courseId)` → `useQuery` amb `queryKey: ['course', courseId]`; `prefetchCourse()`. `staleTime: 30min`, `gcTime: 60min`, `retry: 1`, `enabled: !!courseId && courseId !== 'undefined'` |
-| `src/hooks/useCourses.ts` | `useAllCourses()` → `['courses']`; `usePublicCourses()` → `['public-courses']`; `useCourseDetail(slug)` → `['course', slug]` (**mateixa key** que `useCourse`, així la cache es comparteix); `prefetchAllCourses()` i `prefetchCourseDetail()`. Llistes: `staleTime 5min`. Detalls: `staleTime 30min`, `gcTime 60min` |
+| `src/hooks/useCourses.ts` | `useAllCourses()` → `['courses']`; `usePublicCourses()` → `['public-courses']`; `useCourseDetail(slug)` → `['course', slug]` (**mateixa key** que `useCourse`, així la cache es comparteix); `prefetchAllCourses()`. Llistes: `staleTime 5min`. Detalls: `staleTime 30min`, `gcTime 60min` |
 | `src/hooks/usePublicStats.ts` | `usePublicStats()` → `['public-stats']`. Activada només quan `VITE_ENABLE_PUBLIC_STATS=true` (el backend encara no exposa `GET /public/stats/`). `staleTime 10min`, `gcTime 30min`, `retry: 2`; el `queryFn` va per `api.get` (`httpClient`) |
 | `src/components/CourseCard.tsx` | `useQueryClient()` + `prefetchCourse()` a l'`onMouseEnter` de la Card |
 | `src/components/Hero.tsx` | `usePublicStats()` → comptador d'alumnes de la portada (reactivat; vegeu `TODO(stats)`) |
-| `src/layouts/MainLayout.tsx` | `useQueryClient` + `prefetchAllCourses` / `prefetchCourseDetail` → omple la cache de React Query (una única petició per curs) |
+| `src/layouts/MainLayout.tsx` | `useQueryClient` + `prefetchAllCourses` → omple la cache de React Query amb la llista de cursos |
 | `src/pages/Home.tsx` | `useAllCourses(isLoggedIn)` en lloc de `useState`+`useEffect`; `invalidateQueries(['courses'])` en `authChange`/`storage`/`visibilitychange` |
 | `src/pages/dashboards/StudentDashboard.tsx` | `useAllCourses()` + `usePublicCourses()` + `useQueries(['course', slug])` per als detalls (dedup amb la resta); `invalidateQueries` de llistes i detalls en `auth-state-change` |
 | `src/pages/courses/CourseLessons.tsx` | `useCourse(courseId)` — substitueix el `useState`+`useEffect` original |
 | `src/pages/courses/LessonPage.tsx` | `useCourse(courseId)` — idem |
-| `src/pages/courses/ExamPage.tsx` | `useCourse(courseId)` — idem |
+| `src/pages/courses/TopicTestPage.tsx` | `useCourse(courseId)` — idem |
 
 `useCourse` resol els ids de curs clonat (`clone-<timestamp>`) a l'slug original via `localCourseService.getById().originalSlug` abans de cridar el servei.
 
@@ -86,18 +86,15 @@ new QueryClient({
 
 ### Prefetch — `src/layouts/MainLayout.tsx`
 
-Des del 6 d'octubre el prefetch va **a la cache de React Query** (abans omplia només la cache en memòria de `courseService`):
+Només es precarrega la **llista** de cursos:
 
 ```ts
-prefetchAllCourses(queryClient)
-  .then((courses) => {
-    if (!courses) return;
-    courses.forEach((course) => prefetchCourseDetail(queryClient, course.slug!));
-  })
-  .catch(() => {});
+prefetchAllCourses(queryClient).catch(() => {});
 ```
 
-Conseqüència: la primera visita a un curs ja no retorna `isLoading`, i la portada, el dashboard i `CourseLessons` llegeixen de la mateixa cache (`['course', slug]`). La duplicació de peticions d'abans (cada pàgina baixava el detall complet dels cursos per separat) desapareix perquè React Query deduplica per queryKey.
+Abans també es precarregava el detall complet de cada curs (`prefetchCourseDetail`), però això són 2 + N peticions per curs (una per tema) a cada càrrega de qualsevol pàgina. Ara cada pàgina demana el detall quan el necessita, i continua compartint la cache `['course', slug]` (React Query deduplica per queryKey).
+
+`TopicTestPage` no carrega el detall del curs: demana el curs (`['course-info', slug]`, per al títol) i els problemes del seu tema (`['topic-problems', slug, topic]`, sempre fresca). El tema li arriba per `?topic=`; sense, el treu de `['course', slug]` si ja és a la cache.
 
 ### Cache duplicada
 Encara hi ha **dues caches** de curs:
