@@ -25,7 +25,7 @@ L'origen comú és `courseService.getFullCourseDetail(slug)`, que fa **2 + N** p
 | `MainLayout` | prefetch de `GET /courses/` a cada pàgina | res |
 | `StudentDashboard` sense sessió | llistes + detall de tots els cursos públics | res |
 | `StudentDashboard` amb sessió | detall de tots els cursos | «els meus cursos» + públics només si és l'àmbit actiu o s'obre el menú + detall **només del curs seleccionat** (el de recordat, sense baixar abans el del primer tab) |
-| `Login` | `GET /users/register/` en carregar | només en obrir el formulari de registre |
+| `Login` | `GET /auth/register/options/` en carregar | només en obrir el formulari de registre |
 | `CourseLessons` | les dues llistes + teoria de tots els temes | llista de l'àmbit del curs (recompte del botó), l'altra en obrir el selector; teoria només del tema obert |
 | `CourseCard` (portada) | prefetch del detall en `hover` | res |
 | `Students`, `TeacherLeaderboard` | detall de cada curs (sense ús) | només les llistes |
