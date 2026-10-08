@@ -1,13 +1,19 @@
 import { useState, useRef, useEffect } from 'react';
-import { Box, Tabs, Tab, Accordion, AccordionSummary, AccordionDetails, Typography, Button, Stack, useTheme, Card, CardContent, Radio, RadioGroup, FormControlLabel, FormControl } from '@mui/material';
+import { Box, Tabs, Tab, Accordion, AccordionSummary, AccordionDetails, Typography, Button, Stack, useTheme, Card, CardContent, Radio, RadioGroup, FormControlLabel, FormControl, Tooltip, CircularProgress } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
+import StopIcon from '@mui/icons-material/Stop';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Editor from '@monaco-editor/react';
 import { CodePreview } from './CodePreview';
-import { ConsolePanel } from '../../components/ConsolePanel';
+import { ConsolePanel, type ConsoleLine } from '../../components/ConsolePanel';
+import { MarkdownContent } from '../../components/MarkdownContent';
 import { useTranslation } from 'react-i18next';
+import { usePythonRun } from '../../hooks/usePythonRun';
+import { preloadPython } from '../../services/pythonRunner';
+import { getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
+import { useThemeMode } from '../../hooks/useTheme';
 
 type EditorLang = 'python' | 'react';
 
@@ -32,6 +38,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
   const { t } = useTranslation();
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
+  const { mode } = useThemeMode();
   
   // Storage key para persistencia
   const storageKey = exerciseId ? `teacher_exercise_${exerciseId}` : null;
@@ -57,11 +64,28 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
   const [selectedLanguage, setSelectedLanguage] = useState<EditorLang>('python');
   const [codeByLang, setCodeByLang] = useState<Record<EditorLang, string>>(initialCodeState);
   const [monacoInstance, setMonacoInstance] = useState<any>(null);
-  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
+  const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
+  // Executar: Python real (Pyodide), el mateix que a la pàgina de l'alumne
+  const { isRunning, inputActive, run: runPythonCode, stop: stopPythonCode, submitInput } = usePythonRun(setConsoleOutput, exerciseId);
+  // Monaco local (sense CDN); el servei de TypeScript només per a la pestanya React
+  const [monacoReady, setMonacoReady] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
   const editorRef = useRef<any>(null);
   const currentCode = codeByLang[selectedLanguage];
   const isTest = type === 'test' || type === 'quiz' || type === 'exam' || type === 'multiple_choice' || choices.length > 0;
+
+  useEffect(() => {
+    let cancelled = false;
+    (selectedLanguage === 'react' ? loadMonacoTypescript() : loadMonaco())
+      .then(() => { if (!cancelled) setMonacoReady(true); })
+      .catch((err) => console.error('No s\'ha pogut carregar l\'editor:', err));
+    return () => { cancelled = true; };
+  }, [selectedLanguage]);
+
+  // Python es carrega en segon pla perquè el primer "Executar" no hagi d'esperar
+  useEffect(() => {
+    if (type === 'code' || type === 'coding') void preloadPython().catch(() => { /* es reintentarà en executar */ });
+  }, [type]);
 
   // Guardar en localStorage cuando cambia el código
   useEffect(() => {
@@ -86,7 +110,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
   };
 
   const handleReset = () => {
-    if (!window.confirm('¿Seguro que quieres resetear el código?')) return;
+    if (!window.confirm(t('lesson.reset_confirm', 'Segur que vols tornar a començar el codi?'))) return;
     const resetCode = { python: initialCode || '', react: '' };
     setCodeByLang(resetCode);
     setConsoleOutput([]);
@@ -95,175 +119,14 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
     }
   };
 
-  const runPython = () => {
-    setConsoleOutput(["[PYTHON]: Ejecutando código..."]);
-    
-    const source = codeByLang.python;
-    const lines = source.split('\n').map(l => l.replace(/#.*$/, '').replace(/\s+$/, '')).filter(l => l.trim().length > 0);
-    const variables: Record<string, any> = {};
-    const outputs: string[] = [];
-    
-    const evalExpr = (expr: string): any => {
-      let e = expr.trim();
-      
-      // Manejar strings
-      if ((e.startsWith('"') && e.endsWith('"')) || (e.startsWith("'") && e.endsWith("'"))) {
-        return e.slice(1, -1);
-      }
-      
-      // Manejar range()
-      e = e.replace(/range\(([^)]*)\)/g, (_, a) => {
-        const n = Number(evalExpr(a.trim()));
-        return '[' + Array.from({ length: Math.max(0, n) }, (_, k) => k).join(',') + ']';
-      });
-      
-      // Manejar len()
-      e = e.replace(/len\(([^)]*)\)/g, (_, a) => {
-        const val = evalExpr(a.trim());
-        return String(Array.isArray(val) || typeof val === 'string' ? val.length : 0);
-      });
-      
-      // Manejar str(), int(), float()
-      e = e.replace(/str\(([^)]*)\)/g, (_, a) => String(evalExpr(a.trim())));
-      e = e.replace(/int\(([^)]*)\)/g, (_, a) => String(parseInt(evalExpr(a.trim()))));
-      e = e.replace(/float\(([^)]*)\)/g, (_, a) => String(parseFloat(evalExpr(a.trim()))));
-      
-      // Reemplazar variables
-      Object.keys(variables).forEach(v => {
-        const regex = new RegExp(`\\b${v}\\b`, 'g');
-        e = e.replace(regex, JSON.stringify(variables[v]));
-      });
-      
-      // Manejar operaciones con listas
-      if (e.includes('[') && e.includes(']')) {
-        try {
-          return Function(`'use strict'; return (${e})`)();
-        } catch {
-          // Continuar con el procesamiento normal
-        }
-      }
-      
-      try {
-        return Function(`'use strict'; return (${e})`)();
-      } catch {
-        return e.replace(/^["']|["']$/g, '');
-      }
-    };
-
-    const run = (codeLines: string[], vars: Record<string, any>, outs: string[]) => {
-      let idx = 0;
-      while (idx < codeLines.length) {
-        const line = codeLines[idx].trim();
-        
-        if (!line || line.startsWith('#')) {
-          idx++;
-          continue;
-        }
-
-        // Manejar for loops
-        const forMatch = line.match(/^for\s+([\w.]+)\s+in\s+(.+):$/);
-        if (forMatch) {
-          const varName = forMatch[1].trim();
-          const iterable = evalExpr(forMatch[2].trim());
-          const body: string[] = [];
-          let j = idx + 1;
-          while (j < codeLines.length && (codeLines[j].startsWith(' ') || codeLines[j].startsWith('\t') || codeLines[j].trim() === '')) {
-            if (codeLines[j].trim()) body.push(codeLines[j].trim());
-            j++;
-          }
-          const items = Array.isArray(iterable) ? iterable : typeof iterable === 'string' ? iterable.split('') : [iterable];
-          items.forEach(item => {
-            vars[varName] = item;
-            run(body, vars, outs);
-          });
-          idx = j;
-          continue;
-        }
-
-        // Manejar while loops
-        const whileMatch = line.match(/^while\s+(.+):$/);
-        if (whileMatch) {
-          const body: string[] = [];
-          let j = idx + 1;
-          while (j < codeLines.length && (codeLines[j].startsWith(' ') || codeLines[j].startsWith('\t') || codeLines[j].trim() === '')) {
-            if (codeLines[j].trim()) body.push(codeLines[j].trim());
-            j++;
-          }
-          let guard = 0;
-          while (evalExpr(whileMatch[1].trim()) && guard < 100000) {
-            run(body, vars, outs);
-            guard++;
-          }
-          idx = j;
-          continue;
-        }
-
-        // Manejar if
-        const ifMatch = line.match(/^if\s+(.+):$/);
-        if (ifMatch) {
-          const body: string[] = [];
-          let j = idx + 1;
-          while (j < codeLines.length && (codeLines[j].startsWith(' ') || codeLines[j].startsWith('\t') || codeLines[j].trim() === '')) {
-            if (codeLines[j].trim()) body.push(codeLines[j].trim());
-            j++;
-          }
-          if (evalExpr(ifMatch[1].trim())) {
-            run(body, vars, outs);
-          }
-          idx = j;
-          continue;
-        }
-
-        // Manejar print()
-        const printMatch = line.match(/^print\s*\((.*)\)$/);
-        if (printMatch) {
-          let expr = printMatch[1].trim();
-          try {
-            const val = evalExpr(expr);
-            outs.push(String(val));
-          } catch (err) {
-            outs.push(`Error: ${err}`);
-          }
-          idx++;
-          continue;
-        }
-
-        // Manejar asignaciones
-        if (line.includes('=') && !line.includes('==') && !line.startsWith('print')) {
-          const eqIdx = line.indexOf('=');
-          const varName = line.slice(0, eqIdx).trim();
-          const varVal = line.slice(eqIdx + 1).trim();
-          if (varName && !varName.includes(' ') && !varName.includes('=')) {
-            try {
-              vars[varName] = evalExpr(varVal);
-            } catch (err) {
-              outs.push(`Error asignando ${varName}: ${err}`);
-            }
-          }
-          idx++;
-          continue;
-        }
-
-        idx++;
-      }
-    };
-
-    run(lines, variables, outputs);
-    
-    if (outputs.length > 0) {
-      setConsoleOutput(["[PYTHON]: Resultado de la ejecución:", ...outputs]);
-    } else {
-      setConsoleOutput(["[PYTHON]: Código ejecutado correctamente.", "*(No se han detectado sentencias print() con resultado)*"]);
-    }
-  };
-
   const handleRun = () => {
-    if (selectedLanguage === 'python') {
-      runPython();
-    } else {
-      setConsoleOutput(['[REACT]: Código React ejecutado.']);
-    }
+    if (selectedLanguage !== 'python') return; // React: el preview ja s'actualitza sol
+    if (isRunning) { stopPythonCode(); return; }
+    void runPythonCode(codeByLang.python);
   };
+  const runTooltip = isRunning
+    ? t('lesson.stop_tooltip', "Atura el programa (p. ex. si s'ha quedat en un bucle infinit)")
+    : t('lesson.test_tooltip', "Executa el codi amb Python al navegador (no s'envia)");
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -280,7 +143,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>
-            {isTest ? 'Test' : 'Código'}
+            {isTest ? 'Test' : t('lesson.app_file', 'Codi')}
           </Typography>
           {!isTest && (
             <Tabs
@@ -315,6 +178,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
         </Box>
         {!isTest && (
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Tooltip title={t('lesson.reset_tooltip', 'Torna a començar: recupera el codi inicial')} arrow>
             <Button 
               onClick={handleReset} 
               startIcon={<RestartAltIcon />}
@@ -331,10 +195,13 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
             >
               Reset
             </Button>
+            </Tooltip>
+            {selectedLanguage === 'python' && (
+            <Tooltip title={runTooltip} arrow>
             <Button 
               onClick={handleRun} 
               variant="contained"
-              startIcon={<PlayArrowIcon />}
+              startIcon={isRunning ? <StopIcon /> : <PlayArrowIcon />}
               sx={{ 
                 bgcolor: '#fff', 
                 color: '#000', 
@@ -346,8 +213,10 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
                 '&:hover': { bgcolor: '#e0e0e0' } 
               }}
             >
-              Ejecutar
+              {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
             </Button>
+            </Tooltip>
+            )}
           </Stack>
         )}
         {isTest && (
@@ -369,11 +238,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
           <Box sx={{ p: 3 }}>
             <Card variant="outlined" sx={{ borderRadius: 2, bgcolor: 'background.paper' }}>
               <CardContent>
-                {statement && (
-                  <Typography variant="body1" sx={{ fontWeight: 600, mb: 2, whiteSpace: 'pre-wrap' }}>
-                    {statement}
-                  </Typography>
-                )}
+                {statement && <MarkdownContent sx={{ mb: 2 }}>{statement}</MarkdownContent>}
 
                 <FormControl component="fieldset" sx={{ width: '100%' }}>
                   <RadioGroup>
@@ -415,8 +280,9 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
         ) : (
           <Box sx={{ flex: 1, display: 'flex', minHeight: 0, height: '100%' }}>
             {/* Editor */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', borderRight: '1px solid #333', minHeight: 0 }}>
-              <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', borderRight: selectedLanguage === 'react' ? '1px solid #333' : 'none', minHeight: 0 }}>
+              <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {monacoReady ? (
                 <Editor
                   height="100%"
                   language={selectedLanguage === 'python' ? 'python' : 'typescript'}
@@ -424,7 +290,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
                   value={currentCode}
                   onChange={handleChange}
                   onMount={handleEditorDidMount}
-                  theme={isDark ? 'vs-dark' : 'vs-light'}
+                  theme={getMonacoEditorTheme(mode)}
                   options={{
                     minimap: { enabled: false },
                     fontSize: 15,
@@ -436,23 +302,22 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
                     wordWrap: 'on',
                   }}
                 />
+                ) : (
+                  <CircularProgress size={24} />
+                )}
               </Box>
             </Box>
 
-            {/* Preview */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
-              {selectedLanguage === 'react' ? (
+            {/* Preview: només per a React; Python fa servir tota l'amplada per a l'editor */}
+            {selectedLanguage === 'react' && (
+              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
                 <CodePreview 
                   code={currentCode} 
                   monaco={monacoInstance} 
                   onOutput={setConsoleOutput}
                 />
-              ) : (
-                <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#151515' }}>
-                  <Typography sx={{ fontSize: 12, color: '#555', fontWeight: 600 }}>Python no necessita renderitzar</Typography>
-                </Box>
-              )}
-            </Box>
+              </Box>
+            )}
           </Box>
         )}
       </Box>
@@ -462,7 +327,11 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
         <Box sx={{ height: 180, flexShrink: 0 }}>
           <ConsolePanel 
             output={consoleOutput}
-            emptyMessage="Esperando ejecución..."
+            emptyMessage={t('lesson.waiting_execution', "Esperant l'execució del codi...")}
+            inputActive={inputActive}
+            onInputSubmit={submitInput}
+            inputLabel={t('lesson.console_input_label', 'Resposta per a input()')}
+            inputPlaceholder={t('lesson.console_input_placeholder', 'Escriu la resposta i prem Enter')}
           />
         </Box>
       )}
@@ -475,7 +344,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{t('teacher.enunciado')}</Typography>
             </AccordionSummary>
             <AccordionDetails>
-              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>{statement}</Typography>
+              <MarkdownContent fontSize="0.875rem">{statement}</MarkdownContent>
             </AccordionDetails>
           </Accordion>
         )}
