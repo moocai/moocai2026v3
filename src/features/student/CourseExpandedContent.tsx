@@ -2,6 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { Box, Stack, Typography } from '@mui/material';
 import { PlayCircle, CheckCircle2 } from 'lucide-react';
 import { Course, Topic } from './types';
+import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 
 interface Props {
   course: Course;
@@ -38,7 +39,7 @@ export function CourseExpandedContent({ course, dbProgress, getText, getCourseTo
   }, []);
 
   const lastSession = (() => {
-    try { return JSON.parse(localStorage.getItem('mooc_last_session') || 'null'); }
+    try { return JSON.parse(localStorage.getItem(userKey(LAST_SESSION_KEY)) || 'null'); }
     catch { return null; }
   })();
 

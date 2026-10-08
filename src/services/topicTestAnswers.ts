@@ -22,6 +22,13 @@ export const readJson = (key: string): Record<string, any> => {
   try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
 };
 
+/**
+ * Clau de localStorage pròpia de l'usuari actual (`<base>_<idAlumne>`), per a dades que no han
+ * de passar d'un usuari a un altre del mateix navegador (p. ex. on s'havia quedat).
+ */
+export const userKey = (base: string) => `${base}_${getStudentId()}`;
+export const LAST_SESSION_KEY = 'mooc_last_session';
+
 export const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
 const getAnswersKey = () => `${TEST_ANSWERS_PREFIX}${getStudentId()}`;
 // Amb sessió però sense id d'alumne (p. ex. just després de registrar-se, abans d'iniciar sessió)
@@ -71,13 +78,63 @@ export const saveAnswers = (entries: Record<string, SavedAnswer>) => {
   notify();
 };
 
+// Progrés que ve del servidor (`my_solution` de cada problema). La UI llegeix el progrés de
+// localStorage (`mooc_global_progress_<id>` i les respostes dels tests), així que aquí es porta
+// l'estat del servidor a aquest magatzem: és la font de veritat i el magatzem en fa de cache.
+// Només afegeix o millora (mai rebaixa): un estat local més nou que la dada en cache del
+// servidor (p. ex. just després d'enviar) es manté.
+
+/** Un problema tal com el retorna l'API (llista de tema o del curs), amb `my_solution`. */
+type ApiProblem = { slug: string; type?: string; choices?: any[]; my_solution?: any };
+
+/** Si l'API ja retorna `my_solution` (el backend antic no l'envia). */
+export const hasServerSolutions = (problems: ApiProblem[]) =>
+  problems.some((p) => p && Object.prototype.hasOwnProperty.call(p, 'my_solution'));
+
+export function applyServerSolutions(courseId: string, problems: ApiProblem[]) {
+  if (!isLoggedIn() || !hasServerSolutions(problems)) return;
+
+  const answers: Record<string, SavedAnswer> = {};
+  const progressKey = getProgressKey();
+  const progress = readJson(progressKey);
+  let progressChanged = false;
+
+  for (const p of problems) {
+    const mine = p.my_solution;
+    if (!mine) continue;
+    const key = answerKey(courseId, p.slug);
+    if (p.type === 'test') {
+      if (!Array.isArray(mine.choices) || readSavedAnswer(key, p.choices)) continue;
+      answers[key] = { answers: mine.choices.map(String), correct: !!mine.correct, choices: p.choices || [] };
+    } else if (mine.status === 'accepted' && progress[key] !== true) {
+      progress[key] = true;
+      progressChanged = true;
+    } else if (mine.status && progress[key] == null) {
+      progress[key] = 'attempted';
+      progressChanged = true;
+    }
+  }
+
+  if (progressChanged) {
+    try { localStorage.setItem(progressKey, JSON.stringify(progress)); } catch { /* quota / mode privat */ }
+  }
+  if (Object.keys(answers).length > 0) saveAnswers(answers); // també avisa (lessonProgressUpdated)
+  else if (progressChanged) window.dispatchEvent(new Event('lessonProgressUpdated'));
+}
+
 /**
  * Porta del servidor les respostes dels tests d'un tema que no tenim desades.
- * `problems` ha de ser la llista FRESCA de l'API: un alumne només rep `is_correct` d'un test
- * quan ja l'ha respost, així que només es demana la resposta (GET submissions) d'aquests.
+ * `problems` ha de ser la llista FRESCA de l'API. Si porta `my_solution`, n'hi ha prou;
+ * amb el backend antic, un alumne només rep `is_correct` d'un test quan ja l'ha respost,
+ * així que només es demana la resposta (GET submissions) d'aquests.
  */
 export async function syncTopicAnswers(courseId: string, courseSlug: string, topicSlug: string, problems: any[]) {
   if (!isLoggedIn()) return;
+  // L'API ja porta la resposta pròpia de cada test (`my_solution`): cap petició més.
+  if (hasServerSolutions(problems)) {
+    applyServerSolutions(courseId, problems);
+    return;
+  }
   const toFetch = problems.filter((p: any) => p.type === 'test'
     && (p.choices || []).some((c: any) => typeof c.is_correct === 'boolean')
     && !readSavedAnswer(answerKey(courseId, p.slug), p.choices));

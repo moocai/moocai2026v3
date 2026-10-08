@@ -11,9 +11,11 @@ import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel } from '../../components/ConsolePanel';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useCourse } from '../../hooks/useCourse';
+import { useQuery } from '@tanstack/react-query';
+import { resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
-import { courseService } from '../../services/courseService';
+import { courseService, mapProblem } from '../../services/courseService';
+import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
@@ -254,6 +256,8 @@ export default function LessonPage() {
   const userInput = codeByLang[selectedLanguage];
   const userInputRef = useRef(userInput); userInputRef.current = userInput;
   const codeStorageRef = useRef(codeByLang); codeStorageRef.current = codeByLang;
+  const lastBackupRef = useRef<string | null>(null); // últim codi Python desat al servidor (d'aquest problema)
+  useEffect(() => { lastBackupRef.current = null; }, [courseId, lessonId]);
   const [diagnostics, setDiagnostics] = useState<any[]>([]);
   const editorRef = useRef<any>(null);
   const monacoInstanceRef = useRef<any>(null);
@@ -311,6 +315,9 @@ export default function LessonPage() {
     const editor = editorRef.current;
     if (!editor) return;
     viewStateRef.current[selectedLanguageRef.current] = editor.saveViewState();
+    // Després de sortir de la sessió (la pàgina es desmunta en sortir) no es torna a escriure
+    // res d'aquest alumne: sortir n'acaba d'esborrar els esborranys.
+    if (currentUser && !localStorage.getItem('token')) return;
     try {
       localStorage.setItem(`${codeStorageKey}_view`, JSON.stringify(viewStateRef.current));
     } catch { /* quota */ }
@@ -331,10 +338,23 @@ export default function LessonPage() {
     return field[lang] || field['ca'] || '';
   };
 
-  const currentProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
+  const outlineProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
   // Slug real del tema que conté el problema (abans la revisió IA demanava "general").
   const currentTopicSlug: string =
     course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId))?.id ?? '';
+  // L'estructura del curs no porta enunciats: el problema obert es demana a part (1 petició).
+  // Els tests no cal: es redirigeixen a TopicTestPage.
+  const needsDetail = !!outlineProblem && outlineProblem.text === undefined && outlineProblem.type !== 'test';
+  const { data: problemDetail } = useQuery({
+    queryKey: ['problem', courseId, currentTopicSlug, lessonId],
+    queryFn: () => courseService.getChallenge(resolveSlug(courseId!), currentTopicSlug, lessonId!).then(mapProblem),
+    enabled: needsDetail && !!currentTopicSlug,
+    staleTime: 5 * 60 * 1000,
+  });
+  const currentProblem = useMemo(() => {
+    if (!outlineProblem || !needsDetail) return outlineProblem;
+    return problemDetail ? { ...outlineProblem, ...problemDetail } : undefined;
+  }, [outlineProblem, needsDetail, problemDetail]);
   // Sincronització editor <-> enunciat: es recalcula cada cop que l'usuari escriu
   const statementShown = [getText(currentProblem?.subtitle), typeof currentProblem?.text === 'string' ? currentProblem.text : getText(currentProblem?.text)].join(' ');
   const isRelated = useMemo(
@@ -364,10 +384,10 @@ export default function LessonPage() {
   };
 
   useEffect(() => {
-    if (currentProblem?.type === 'test') {
+    if (outlineProblem?.type === 'test') {
       navigate(testPath(lessonId!), { replace: true });
     }
-  }, [currentProblem?.type, courseId, lessonId, navigate]);
+  }, [outlineProblem?.type, courseId, lessonId, navigate]);
 
   const isCoding = (p: any) => p?.type !== 'test';
 
@@ -489,6 +509,26 @@ export default function LessonPage() {
     }
   }, [currentUser, courseId, lessonId, currentProblem]);
 
+  // Sense esborrany local de Python (un altre dispositiu, o s'ha sortit de la sessió, que l'esborra):
+  // es recupera la còpia de seguretat del servidor, si l'alumne encara no ha tocat l'editor.
+  useEffect(() => {
+    if (!currentUser || !currentProblem || !currentTopicSlug || !lessonId) return;
+    try {
+      const raw = localStorage.getItem(codeStorageKey);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (typeof parsed === 'string' ? parsed : parsed?.python) return;
+    } catch { return; }
+    let cancelled = false;
+    courseService.getCodeBackup(resolveSlug(courseId!), currentTopicSlug, lessonId)
+      .then((code) => {
+        if (cancelled || !code) return;
+        lastBackupRef.current = code;
+        setCodeByLang((prev) => (prev.python === (currentProblem.precode || '') ? { ...prev, python: code } : prev));
+      })
+      .catch(() => { /* sense còpia: es queda el codi inicial */ });
+    return () => { cancelled = true; };
+  }, [currentUser, courseId, lessonId, currentTopicSlug, currentProblem, codeStorageKey]);
+
   // Disposa els models de la lliçó anterior per evitar que s'acumulin
   useEffect(() => {
     const key = `${courseId}/${lessonId}`;
@@ -529,6 +569,14 @@ export default function LessonPage() {
       const key = getGlobalProgressKey();
       const wasAlreadyComplete = globalProgress[key] === true;
       localStorage.setItem(codeStorageKey, JSON.stringify(codeStorageRef.current));
+      // El codi Python també es desa al servidor: és el que queda en sortir de la sessió
+      // (l'esborrany local s'esborra) i el que es veu des d'un altre dispositiu.
+      const python = codeStorageRef.current.python;
+      if (python && python !== lastBackupRef.current && currentTopicSlug) {
+        lastBackupRef.current = python;
+        void courseService.saveCodeBackup(resolveSlug(courseId), currentTopicSlug, lessonId, python)
+          .catch(() => { lastBackupRef.current = null; });
+      }
       if (isAutoSaveOnPass) {
         globalProgress[key] = true;
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
@@ -539,7 +587,7 @@ export default function LessonPage() {
         globalProgress[key] = 'attempted';
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
       }
-      localStorage.setItem('mooc_last_session', JSON.stringify({courseId, lessonId, courseTitle: getText(course?.title), lessonTitle: getText(currentProblem?.subtitle), timestamp: Date.now()}));
+      localStorage.setItem(userKey(LAST_SESSION_KEY), JSON.stringify({courseId, lessonId, courseTitle: getText(course?.title), lessonTitle: getText(currentProblem?.subtitle), timestamp: Date.now()}));
       setIsDirty(false); setWasSavedInSession(true);
       setConsoleOutput(p => [...p, "💾 Sincronitzat!"]);
       await api.postProgress({ studentId: currentUser.id, courseId, lessonId, status: globalProgress[key] || false });
@@ -594,20 +642,12 @@ export default function LessonPage() {
 
       // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
-      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0).then(() => {
+      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0, 1000, result).then(() => {
         const st = getCurrentStudent();
         if (st) setConsoleOutput(p => [...p, `🏆 Punts totals: ${getTotalPoints(st.id)}`]);
       });
 
-      if (currentUser) {
-        const submissions = JSON.parse(localStorage.getItem(`mooc_submissions_${courseId}_${lessonId}`) || '[]');
-        const existingIdx = submissions.findIndex((s: any) => s.studentId === currentUser.id);
-        const entry = { studentId: currentUser.id, studentName: currentUser.name, code: userInputRef.current, passed, timestamp: Date.now() };
-        if (existingIdx >= 0) submissions[existingIdx] = entry;
-        else submissions.push(entry);
-        localStorage.setItem(`mooc_submissions_${courseId}_${lessonId}`, JSON.stringify(submissions));
-        setSubmissionsRefreshKey(k => k + 1);
-      }
+      setSubmissionsRefreshKey(k => k + 1);
     } catch (err: any) {
       const message =
         apiErrorMessages(err).join(' ') ||
