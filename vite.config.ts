@@ -6,6 +6,12 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// El preview de React s'executa en un iframe aïllat (origen "null", vegeu preview.html): els seus
+// mòduls es demanen amb CORS. Als orígens locals per defecte de Vite s'hi afegeix "null".
+const previewCors = {
+  origin: [/^https?:\/\/(?:(?:[^:]+\.)?localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/, 'null'],
+};
+
 export default defineConfig({
   plugins: [
     react(),
@@ -17,6 +23,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    cors: previewCors,
     watch: {
       usePolling: true,
     },
@@ -27,7 +34,17 @@ export default defineConfig({
       }
     }
   },
+  preview: {
+    cors: previewCors,
+  },
   build: {
+    rollupOptions: {
+      // preview.html: runtime del preview de React, que s'executa en un iframe aïllat
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        preview: path.resolve(__dirname, 'preview.html'),
+      },
+    },
     sourcemap: true,
     reportCompressedSize: true,
     cssCodeSplit: true,

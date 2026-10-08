@@ -69,3 +69,18 @@ Mesurat amb Playwright contra un `algorien` local amb els 4 PRs (3 cursos de 5 t
 | Enviar un test | 3 | 1 |
 
 Amb el backend actual (sense els PRs) les mateixes pàgines funcionen, amb les peticions de la fase 1 més un 404 per càrrega de curs.
+
+## Dades locals: què es queda al navegador
+
+`localStorage` és del navegador, no de l'usuari: qui faci servir el mateix ordinador (p. ex. una aula) el comparteix, i qualsevol script de la pàgina el pot llegir.
+
+| Problema | Ara |
+|----|----|
+| Esborranys de codi (`code_<id>_…`): es quedaven en sortir; el següent alumne podia copiar les solucions | s'esborren en sortir, en entrar (algú pot tancar sense sortir) i en caducar la sessió. El codi Python es desa al servidor (`…/submissions/backup/`, amb el desament automàtic de cada 10 s) i es recupera en obrir el problema si no n'hi ha cap còpia local, també des d'un altre dispositiu |
+| `mooc_submissions_<curs>_<problema>`: nom i codi de cada alumne que enviava, que no es llegia enlloc | ja no s'escriu; els que hi hagi s'esborren igual que els esborranys |
+| «Continuar estudiant» i el curs recordat del dashboard eren compartits | per usuari (`mooc_last_session_<id>`, `mooc_dashboard_last_course_<id>`) |
+| El preview de React executava el codi de l'alumne dins la pàgina: podia llegir el token de sessió | s'executa en un iframe aïllat (`preview.html`, `sandbox="allow-scripts"`, origen opac): `localStorage` hi dona `SecurityError`. Els scripts del preview es demanen amb CORS, per això `/assets/*` porta `Access-Control-Allow-Origin: *` (Netlify, Vercel) i Vite accepta l'origen `null` |
+
+Es queden: el progrés, els punts i la ratxa (per usuari, no revelen res, i la teoria marcada com a llegida i la ratxa només existeixen aquí), el tema i l'idioma. Els esborranys de React (només de prova, el backend només avalua Python) es perden en sortir.
+
+Comprovat amb Playwright contra un `algorien` local: el codi de prova que llegeix el token rep `SecurityError`; després de sortir no queda cap esborrany ni resposta; un altre usuari no veu el «continuar» del primer; tornant a entrar, l'esborrany Python surt del servidor.

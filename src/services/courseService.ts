@@ -160,6 +160,22 @@ export const courseService = {
     return data && typeof data === 'object' ? [data] : [];
   },
 
+  /** Còpia de seguretat del codi (Python) de l'alumne en un problema; `null` si no n'hi ha. */
+  async getCodeBackup(courseSlug: string, topicSlug: string, problemSlug: string): Promise<string | null> {
+    try {
+      const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/backup/`);
+      return typeof data?.code === 'string' ? data.code : null;
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  },
+
+  /** Desa al servidor el codi (Python) de l'alumne sense executar-lo. */
+  async saveCodeBackup(courseSlug: string, topicSlug: string, problemSlug: string, code: string): Promise<void> {
+    await apiClient.post(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/backup/`, { code });
+  },
+
   async getPeerSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     try {
       const { data } = await apiClient.get(

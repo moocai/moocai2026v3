@@ -1,3 +1,4 @@
+import { LAST_SESSION_KEY } from './topicTestAnswers';
 import { apiClient } from './httpClient';
 
 const getProgress = (studentId: string) =>
@@ -42,9 +43,10 @@ export const api = {
     });
 
     try {
-      const lastSession = JSON.parse(localStorage.getItem('mooc_last_session') || '{}');
+      const sessionKey = `${LAST_SESSION_KEY}_${studentId}`;
+      const lastSession = JSON.parse(localStorage.getItem(sessionKey) || '{}');
       if (lastSession.courseId === courseId) {
-        localStorage.removeItem('mooc_last_session');
+        localStorage.removeItem(sessionKey);
       }
     } catch {}
 

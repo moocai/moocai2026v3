@@ -22,6 +22,13 @@ export const readJson = (key: string): Record<string, any> => {
   try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch { return {}; }
 };
 
+/**
+ * Clau de localStorage pròpia de l'usuari actual (`<base>_<idAlumne>`), per a dades que no han
+ * de passar d'un usuari a un altre del mateix navegador (p. ex. on s'havia quedat).
+ */
+export const userKey = (base: string) => `${base}_${getStudentId()}`;
+export const LAST_SESSION_KEY = 'mooc_last_session';
+
 export const getProgressKey = () => `mooc_global_progress_${getStudentId()}`;
 const getAnswersKey = () => `${TEST_ANSWERS_PREFIX}${getStudentId()}`;
 // Amb sessió però sense id d'alumne (p. ex. just després de registrar-se, abans d'iniciar sessió)

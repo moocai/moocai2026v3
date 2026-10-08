@@ -17,6 +17,7 @@ import ProtectedAvatar from '../../components/ProtectedAvatar';
 import { courseImages } from '../../data/courses';
 import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
+import { userKey } from '../../services/topicTestAnswers';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -79,7 +80,7 @@ const LAST_COURSE_KEY = 'mooc_dashboard_last_course';
 
 function readLastCourse(): { slug?: string; scope?: string } | null {
   try {
-    const raw = localStorage.getItem(LAST_COURSE_KEY);
+    const raw = localStorage.getItem(userKey(LAST_COURSE_KEY));
     return raw ? JSON.parse(raw) : null;
   } catch { return null; }
 }
@@ -89,7 +90,7 @@ function savedScope(saved: { scope?: string } | null): CourseScope {
 }
 
 function writeLastCourse(slug: string | undefined, scope: string) {
-  try { localStorage.setItem(LAST_COURSE_KEY, JSON.stringify({ slug, scope })); } catch { /* mode privat */ }
+  try { localStorage.setItem(userKey(LAST_COURSE_KEY), JSON.stringify({ slug, scope })); } catch { /* mode privat */ }
 }
 
 /** Una fila del leaderboard. */
@@ -386,16 +387,22 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     persistSelection(filterByScope(source, nextScope)[0], nextScope);
   };
 
-  // Restaura el curs recordat quan arriba la llista de l'àmbit actiu
+  // Restaura el curs recordat (de l'usuari) quan arriba la llista de l'àmbit actiu.
+  // L'àmbit inicial es llegeix abans d'entrar, quan encara no se sap qui és l'usuari:
+  // si el desat de l'usuari és un altre, primer es canvia d'àmbit.
   useEffect(() => {
-    if (restored) return;
+    if (restored || !isLoggedIn) return;
+    const saved = readLastCourse();
+    if (saved && savedScope(saved) !== scope) {
+      setScope(savedScope(saved));
+      return;
+    }
     const query = scope === 'public' ? publicQuery : assignedQuery;
     if (!query.isFetched) return;
-    const saved = readLastCourse();
     const idx = saved ? visibleCourses.findIndex((c) => c.slug === saved.slug) : -1;
     if (idx >= 0) setCourseTabIndex(idx);
     setRestored(true);
-  }, [restored, scope, visibleCourses, publicQuery.isFetched, assignedQuery.isFetched]);
+  }, [restored, isLoggedIn, scope, visibleCourses, publicQuery.isFetched, assignedQuery.isFetched]);
 
   const selectedStudentId = selectedStudent?.id;
 
