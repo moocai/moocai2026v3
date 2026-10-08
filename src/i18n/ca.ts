@@ -58,7 +58,10 @@ export default {
     days: "dies",
     success_rate: "Encerts",
     remaining: "Falten",
-    hours: "hores"
+    hours: "hores",
+    code_correct: "Problemes de programació",
+    continue_activity: "Continuar l'activitat",
+    tests_correct: "Tests correctes"
   },
   home: {
     featured_title: "Cursos Destacats",
@@ -100,7 +103,8 @@ export default {
     blog: "Blog",
     events: "Events",
     copyright: "MOOC REACT • BARCELONA",
-    telegram: "Telegram"
+    telegram: "Telegram",
+    access: "Accedir"
   },
 
   course: {by: "by", enroll: "Veure temari del curs"},
@@ -134,7 +138,8 @@ export default {
     new_password2: "Confirma la nova contrasenya",
     current_password_required: "Cal la contrasenya actual per canviar-la",
     passwords_mismatch: "Les contrasenys no coincideixen",
-    saved: "Perfil actualitzat correctament ✅"
+    saved: "Perfil actualitzat correctament ✅",
+    save: "Desa els canvis"
   },
 
   notifications: {
@@ -249,6 +254,7 @@ export default {
     eliminarCurso: "Eliminar curs",
     eliminarCursoConfirmar: "Esteu segur que voleu eliminar \"{{nombre}}\"? Aquesta acció no es pot desfer.",
     eliminar: "Eliminar",
+    solucionProfesor: "Solució del professor"
   },
   lesson: {
     syllabus: "Temari",
@@ -263,7 +269,7 @@ export default {
     back_to_course: "Torna al curs",
     back: "Tornar al prompt",
     lessons: "Lliçons",
-    objective: "Anunciat",
+    objective: "Enunciat",
     run: "ENVIAR",
     debug_console: "CONSOLA DE DEBUG",
     lesson_completed: "LLIÇÓ COMPLETADA!",
@@ -319,6 +325,62 @@ export default {
     console_input_placeholder: "Escriu la resposta i prem Enter",
     reset_confirm: "Segur que vols tornar a començar el codi?",
     resize_console: "Canvia la mida de la consola",
-    hide_live_render: "Amaga la visualització"
+    hide_live_render: "Amaga la visualització",
+    close_topics: "Tanca els temes",
+    open_topics: "Obre els temes",
+    topics: "Temes",
+    mark_as_done: "Marca com a completat",
+    no_theory_content: "No hi ha contingut teòric detallat per a aquesta lliçó.",
+    pending_send: "Pendent d'enviar",
+    test_wrong: "Incorrecte",
+    diff_hint: "Compara la teva solució (dreta) amb la del professor (esquerra).",
+    locked_other_solutions: "Completa l'exercici correctament per veure les solucions d'altres estudiants.",
+    locked_teacher_solution: "Completa l'exercici correctament per desbloquejar la solució del professor.",
+    other_solutions_title: "Estudiants",
+    submit_error: "Error en enviar la resposta",
+    tab_statement: "Enunciat",
+    tab_teacher_solution: "Professor",
+    tab_other_solutions: "Alumnes",
+    tab_ai_help: "IA",
+    teacher_solution_title: "Solució del professor",
+    teacher_solution_full: "Solució completa",
+    loading_problem: "Carregant el problema...",
+    live_render: "Visualització",
+    student_fallback: "Estudiant",
+    console: "Consola",
+    reset: "Reinicia",
+    diagnostics_errors: "Errors: {{count}}",
+    diagnostics_warnings: "Avisos: {{count}}",
+    points_earned: "+{{points}} punts!",
+    total_points: "Punts totals: {{points}}",
+    sending: "Enviant al servidor...",
+    submitted: "Resposta enviada al servidor"
+  },
+  difficulty: {
+    easy: "Fàcil",
+    medium: "Mitjà",
+    hard: "Difícil",
+    very_hard: "Molt difícil"
+  },
+  topic_test: {
+    choose_answer: "Test d'elecció única",
+    multi_choice: "Test de selecció múltiple",
+    correct_option: "Opció correcta",
+    wrong_option: "Opció incorrecta",
+    next_question: "Següent pregunta",
+    next_short: "Següent",
+    prev: "Anterior",
+    not_found: "Test no trobat",
+    question: "Pregunta",
+    question_n_of: "Pregunta {{n}} de {{total}}",
+    result_correct: "Resposta correcta",
+    result_wrong: "Resposta incorrecta",
+    statement: "Enunciat",
+    status_correct: "encertada",
+    status_pending: "pendent",
+    status_wrong: "fallada",
+    submit: "Envia",
+    submit_busy: "El servidor està ocupat. Torna-ho a provar d'aquí a una estona.",
+    submit_error: "No s'ha pogut enviar la resposta."
   }
 };

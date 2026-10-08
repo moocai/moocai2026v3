@@ -1,11 +1,38 @@
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { Box, alpha, useTheme, type SxProps, type Theme } from '@mui/material';
+
+// L'HTML escrit pel professorat es mostra, però passat per una llista blanca (com fa el
+// servidor d'algorien amb nh3): sense <script>, atributs on*, URLs javascript:, <iframe>,
+// <form>, <style>, estils en línia... Sense això, qualsevol autor podria executar
+// JavaScript a la sessió dels alumnes (XSS) i, p. ex., llegir-ne el token de sessió.
+// `class` es manté restringit (només `language-*` als blocs de codi): aquí Tailwind és
+// actiu i una classe com `fixed inset-0` permetria tapar la pàgina amb contingut fals.
+const SANITIZE_SCHEMA = {
+  ...defaultSchema,
+  // <script> i <style> es treuen amb el contingut (no només l'etiqueta)
+  strip: [...(defaultSchema.strip || []), 'style'],
+  protocols: {
+    ...defaultSchema.protocols,
+    // data: només pot arribar a <img src> (l'únic element permès amb src): una imatge no executa codi
+    src: [...(defaultSchema.protocols?.src || []), 'data'],
+  },
+  attributes: {
+    ...defaultSchema.attributes,
+    img: [...(defaultSchema.attributes?.img || []), 'title'],
+  },
+};
+
+// react-markdown també filtra les URL: es manté el seu filtre, però s'hi afegeixen les
+// imatges incrustades (data:image/...) a <img src>, que el servidor també accepta.
+const urlTransform = (url: string, key: string, node: { tagName?: string }) =>
+  key === 'src' && node.tagName === 'img' && /^data:image\//i.test(url.trim()) ? url : defaultUrlTransform(url);
 
 /**
  * Text en Markdown escrit pel professorat (p. ex. l'enunciat d'un problema), amb
- * GitHub Flavored Markdown (taules, llistes de tasques...). L'HTML dins del Markdown
- * no s'interpreta: només es mostra el que genera el Markdown.
+ * GitHub Flavored Markdown (taules, llistes de tasques...) i HTML sanejat.
  */
 export function MarkdownContent({ children, fontSize = '0.95rem', sx }: { children: string; fontSize?: string; sx?: SxProps<Theme> }) {
   const theme = useTheme();
@@ -42,6 +69,8 @@ export function MarkdownContent({ children, fontSize = '0.95rem', sx }: { childr
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]]}
+        urlTransform={urlTransform}
         components={{ a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}
       >
         {children}

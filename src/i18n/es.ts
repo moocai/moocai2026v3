@@ -58,7 +58,10 @@ export default {
     days: "días",
     success_rate: "Aciertos",
     remaining: "Faltan",
-    hours: "horas"
+    hours: "horas",
+    code_correct: "Problemas de programación",
+    continue_activity: "Continuar la actividad",
+    tests_correct: "Tests correctos"
   },
   home: {
     featured_title: "Cursos Destacados",
@@ -103,7 +106,8 @@ export default {
     blog: "Blog",
     events: "Eventos",
     copyright: "MOOC REACT • BARCELONA",
-    telegram: "Telegram"
+    telegram: "Telegram",
+    access: "Acceder"
   },
   course: {
     by: "by",
@@ -140,7 +144,8 @@ export default {
     new_password2: "Confirma la nueva contraseña",
     current_password_required: "Se necesita la contraseña actual para cambiarla",
     passwords_mismatch: "Las contraseñas no coinciden",
-    saved: "Perfil actualizado correctamente ✅"
+    saved: "Perfil actualizado correctamente ✅",
+    save: "Guardar los cambios"
   },
 
   notifications: {
@@ -255,6 +260,7 @@ export default {
     eliminarCurso: "Eliminar curso",
     eliminarCursoConfirmar: "¿Seguro que quieres eliminar \"{{nombre}}\"? Esta acción no se puede deshacer.",
     eliminar: "Eliminar",
+    solucionProfesor: "Solución del profesor"
   },
   lesson: {
     syllabus: "Temario",
@@ -265,11 +271,11 @@ export default {
     your_challenge: "Tu reto",
     previous: "Anterior",
     next: "Siguiente",
-    go_to_activity: "Siguiente actividad",
-    back_to_course: "Volver a la actividad",
+    go_to_activity: "Ir a la actividad",
+    back_to_course: "Volver al curso",
     back: "Volver",
     lessons: "Lecciones",
-    objective: "Anunciado",
+    objective: "Enunciado",
     run: "ENVIAR",
     debug_console: "CONSOLA DE DEBUG",
     lesson_completed: "LECCIÓN COMPLETADA!",
@@ -325,6 +331,62 @@ export default {
     console_input_placeholder: "Escribe la respuesta y pulsa Enter",
     reset_confirm: "¿Seguro que quieres volver a empezar el código?",
     resize_console: "Cambia el tamaño de la consola",
-    hide_live_render: "Ocultar la visualización"
+    hide_live_render: "Ocultar la visualización",
+    close_topics: "Cerrar los temas",
+    open_topics: "Abrir los temas",
+    topics: "Temas",
+    mark_as_done: "Marcar como completado",
+    no_theory_content: "No hay contenido teórico detallado para esta lección.",
+    pending_send: "Pendiente de enviar",
+    test_wrong: "Incorrecto",
+    diff_hint: "Compara tu solución (derecha) con la del profesor (izquierda).",
+    locked_other_solutions: "Completa el ejercicio correctamente para ver las soluciones de otros estudiantes.",
+    locked_teacher_solution: "Completa el ejercicio correctamente para desbloquear la solución del profesor.",
+    other_solutions_title: "Estudiantes",
+    submit_error: "Error al enviar la respuesta",
+    tab_statement: "Enunciado",
+    tab_teacher_solution: "Profesor",
+    tab_other_solutions: "Alumnos",
+    tab_ai_help: "IA",
+    teacher_solution_title: "Solución del profesor",
+    teacher_solution_full: "Solución completa",
+    loading_problem: "Cargando el problema...",
+    live_render: "Visualización",
+    student_fallback: "Estudiante",
+    console: "Consola",
+    reset: "Reiniciar",
+    diagnostics_errors: "Errores: {{count}}",
+    diagnostics_warnings: "Avisos: {{count}}",
+    points_earned: "¡+{{points}} puntos!",
+    total_points: "Puntos totales: {{points}}",
+    sending: "Enviando al servidor...",
+    submitted: "Respuesta enviada al servidor"
+  },
+  difficulty: {
+    easy: "Fácil",
+    medium: "Medio",
+    hard: "Difícil",
+    very_hard: "Muy difícil"
+  },
+  topic_test: {
+    choose_answer: "Test de respuesta única",
+    multi_choice: "Test de selección múltiple",
+    correct_option: "Opción correcta",
+    wrong_option: "Opción incorrecta",
+    next_question: "Siguiente pregunta",
+    next_short: "Siguiente",
+    prev: "Anterior",
+    not_found: "Test no encontrado",
+    question: "Pregunta",
+    question_n_of: "Pregunta {{n}} de {{total}}",
+    result_correct: "Respuesta correcta",
+    result_wrong: "Respuesta incorrecta",
+    statement: "Enunciado",
+    status_correct: "acertada",
+    status_pending: "pendiente",
+    status_wrong: "fallada",
+    submit: "Enviar",
+    submit_busy: "El servidor está ocupado. Vuelve a intentarlo dentro de un rato.",
+    submit_error: "No se ha podido enviar la respuesta."
   }
 };

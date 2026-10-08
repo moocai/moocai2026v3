@@ -94,19 +94,20 @@ const MONACO_SEVERITY_ERROR = 8;
 const MONACO_SEVERITY_WARNING = 4;
 
 function EditorDiagnosticsBadge({ markers }: { markers: any[] }) {
+  const { t } = useTranslation();
   const errors = markers.filter((m) => m.severity === MONACO_SEVERITY_ERROR).length;
   const warnings = markers.filter((m) => m.severity === MONACO_SEVERITY_WARNING).length;
   if (!errors && !warnings) return null;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {errors > 0 && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={`${errors} error(s)`}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={t('lesson.diagnostics_errors', 'Errors: {{count}}', { count: errors })}>
           <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#f87171' }} />
           <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: '#f87171' }}>{errors}</Typography>
         </Box>
       )}
       {warnings > 0 && (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={`${warnings} avís(s)`}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={t('lesson.diagnostics_warnings', 'Avisos: {{count}}', { count: warnings })}>
           <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#fbbf24' }} />
           <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: '#fbbf24' }}>{warnings}</Typography>
         </Box>
@@ -538,7 +539,7 @@ export default function LessonPage() {
         globalProgress[key] = true;
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
         if (!wasAlreadyComplete) {
-          setConsoleOutput(p => [...p, '🏆 +10 Punts!']);
+          setConsoleOutput(p => [...p, `🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: 10 })}`]);
         }
       } else if (!globalProgress[key]) {
         globalProgress[key] = 'attempted';
@@ -546,14 +547,14 @@ export default function LessonPage() {
       }
       localStorage.setItem(userKey(LAST_SESSION_KEY), JSON.stringify({courseId, lessonId, courseTitle: getText(course?.title), lessonTitle: getText(currentProblem?.subtitle), timestamp: Date.now()}));
       setIsDirty(false); setWasSavedInSession(true);
-      setConsoleOutput(p => [...p, "💾 Sincronitzat!"]);
+      setConsoleOutput(p => [...p, `💾 ${t('lesson.synced', 'Sincronitzat!')}`]);
       await api.postProgress({ studentId: currentUser.id, courseId, lessonId, status: globalProgress[key] || false });
       window.dispatchEvent(new Event('lessonProgressUpdated'));
       document.dispatchEvent(new Event('lessonProgressUpdated'));
       addNotification(t('notifications.progress_saved'), 'success');
     } catch (err) {
       addNotification(t('notifications.progress_error'), 'error');
-      setConsoleOutput(p => [...p, "⚠️ Error local"]);
+      setConsoleOutput(p => [...p, `⚠️ ${t('lesson.error_local', 'Error local')}`]);
     } 
     finally { setIsSaving(false); }
   };
@@ -563,14 +564,14 @@ export default function LessonPage() {
       navigate(testPath(lessonId!), { replace: true });
       return;
     }
-    setConsoleOutput(["[SISTEMA]: Executant..."]);
+    setConsoleOutput([`[${t('lesson.system', 'SISTEMA')}]: ${t('lesson.executing', 'Executant...')}`]);
     setStatus('idle');
-    try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, "📤 Enviat al servidor..."]);
+    try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, `📤 ${t('lesson.sending', 'Enviant al servidor...')}`]);
       const result = await courseService.submitChallenge(courseId!,topic.id,lessonId!,{code: userInputRef.current, language: selectedLanguage });
-      setConsoleOutput(p => [...p, "✅ Resposta enviada al servidor"]);
+      setConsoleOutput(p => [...p, `✅ ${t('lesson.submitted', 'Resposta enviada al servidor')}`]);
       const passed = !isRejectedResult(result);
       console.debug('[Enviar] resposta del servidor', result, { passed });
-      const msg = result?.feedback || (passed ? "✅ COMPLETAT!" : null);
+      const msg = result?.feedback || (passed ? `✅ ${t('lesson.completed', 'COMPLETAT!').trim()}` : null);
       if (msg) setConsoleOutput(p => [...p, msg]);
       setUnlocked(true);
       // Només es marca com a completada (i suma punts) si el servidor l'ha donat per correcta
@@ -584,7 +585,7 @@ export default function LessonPage() {
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
       void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0, 1000, result).then(() => {
         const st = getCurrentStudent();
-        if (st) setConsoleOutput(p => [...p, `🏆 Punts totals: ${getTotalPoints(st.id)}`]);
+        if (st) setConsoleOutput(p => [...p, `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: getTotalPoints(st.id) })}`]);
       });
 
       setSubmissionsRefreshKey(k => k + 1);
@@ -638,7 +639,7 @@ export default function LessonPage() {
   if (!currentProblem) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999, flexDirection: 'column', gap: 2 }}>
       <CircularProgress color="secondary" />
-      <Typography>Cargando lección...</Typography>
+      <Typography>{t('lesson.loading_problem', 'Carregant el problema...')}</Typography>
     </Box>
   );
 
@@ -750,7 +751,7 @@ export default function LessonPage() {
           {isReactCourse && showLiveRender && !(activeTab === 1 && unlocked) && (
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <Box sx={{ height: 30, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
-                <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>Live Render</Typography>
+                <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.live_render', 'Visualització')}</Typography>
               </Box>
               <Box sx={{ flex: 1, height: 0, display: 'flex', minHeight: 0 }}>
                 <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
@@ -884,7 +885,7 @@ export default function LessonPage() {
                     peerSolutions.map((s: any, i: number) => (
                       <Box key={i} sx={{ mb: 1.5, p: 1.5, borderRadius: 1, bgcolor: s.passed ? alpha(theme.palette.success.main, 0.06) : alpha(theme.palette.warning.main, 0.06), border: '1px solid', borderColor: s.passed ? alpha(theme.palette.success.main, 0.3) : alpha(theme.palette.warning.main, 0.3) }}>
                         <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, mb: 0.5 }}>
-                          {s.passed ? '✅' : '📝'} {s.user?.name || s.username || s.studentName || s.student_email || 'Estudiant'}
+                          {s.passed ? '✅' : '📝'} {s.user?.name || s.username || s.studentName || s.student_email || t('lesson.student_fallback', 'Estudiant')}
                         </Typography>
                         {(s.code || s.content || s.source_code) && (
                           <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: 'text.secondary' }}>

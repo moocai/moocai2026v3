@@ -143,7 +143,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>
-            {isTest ? 'Test' : t('lesson.app_file', 'Codi')}
+            {isTest ? t('lesson.tab_tests', 'Tests') : t('lesson.app_file', 'Codi')}
           </Typography>
           {!isTest && (
             <Tabs
@@ -193,7 +193,7 @@ export function ExerciseEditor({ exerciseId, initialCode = '', hint, solution, t
                 '&:hover': { bgcolor: '#333', borderColor: '#888' } 
               }}
             >
-              Reset
+              {t('lesson.reset', 'Reinicia')}
             </Button>
             </Tooltip>
             {selectedLanguage === 'python' && (

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { useThemeMode } from '../hooks/useTheme';
 
 /**
@@ -24,8 +25,9 @@ interface ConsolePanelProps {
 const KIND_COLORS = { stdout: '#e5e7eb', stderr: '#f87171', info: '#9ca3af' } as const;
 const ECHO_COLOR = '#67e8f9';
 
-export function ConsolePanel({ output, emptyMessage = 'Esperando ejecución...', inputActive = false, onInputSubmit, inputLabel, inputPlaceholder }: ConsolePanelProps) {
+export function ConsolePanel({ output, emptyMessage, inputActive = false, onInputSubmit, inputLabel, inputPlaceholder }: ConsolePanelProps) {
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -82,14 +84,14 @@ export function ConsolePanel({ output, emptyMessage = 'Esperando ejecución...',
         flexShrink: 0
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>CONSOLE</Typography>
+          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.console', 'Consola').toUpperCase()}</Typography>
         </Box>
       </Box>
       {/* Clicar a la consola posa el cursor al camp d'entrada, com en un terminal */}
       <Box ref={scrollRef} onClick={() => { if (inputActive && !window.getSelection()?.toString()) inputRef.current?.focus(); }} sx={{ p: 2, overflowY: 'auto', flex: 1, cursor: inputActive ? 'text' : 'default' }}>
         {output.length === 0 && !inputActive && (
           <Typography sx={{ fontSize: 14, color: '#444', fontFamily: 'monospace' }}>
-            {`// ${emptyMessage}`}
+            {`// ${emptyMessage ?? t('lesson.waiting_execution', "Esperant l'execució del codi...")}`}
           </Typography>
         )}
         {output.map((line, i) =>

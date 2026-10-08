@@ -58,7 +58,10 @@ export default {
     days: "days",
     success_rate: "Success rate",
     remaining: "Remaining",
-    hours: "hours"
+    hours: "hours",
+    code_correct: "Programming problems",
+    continue_activity: "Continue the activity",
+    tests_correct: "Correct tests"
   },
   home: {
     featured_title: "Featured Courses",
@@ -103,7 +106,8 @@ export default {
     blog: "Blog",
     events: "Events",
     copyright: "MOOC REACT • BARCELONA",
-    telegram: "Telegram"
+    telegram: "Telegram",
+    access: "Log in"
   },
   course: {by: "by", enroll: "View course syllabus"},
   common: {error_loading: "Error loading data"},
@@ -136,7 +140,8 @@ export default {
     new_password2: "Confirm new password",
     current_password_required: "The current password is required to change it",
     passwords_mismatch: "The passwords do not match",
-    saved: "Profile updated successfully ✅"
+    saved: "Profile updated successfully ✅",
+    save: "Save changes"
   },
 
   notifications: {
@@ -251,9 +256,10 @@ export default {
     eliminarCurso: "Delete course",
     eliminarCursoConfirmar: "Are you sure you want to delete \"{{nombre}}\"? This action cannot be undone.",
     eliminar: "Delete",
+    solucionProfesor: "Teacher's solution"
   },
   lesson: {
-    syllabus: "Leassons",
+    syllabus: "Syllabus",
     laboratory: "Laboratory",
     academy: "Academy",
     course_not_found: "Course not found",
@@ -261,11 +267,11 @@ export default {
     your_challenge: "Your challenge",
     previous: "Previous",
     next: "Next",
-    go_to_activity: "Next activity",
-    back_to_course: "Back activity",
+    go_to_activity: "Go to activity",
+    back_to_course: "Back to course",
     back: "Back",
     lessons: "Lessons",
-    objective: "Announced",
+    objective: "Statement",
     run: "SEND",
     debug_console: "DEBUG CONSOLE",
     lesson_completed: "LESSON COMPLETED!",
@@ -321,6 +327,62 @@ export default {
     console_input_placeholder: "Type your answer and press Enter",
     reset_confirm: "Are you sure you want to start the code over?",
     resize_console: "Resize the console",
-    hide_live_render: "Hide the preview"
+    hide_live_render: "Hide the preview",
+    close_topics: "Close topics",
+    open_topics: "Open topics",
+    topics: "Topics",
+    mark_as_done: "Mark as done",
+    no_theory_content: "There is no detailed theory for this lesson.",
+    pending_send: "Not submitted yet",
+    test_wrong: "Incorrect",
+    diff_hint: "Compare your solution (right) with the teacher's (left).",
+    locked_other_solutions: "Solve the exercise correctly to see other students' solutions.",
+    locked_teacher_solution: "Solve the exercise correctly to unlock the teacher's solution.",
+    other_solutions_title: "Students",
+    submit_error: "Error submitting the answer",
+    tab_statement: "Statement",
+    tab_teacher_solution: "Teacher",
+    tab_other_solutions: "Students",
+    tab_ai_help: "AI",
+    teacher_solution_title: "Teacher's solution",
+    teacher_solution_full: "Full solution",
+    loading_problem: "Loading the problem...",
+    live_render: "Preview",
+    student_fallback: "Student",
+    console: "Console",
+    reset: "Reset",
+    diagnostics_errors: "Errors: {{count}}",
+    diagnostics_warnings: "Warnings: {{count}}",
+    points_earned: "+{{points}} points!",
+    total_points: "Total points: {{points}}",
+    sending: "Sending to the server...",
+    submitted: "Answer sent to the server"
+  },
+  difficulty: {
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
+    very_hard: "Very hard"
+  },
+  topic_test: {
+    choose_answer: "Single-choice test",
+    multi_choice: "Multiple-choice test",
+    correct_option: "Correct option",
+    wrong_option: "Wrong option",
+    next_question: "Next question",
+    next_short: "Next",
+    prev: "Previous",
+    not_found: "Test not found",
+    question: "Question",
+    question_n_of: "Question {{n}} of {{total}}",
+    result_correct: "Correct answer",
+    result_wrong: "Wrong answer",
+    statement: "Statement",
+    status_correct: "correct",
+    status_pending: "pending",
+    status_wrong: "wrong",
+    submit: "Submit",
+    submit_busy: "The server is busy. Please try again in a while.",
+    submit_error: "The answer could not be sent."
   }
 };
