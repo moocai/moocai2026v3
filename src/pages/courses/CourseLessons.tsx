@@ -12,7 +12,8 @@ import { useThemeMode } from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { courseService } from '../../services/courseService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { resolveSlug } from '../../hooks/useCourse';
+import { problemDetailQuery, resolveSlug } from '../../hooks/useCourse';
+import { preloadMonaco } from '../../utils/monaco';
 import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
@@ -268,14 +269,14 @@ export default function CourseLessons() {
     </Box>
   );
 
-  const renderOverviewRow = (opts: {key: string; icon: ReactNode; label: string; to?: string; onClick?: () => void; right?: ReactNode;}) => {
+  const renderOverviewRow = (opts: {key: string; icon: ReactNode; label: string; to?: string; onClick?: () => void; right?: ReactNode; onIntent?: () => void;}) => {
     const content = (
       <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5,px: 1, py: 1.25, borderBottom: '1px solid', borderColor: 'divider','&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }}}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'primary.main' }}>{opts.icon}</Box>
         <Typography sx={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: 'text.primary' }}>{opts.label}</Typography>{opts.right}</Box>
     );
     if (opts.to) {
-      return (<Box key={opts.key} component={RouterLink} to={opts.to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
+      return (<Box key={opts.key} component={RouterLink} to={opts.to} onMouseEnter={opts.onIntent} onFocus={opts.onIntent} onTouchStart={opts.onIntent} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
       return (<Box key={opts.key} onClick={opts.onClick} sx={{ cursor: 'pointer' }}>{content}</Box>);
   };
 
@@ -283,6 +284,9 @@ export default function CourseLessons() {
   // veu bé en qualsevol navegador). Llista del tema fresca (1 petició) + GET submissions només
   // dels tests ja resposts que no tenim desats.
   const queryClient = useQueryClient();
+  // Pestanya Programació: es descarrega l'editor de codi (Monaco) en segon pla,
+  // així en obrir un problema l'editor apareix sense esperes.
+  useEffect(() => { if (mainTab === 1) preloadMonaco(); }, [mainTab]);
   const syncTopicId = mainTab === 2 && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
@@ -469,7 +473,7 @@ export default function CourseLessons() {
     return saved.correct ? true : 'wrong';
   };
 
-  const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.');
+  const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'No hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'No hi ha tests per aquest curs.');
     if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{emptyMessage}</Typography>;}
 
     const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
@@ -499,6 +503,10 @@ export default function CourseLessons() {
                 label: getText(sub.subtitle || sub.title),
                 to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/test/${targetSlug}?topic=${encodeURIComponent(active.id)}`,
                 right: renderStatusWithDifficulty(status || false, sub.difficulty),
+                // Problema de codi: n'avança l'enunciat en passar-hi per sobre, perquè s'obri a l'instant
+                onIntent: type === 'coding' && sub.text === undefined
+                  ? () => { void queryClient.prefetchQuery(problemDetailQuery(courseId!, active.id, targetSlug)); }
+                  : undefined,
               });
             })}
           </Box>
@@ -508,7 +516,7 @@ export default function CourseLessons() {
   };
 
   const renderFilesTab = () => {
-    const message = t('lesson.no_files', 'Encara no hi ha fitxers disponibles per aquest curs.');
+    const message = t('lesson.no_files', 'No hi ha fitxers disponibles per aquest curs.');
     if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{message}</Typography>;}
 
     return renderMasterDetail(topicItems, activeTopicId, (

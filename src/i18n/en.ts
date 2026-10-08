@@ -44,7 +44,7 @@ export default {
     more_stats: "More Stats",
     coming_soon: "Coming Soon",
     continue_studying: "Continue Studying",
-    no_lessons: "This course has no lessons yet.",
+    no_lessons: "This course has no lessons.",
     and_more: "+{{count}} more",
     no_attempted_lessons: "You haven't attempted any exercises yet.",
     view_full_course: "View Full Course",
@@ -294,6 +294,18 @@ export default {
     tab_prev: "Previous tab",
     tab_next: "Next tab",
     expand_all: "Expand all",
-    collapse_all: "Collapse all"
+    collapse_all: "Collapse all",
+    no_exercises: "There are no exercises for this course.",
+    no_tests: "There are no tests for this course.",
+    no_files: "There are no files available for this course.",
+    no_solution_available: "There is no solution available for this exercise.",
+    no_other_solutions: "There are no student solutions.",
+    reset_tooltip: "Start over: restore the starter code",
+    test_tooltip: "Run the code here to check the result (it is not submitted)",
+    submit_tooltip: "Submit your solution to the server",
+    submit_blocked_off_topic: "To submit, your code must be related to the statement",
+    test_first_hint: "Test your code with Test Python before submitting",
+    show_live_render: "Show the preview",
+    hide_live_render: "Hide the preview"
   }
 };

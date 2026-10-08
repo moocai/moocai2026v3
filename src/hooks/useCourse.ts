@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { courseService } from '../services/courseService';
+import { courseService, mapProblem } from '../services/courseService';
 import { localCourseService } from '../services/localCourseService';
 
 interface SubTopic {
@@ -51,3 +51,14 @@ export function useCourse(courseId: string | undefined) {
     retry: 1,
   });
 }
+
+/**
+ * Consulta del detall d'un problema (enunciat, codi inicial...). La comparteixen
+ * LessonPage (que la llegeix) i la llista de problemes (que l'avança en passar-hi
+ * per sobre), de manera que en obrir el problema les dades ja hi són.
+ */
+export const problemDetailQuery = (courseId: string, topicSlug: string, problemSlug: string) => ({
+  queryKey: ['problem', courseId, topicSlug, problemSlug] as const,
+  queryFn: () => courseService.getChallenge(resolveSlug(courseId), topicSlug, problemSlug).then(mapProblem),
+  staleTime: 5 * 60 * 1000,
+});

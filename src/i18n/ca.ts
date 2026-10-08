@@ -44,7 +44,7 @@ export default {
     more_stats: "Més estadístiques",
     coming_soon: "Aviat disponible",
     continue_studying: "Continua estudiant",
-    no_lessons: "Aquest curs encara no té lliçons.",
+    no_lessons: "Aquest curs no té lliçons.",
     and_more: "+{{count}} més",
     no_attempted_lessons: "Encara no has fet cap exercici.",
     view_full_course: "Veure curs sencer",
@@ -292,6 +292,18 @@ export default {
     tab_prev: "Pestanya anterior",
     tab_next: "Pestanya següent",
     expand_all: "Expandeix-ho tot",
-    collapse_all: "Col·lapsa-ho tot"
+    collapse_all: "Col·lapsa-ho tot",
+    no_exercises: "No hi ha exercicis per aquest curs.",
+    no_tests: "No hi ha tests per aquest curs.",
+    no_files: "No hi ha fitxers disponibles per aquest curs.",
+    no_solution_available: "No hi ha solució disponible per aquest exercici.",
+    no_other_solutions: "No hi ha solucions d'estudiants.",
+    reset_tooltip: "Torna a començar: recupera el codi inicial",
+    test_tooltip: "Executa el codi aquí per comprovar-ne el resultat (no s'envia)",
+    submit_tooltip: "Envia la teva solució al servidor",
+    submit_blocked_off_topic: "Per enviar, el codi ha de tenir relació amb l'enunciat",
+    test_first_hint: "Prova el codi amb Test Python per poder enviar",
+    show_live_render: "Mostra la visualització",
+    hide_live_render: "Amaga la visualització"
   }
 };

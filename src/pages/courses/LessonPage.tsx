@@ -1,20 +1,19 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, RotateCcw, Lock, Sparkles, Code2, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { motion } from 'framer-motion';
-import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab } from '@mui/material';
+import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import { api } from '../../services/api';
-import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, registerMonacoThemes, registerPythonCompletionProvider, setupTypescriptDefaults } from '../../utils/monaco';
+import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
 import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel } from '../../components/ConsolePanel';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useQuery } from '@tanstack/react-query';
-import { resolveSlug, useCourse } from '../../hooks/useCourse';
+import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
-import { courseService, mapProblem } from '../../services/courseService';
+import { courseService } from '../../services/courseService';
 import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
@@ -40,19 +39,26 @@ interface EditorFileInfo {
   path: string;
 }
 const PYTHON_FILE = 'python.py';
+// Llenguatge de programació del curs. L'API encara no l'envia: els cursos són de
+// Python llevat que el curs digui explícitament que és de React.
+function getCourseLanguage(course: any): EditorLang {
+  const raw = String(course?.language ?? course?.programming_language ?? course?.code_language ?? '').toLowerCase();
+  return /react|jsx|tsx/.test(raw) ? 'react' : 'python';
+}
 const REACT_FILE = 'React.tsx';
 const LESSON_URI_PREFIX = 'file:///lesson';
 
-function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: Record<EditorLang, EditorFileInfo>; onChange: (v: EditorLang) => void }) {
+function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: Partial<Record<EditorLang, EditorFileInfo>>; onChange: (v: EditorLang) => void }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
       {(Object.keys(files) as EditorLang[]).map((lang) => {
+        const file = files[lang]!;
         const active = value === lang;
         return (
           <Box
             key={lang}
             onClick={() => onChange(lang)}
-            title={files[lang].language}
+            title={file.language}
             sx={{
               cursor: 'pointer',
               userSelect: 'none',
@@ -71,7 +77,7 @@ function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: 
               '&:hover': { color: '#fff', borderColor: '#8400ff' },
             }}
           >
-            {files[lang].label}
+            {file.label}
           </Box>
         );
       })}
@@ -272,18 +278,24 @@ export default function LessonPage() {
       ? { language: 'typescript', label: REACT_FILE, path: `${LESSON_URI_PREFIX}/${courseId}/${lessonId}/${REACT_FILE}` }
       : { language: 'python', label: PYTHON_FILE, path: `${LESSON_URI_PREFIX}/${courseId}/${lessonId}/${PYTHON_FILE}` };
 
-  // Carrega Monaco de manera diferida i registra temes, tipus de React/JSX i el provider de Python
+  // Monaco es comença a descarregar de seguida, en paral·lel amb les dades del curs
+  // (i normalment ja ve precarregat de la llista de problemes).
+  useEffect(() => { void loadMonaco().catch(() => {}); }, []);
+
+  // Llenguatge del curs: només es mostra el seu fitxer a l'editor. El servei de
+  // TypeScript (gran) només es carrega per als cursos de React.
+  const courseLanguage = getCourseLanguage(course);
+  const isReactCourse = courseLanguage === 'react';
+  const editorFiles: Partial<Record<EditorLang, EditorFileInfo>> = { [courseLanguage]: getFile(courseLanguage) };
+  useEffect(() => { setSelectedLanguage(courseLanguage); }, [courseLanguage]);
   useEffect(() => {
+    if (!course) return;
     let cancelled = false;
-    loadMonaco().then((m) => {
-      if (cancelled) return;
-      registerMonacoThemes(m);
-      setupTypescriptDefaults(m);
-      registerPythonCompletionProvider(m);
-      setMonaco(m);
-    });
+    (isReactCourse ? loadMonacoTypescript() : loadMonaco())
+      .then((m) => { if (!cancelled) setMonaco(m); })
+      .catch((err) => console.error('No s\'ha pogut carregar l\'editor:', err));
     return () => { cancelled = true; };
-  }, []);
+  }, [!!course, isReactCourse]);
 
   // Manté el tema de Monaco sincronitzat amb el mode de l'aplicació
   useEffect(() => {
@@ -346,10 +358,8 @@ export default function LessonPage() {
   // Els tests no cal: es redirigeixen a TopicTestPage.
   const needsDetail = !!outlineProblem && outlineProblem.text === undefined && outlineProblem.type !== 'test';
   const { data: problemDetail } = useQuery({
-    queryKey: ['problem', courseId, currentTopicSlug, lessonId],
-    queryFn: () => courseService.getChallenge(resolveSlug(courseId!), currentTopicSlug, lessonId!).then(mapProblem),
+    ...problemDetailQuery(courseId!, currentTopicSlug, lessonId!),
     enabled: needsDetail && !!currentTopicSlug,
-    staleTime: 5 * 60 * 1000,
   });
   const currentProblem = useMemo(() => {
     if (!outlineProblem || !needsDetail) return outlineProblem;
@@ -372,6 +382,15 @@ export default function LessonPage() {
   const hasBeenTested = selectedLanguage !== 'python' || (testedCode !== null && testedCode === userInput);
   const canSubmit = isRelated && hasBeenTested;
   const showTestHint = selectedLanguage === 'python' && userInput.trim().length > 0 && isRelated && !hasBeenTested;
+  // Textos d'ajuda en passar el ratolí pels botons de l'editor
+  const resetTooltip = t('lesson.reset_tooltip', 'Torna a començar: recupera el codi inicial');
+  const testTooltip = t('lesson.test_tooltip', "Executa el codi aquí per comprovar-ne el resultat (no s'envia)");
+  const submitTooltip = canSubmit
+    ? t('lesson.submit_tooltip', 'Envia la teva solució al servidor')
+    : !isRelated
+      ? t('lesson.submit_blocked_off_topic', "Per enviar, el codi ha de tenir relació amb l'enunciat")
+      : t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar');
+  const liveRenderTooltip = showLiveRender ? t('lesson.hide_live_render', 'Amaga la visualització') : t('lesson.show_live_render', 'Mostra la visualització');
 
 
   // Els problemes de tipus "test" no es resolen amb codi: es respon amb `answers`
@@ -882,7 +901,7 @@ export default function LessonPage() {
                 </>
               ) : (
                 <Typography sx={{ fontSize: 11, color: '#aaa' }}>
-                  {t('lesson.no_solution_available', 'Encara no hi ha solució disponible per aquest exercici.')}
+                  {t('lesson.no_solution_available', 'No hi ha solució disponible per aquest exercici.')}
                 </Typography>
               )}
             </Box>
@@ -892,13 +911,17 @@ export default function LessonPage() {
             <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
               <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <EditorFileTabs value={selectedLanguage} files={{ python: getFile('python'), react: getFile('react') }} onChange={handleLanguageChange} />
+                <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
                 {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
                 {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
-                <IconButton size="small" onClick={() => setShowLiveRender(v => !v)} sx={{ p: 0.5 }}>
-                  {showLiveRender ? <EyeOff size={14} color="#fff" /> : <Eye size={14} color="#fff" />}
-                </IconButton>
+                {isReactCourse && (
+                  <Tooltip title={liveRenderTooltip} arrow>
+                    <IconButton size="small" aria-label={liveRenderTooltip} onClick={() => setShowLiveRender(v => !v)} sx={{ p: 0.5 }}>
+                      {showLiveRender ? <EyeOff size={14} color="#fff" /> : <Eye size={14} color="#fff" />}
+                    </IconButton>
+                  </Tooltip>
+                )}
               </Box>
             </Box>
             <Box sx={{ flex: 1, position: 'relative' }}>
@@ -923,19 +946,13 @@ export default function LessonPage() {
           </Box>
 
           {/* VISUALITZACIÓ EN TEMPS REAL (MÒBIL) */}
-          {showLiveRender && !(activeTab === 1 && unlocked) && (
+          {isReactCourse && showLiveRender && !(activeTab === 1 && unlocked) && (
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <Box sx={{ height: 30, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>Live Render</Typography>
               </Box>
               <Box sx={{ flex: 1, height: 0, display: 'flex', minHeight: 0 }}>
-                {selectedLanguage === 'python' ? (
-                  <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Typography sx={{ fontSize: 11, color: '#555', fontWeight: 600 }}>Python no necessita renderitzar</Typography>
-                  </Box>
-                ) : (
-                  <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
-                )}
+                <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
               </Box>
             </Box>
           )}
@@ -951,9 +968,20 @@ export default function LessonPage() {
             <ChevronLeft size={20}/>
           </IconButton>
           <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
-            <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
-            <Button onClick={handleLocalRun} variant="outlined" sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit' }}>Codetest</Button>
-            <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" fullWidth sx={{fontWeight: 900, borderRadius: 1, fontSize: 13 }}>{t('lesson.run')}</Button>
+            <Tooltip title={resetTooltip} arrow>
+              <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
+            </Tooltip>
+            {selectedLanguage === 'python' && (
+              <Tooltip title={testTooltip} arrow>
+                <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>Test Python</Button>
+              </Tooltip>
+            )}
+            <Tooltip title={submitTooltip} arrow>
+              {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
+              <Box component="span" sx={{ display: 'flex', flex: 1 }}>
+                <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" fullWidth startIcon={<CloudUpload size={16} />} sx={{fontWeight: 900, borderRadius: 1, fontSize: 13 }}>{t('lesson.run')}</Button>
+              </Box>
+            </Tooltip>
           </Stack>
           <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1.5, p: 1 }}>
             <ChevronRight size={20}/>
@@ -1024,7 +1052,7 @@ export default function LessonPage() {
                     </>
                   ) : (
                     <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
-                      {t('lesson.no_solution_available', 'Encara no hi ha solució disponible per aquest exercici.')}
+                      {t('lesson.no_solution_available', 'No hi ha solució disponible per aquest exercici.')}
                     </Typography>
                   )}
                 </Box>
@@ -1040,7 +1068,7 @@ export default function LessonPage() {
                   {loadingPeers ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>) 
                   : peerSolutions.length === 0 ? (
                     <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
-                      {t('lesson.no_other_solutions', 'Encara no hi ha solucions d\'estudiants.')}
+                      {t('lesson.no_other_solutions', 'No hi ha solucions d\'estudiants.')}
                     </Typography>
                   ) : (
                     peerSolutions.map((s: any, i: number) => (
@@ -1090,29 +1118,40 @@ export default function LessonPage() {
             <Box sx={{ height: 60, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>
-                <EditorFileTabs value={selectedLanguage} files={{ python: getFile('python'), react: getFile('react') }} onChange={handleLanguageChange} />
+                <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
                 {showTestHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#fbbf24' }}>{t('lesson.test_first_hint', 'Prova el codi amb Test Python per poder enviar')}</Typography>)}
                 {showOffTopicHint && (<Typography sx={{ fontSize: 10, fontWeight: 800, color: '#f87171' }}>{t('lesson.off_topic_hint', "Sense relació amb l'enunciat") + missingHint}</Typography>)}
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <IconButton onClick={handleResetCode} sx={{ border: '1px solid #444', borderRadius: 1, width: 32, height: 32, '&:hover': { bgcolor: '#333' } }}>
-                  <RotateCcw size={16} color="red"/>
-                </IconButton>
-                <Button onClick={handleLocalRun} variant="outlined" startIcon={<Code2 size={14}/>} sx={{ borderColor: '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                  Test Python 
-                </Button>
-                <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<Play size={12} fill="#000"/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
-                  {t('lesson.run', 'Enviar')}
-                </Button>
+                <Tooltip title={resetTooltip} arrow>
+                  <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: '1px solid #444', borderRadius: 1, width: 32, height: 32, '&:hover': { bgcolor: '#333' } }}>
+                    <RotateCcw size={16} color="red"/>
+                  </IconButton>
+                </Tooltip>
+                {selectedLanguage === 'python' && (
+                  <Tooltip title={testTooltip} arrow>
+                    <Button onClick={handleLocalRun} variant="outlined" startIcon={<Play size={12} fill="#fff"/>} sx={{ borderColor: '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                      Test Python
+                    </Button>
+                  </Tooltip>
+                )}
+                <Tooltip title={submitTooltip} arrow>
+                  {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
+                  <Box component="span" sx={{ display: 'inline-flex' }}>
+                    <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
+                      {t('lesson.run', 'Enviar')}
+                    </Button>
+                  </Box>
+                </Tooltip>
               </Stack>
             </Box>
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
               {/* L'Editor de Codi */}
-              <Box ref={contentRef} sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0, borderRight: '1px solid #8400ff'}}>
+              <Box ref={contentRef} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0, borderRight: isReactCourse ? '1px solid #8400ff' : 'none'}}>
                 {monaco ? (
-                  <motion.div key={fadeKey} initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ height: '100%' }}>
+                  <Box key={fadeKey} sx={{ height: '100%' }}>
                     <Editor
                       height="100%"
                       path={getFile(selectedLanguage).path}
@@ -1124,24 +1163,20 @@ export default function LessonPage() {
                       onChange={(value: string | undefined) => { setCodeByLang(prev => ({ ...prev, [selectedLanguage]: value || '' })); setIsDirty(true); setWasSavedInSession(false); if (!value || value.trim().length === 0) setConsoleOutput([]); }}
                       options={getMonacoEditorOptions(true)}
                     />
-                  </motion.div>
+                  </Box>
                 ) : (
                   <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CircularProgress size={24} /></Box>
                 )}
               </Box>
 
-              {/* LIVE RENDER */}
-              <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>               
-                <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
-                {selectedLanguage === 'python' ? (
-                  <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#151515' }}>
-                    <Typography sx={{ fontSize: 12, color: '#555', fontWeight: 600 }}>Python no necessita renderitzar</Typography>
+              {/* LIVE RENDER: només als cursos de React (Python fa servir tota l'amplada per a l'editor) */}
+              {isReactCourse && (
+                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+                  <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
+                    <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
                   </Box>
-                ) : (
-                  <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
-                )}
-              </Box>
-              </Box>
+                </Box>
+              )}
             </Box>
           </Box>
 

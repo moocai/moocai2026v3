@@ -44,7 +44,7 @@ export default {
     more_stats: "Más estadísticas",
     coming_soon: "Próximamente",
     continue_studying: "Continúa estudiando",
-    no_lessons: "Este curso aún no tiene lecciones.",
+    no_lessons: "Este curso no tiene lecciones.",
     and_more: "+{{count}} más",
     no_attempted_lessons: "Aún no has hecho ningún ejercicio.",
     view_full_course: "Ver curso completo",
@@ -298,6 +298,18 @@ export default {
     tab_prev: "Pestaña anterior",
     tab_next: "Pestaña siguiente",
     expand_all: "Expandir todo",
-    collapse_all: "Colapsar todo"
+    collapse_all: "Colapsar todo",
+    no_exercises: "No hay ejercicios para este curso.",
+    no_tests: "No hay tests para este curso.",
+    no_files: "No hay archivos disponibles para este curso.",
+    no_solution_available: "No hay solución disponible para este ejercicio.",
+    no_other_solutions: "No hay soluciones de estudiantes.",
+    reset_tooltip: "Volver a empezar: recupera el código inicial",
+    test_tooltip: "Ejecuta el código aquí para comprobar el resultado (no se envía)",
+    submit_tooltip: "Envía tu solución al servidor",
+    submit_blocked_off_topic: "Para enviar, el código debe estar relacionado con el enunciado",
+    test_first_hint: "Prueba el código con Test Python para poder enviar",
+    show_live_render: "Mostrar la visualización",
+    hide_live_render: "Ocultar la visualización"
   }
 };
