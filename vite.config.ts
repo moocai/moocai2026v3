@@ -15,6 +15,10 @@ const PYODIDE_SRC = path.resolve(__dirname, 'node_modules/pyodide');
 const PYODIDE_VERSION: string = JSON.parse(fs.readFileSync(path.join(PYODIDE_SRC, 'package.json'), 'utf8')).version;
 const PYODIDE_DIR = `pyodide/v${PYODIDE_VERSION}/`;
 const PYODIDE_FILES = ['pyodide.mjs', 'pyodide.asm.mjs', 'pyodide.asm.wasm', 'python_stdlib.zip', 'pyodide-lock.json'];
+// Fitxers que Pyodide demana amb fetch en carregar-se, amb la seva mida: el worker
+// en compta els bytes per mostrar el progrés de la primera càrrega.
+const PYODIDE_FETCHED = ['pyodide.asm.wasm', 'python_stdlib.zip', 'pyodide-lock.json'];
+const PYODIDE_SIZES = Object.fromEntries(PYODIDE_FETCHED.map((name) => [name, fs.statSync(path.join(PYODIDE_SRC, name)).size]));
 const PYODIDE_TYPES: Record<string, string> = {
   '.mjs': 'text/javascript',
   '.wasm': 'application/wasm',
@@ -54,6 +58,7 @@ export default defineConfig({
   ],
   define: {
     __PYODIDE_DIR__: JSON.stringify(PYODIDE_DIR),
+    __PYODIDE_SIZES__: JSON.stringify(PYODIDE_SIZES),
   },
   // El worker de Python carrega Pyodide amb un import() dinàmic: cal format ES
   worker: {

@@ -8,7 +8,10 @@ import { api } from '../../services/api';
 import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
 import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel, type ConsoleLine } from '../../components/ConsolePanel';
-import { DEFAULT_PYTHON_TIMEOUT_MS, isPythonReady, preloadPython, runPython, stopPython } from '../../services/pythonRunner';
+import { MarkdownContent } from '../../components/MarkdownContent';
+import { ResizeHandle } from '../../components/ResizeHandle';
+import { preloadPython } from '../../services/pythonRunner';
+import { usePythonRun } from '../../hooks/usePythonRun';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useQuery } from '@tanstack/react-query';
@@ -129,31 +132,13 @@ function BackToCourseButton({ label, onClick, fontSize = 11 }: { label: string; 
   );
 }
 
-// === Execució de Python (botó "Executar") ===
-// Límit de línies a la consola: un print dins d'un bucle llarg no ha de penjar la pàgina
-const MAX_CONSOLE_LINES = 1000;
-// El quadre "Entrada" només apareix si el codi fa servir input()
-const usesInput = (code: string) => /\binput\s*\(/.test(code);
-
-function StdinBox({ value, onChange, label, placeholder, rows }: { value: string; onChange: (v: string) => void; label: string; placeholder: string; rows: number }) {
-  return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0, bgcolor: '#111' }}>
-      <Box sx={{ height: 30, px: 1.5, bgcolor: '#000', display: 'flex', alignItems: 'center', borderBottom: '1px solid #333', flexShrink: 0 }}>
-        <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900, textTransform: 'uppercase' }}>{label}</Typography>
-      </Box>
-      <Box
-        component="textarea"
-        value={value}
-        rows={rows}
-        spellCheck={false}
-        placeholder={placeholder}
-        aria-label={label}
-        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => onChange(e.target.value)}
-        sx={{ flex: 1, minHeight: 0, resize: 'none', border: 'none', outline: 'none', p: 1.5, bgcolor: 'transparent', color: '#e5e7eb', fontFamily: 'monospace', fontSize: 13, lineHeight: 1.45, '&::placeholder': { color: '#6b7280' } }}
-      />
-    </Box>
-  );
-}
+// === Consola redimensionable ===
+const CONSOLE_HEIGHT_KEY = 'mooc_console_height';
+const readConsoleHeight = (fallback: number) => {
+  try { const v = Number(localStorage.getItem(CONSOLE_HEIGHT_KEY)); return v > 0 ? v : fallback; } catch { return fallback; }
+};
+// Per sota d'aquesta amplada, els botons de l'editor es mostren només amb la icona
+const COMPACT_EDITOR_HEADER_PX = 640;
 
 // El servidor NO corregeix les activitats: una resposta 2xx vol dir "rebut".
 // Només es considera rebutjada si el servidor ho diu explícitament.
@@ -178,8 +163,8 @@ export default function LessonPage() {
   const { data: course, isLoading: loading } = useCourse(courseId);
   const [currentUser] = useState<Student | null>(() => {const saved = localStorage.getItem('currentStudent'); return saved ? JSON.parse(saved) : null;  });
   const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [stdinText, setStdinText] = useState('');
+  // Botó "Executar": Python real (Pyodide); input() es respon a la consola
+  const { isRunning, inputActive, run: runPythonCode, stop: stopPythonCode, submitInput } = usePythonRun(setConsoleOutput, `${courseId}/${lessonId}`);
   const [status, setStatus] = useState<'idle' | 'pass' | 'fail'>('idle');
   const [, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -239,10 +224,6 @@ export default function LessonPage() {
     const handle = typeof ric === 'function' ? ric(start, { timeout: 3000 }) : setTimeout(start, 500);
     return () => { if (typeof ric === 'function') (window as any).cancelIdleCallback?.(handle); else clearTimeout(handle); };
   }, [!!course, isReactCourse]);
-  // En canviar de problema o sortir de la pàgina, s'atura el programa que s'estigui executant
-  // (i la seva sortida ja no s'escriu a la consola del problema nou)
-  const runLessonRef = useRef(0);
-  useEffect(() => () => { runLessonRef.current++; stopPython(); setIsRunning(false); }, [courseId, lessonId]);
 
   // Manté el tema de Monaco sincronitzat amb el mode de l'aplicació
   useEffect(() => {
@@ -294,7 +275,7 @@ export default function LessonPage() {
   const getText = (field: any): string => {
     if (!field) return '';
     if (typeof field === 'string') return field;
-    return field[lang] || field['ca'] || '';
+    return field[lang] || field['ca'] || field['es'] || field['en'] || '';
   };
 
   const outlineProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
@@ -314,7 +295,8 @@ export default function LessonPage() {
   }, [outlineProblem, needsDetail, problemDetail]);
   // Enviar: el servidor decideix si la solució és correcta; aquí només cal que hi hagi codi
   const canSubmit = userInput.trim().length > 0 && !isRunning;
-  const showStdin = selectedLanguage === 'python' && usesInput(userInput);
+  // Enunciat en Markdown, en l'idioma de l'alumne
+  const statementMarkdown = getText(currentProblem?.statement) || getText(currentProblem?.text);
   // Textos d'ajuda en passar el ratolí pels botons de l'editor
   const resetTooltip = t('lesson.reset_tooltip', 'Torna a començar: recupera el codi inicial');
   const testTooltip = isRunning
@@ -325,8 +307,8 @@ export default function LessonPage() {
     : canSubmit
       ? t('lesson.submit_tooltip', 'Envia la teva solució al servidor')
       : t('lesson.submit_blocked_empty', 'Escriu codi per poder enviar');
-  const stdinLabel = t('lesson.stdin_label', 'Entrada');
-  const stdinPlaceholder = t('lesson.stdin_placeholder', 'Una línia per a cada input()');
+  const consoleInputLabel = t('lesson.console_input_label', 'Resposta per a input()');
+  const consoleInputPlaceholder = t('lesson.console_input_placeholder', 'Escriu la resposta i prem Enter');
   const liveRenderTooltip = showLiveRender ? t('lesson.hide_live_render', 'Amaga la visualització') : t('lesson.show_live_render', 'Mostra la visualització');
 
 
@@ -401,6 +383,26 @@ export default function LessonPage() {
   const [loadingPeers, setLoadingPeers] = useState(false);
   const [col1Pct, setCol1Pct] = useState(25); // --- Resizable columns (desktop layout) ---
   const containerRef = useRef<HTMLDivElement>(null);
+  // Columna de l'editor: amplada (botons compactes si és estreta) i alçada de la consola
+  const editorColumnRef = useRef<HTMLDivElement>(null);
+  const [editorColumnWidth, setEditorColumnWidth] = useState(1000);
+  const compactHeader = editorColumnWidth < COMPACT_EDITOR_HEADER_PX;
+  const [consoleHeight, setConsoleHeight] = useState(() => readConsoleHeight(180));
+  const consoleDragStartRef = useRef(consoleHeight);
+  const resizeConsole = (delta: number) => {
+    const column = editorColumnRef.current?.offsetHeight || window.innerHeight;
+    // Arrossegar cap amunt (delta negatiu) fa la consola més alta
+    const next = Math.round(Math.min(column - 140, Math.max(60, consoleDragStartRef.current - delta)));
+    setConsoleHeight(next);
+    try { localStorage.setItem(CONSOLE_HEIGHT_KEY, String(next)); } catch { /* sense emmagatzematge */ }
+  };
+  useEffect(() => {
+    const el = editorColumnRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setEditorColumnWidth(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isMobile, loading, !!currentProblem]);
   const dragRef = useRef<{ type: 'col1'; startX: number; startPct: number } | null>(null);
   const handleDragStart = (type: 'col1') => (e: React.MouseEvent) => {e.preventDefault(); dragRef.current = { type, startX: e.clientX, startPct: col1Pct }; document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';};
 
@@ -447,7 +449,6 @@ export default function LessonPage() {
         react: saved?.react || '',
       });
       setDiagnostics([]);
-      setStdinText('');
       // Recupera l'estat de vista (cursor/selecció/scroll) desat per a aquesta lliçó
       try {
         const rawView = localStorage.getItem(`${codeStorageKey}_view`);
@@ -600,7 +601,7 @@ export default function LessonPage() {
   };
 
   const handleResetCode = () => {
-    if (!window.confirm("Segur que vols tornar a començar el codi?")) return;
+    if (!window.confirm(t('lesson.reset_confirm', 'Segur que vols tornar a començar el codi?'))) return;
     setCodeByLang({ python: currentProblem?.precode || '', react: '' });
     setConsoleOutput([]);
     setStatus('idle');
@@ -608,58 +609,12 @@ export default function LessonPage() {
     setIsDirty(true);
   };
 
-  // "Executar": Python real (Pyodide) en un worker. La sortida apareix a la consola a mesura
-  // que el programa l'escriu; tornar-hi a clicar mentre s'executa l'atura.
-  const handleLocalRun = async () => {
-    if (isRunning) { stopPython(); return; }
-    if (selectedLanguage !== 'python') return;
-    const code = userInputRef.current;
-    if (!code.trim()) return;
-    setIsRunning(true);
+  // "Executar": tornar-hi a clicar mentre el programa s'executa l'atura
+  const handleLocalRun = () => {
+    if (isRunning) { stopPythonCode(); return; }
+    if (selectedLanguage !== 'python' || !userInputRef.current.trim()) return;
     setStatus('idle');
-    const lesson = runLessonRef.current;
-    const lines: ConsoleLine[] = [];
-    let truncated = false;
-    const show = () => { if (runLessonRef.current === lesson) setConsoleOutput([...lines]); };
-    // Avís de càrrega: es treu en arribar la primera sortida o en acabar
-    let loadingShown = false;
-    const clearLoading = () => { if (loadingShown) { lines.shift(); loadingShown = false; } };
-    if (!isPythonReady()) {
-      lines.push({ kind: 'info', text: t('lesson.python_loading', 'Carregant Python… (la primera vegada pot trigar uns segons)') });
-      loadingShown = true;
-      show();
-    }
-    let sawEOF = false;
-    const result = await runPython(code, {
-      stdin: usesInput(code) ? stdinText : '',
-      onOutput: (chunks) => {
-        clearLoading();
-        for (const { stream, text } of chunks) {
-          if (stream === 'stderr' && /\bEOFError\b/.test(text)) sawEOF = true;
-          for (const line of text.split('\n')) {
-            if (lines.length >= MAX_CONSOLE_LINES) { truncated = true; break; }
-            lines.push({ kind: stream, text: line });
-          }
-        }
-        show();
-      },
-    });
-    clearLoading();
-    if (truncated) lines.push({ kind: 'info', text: t('lesson.output_truncated', 'Sortida retallada: només es mostren les primeres {{count}} línies.', { count: MAX_CONSOLE_LINES }) });
-    if (sawEOF) lines.push({ kind: 'info', text: t('lesson.stdin_eof_hint', "El programa demana més dades amb input() de les que hi ha a «Entrada»: escriu-hi una línia per a cada input().") });
-    if (result === 'ok') {
-      if (!lines.length) lines.push({ kind: 'info', text: t('lesson.run_no_output', "El programa s'ha executat sense mostrar res. Per veure un resultat, fes servir print().") });
-      lines.push({ kind: 'info', text: t('lesson.run_finished', 'Execució finalitzada.') });
-    } else if (result === 'stopped') {
-      lines.push({ kind: 'info', text: t('lesson.run_stopped', 'Execució aturada.') });
-    } else if (result === 'timeout') {
-      lines.push({ kind: 'stderr', text: t('lesson.run_timeout', 'Aturat: ha trigat més de {{seconds}} s. Potser hi ha un bucle infinit?', { seconds: DEFAULT_PYTHON_TIMEOUT_MS / 1000 }) });
-    } else if (result === 'load-error') {
-      lines.push({ kind: 'stderr', text: t('lesson.python_load_error', "No s'ha pogut carregar Python. Comprova la connexió i torna-ho a provar.") });
-    }
-    if (runLessonRef.current !== lesson) return;
-    show();
-    setIsRunning(false);
+    void runPythonCode(userInputRef.current);
   };
 
   const loadPeerSolutions = async () => {
@@ -709,7 +664,9 @@ export default function LessonPage() {
           <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0 }}>
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
-              <Typography sx={{ fontFamily: 'monospace', fontSize: '0.8rem', fontWeight: 600 }}>{currentProblem?.text || ''}</Typography>
+              <Box sx={{ maxHeight: '26vh', overflowY: 'auto' }}>
+                <MarkdownContent fontSize="0.85rem">{statementMarkdown}</MarkdownContent>
+              </Box>
             </Box>
             {status === 'fail' && !backHidden && (
               <Box sx={{ textAlign: 'center', mt: 2 }}>
@@ -802,15 +759,19 @@ export default function LessonPage() {
           )}
         </Box>
 
-        {showStdin && (
-          <Box sx={{ flexShrink: 0, height: 96, display: 'flex', flexDirection: 'column' }}>
-            <StdinBox value={stdinText} onChange={setStdinText} label={stdinLabel} placeholder={stdinPlaceholder} rows={2} />
-          </Box>
-        )}
-        <ConsolePanel 
-          output={consoleOutput}
-          emptyMessage={t('lesson.waiting_execution')}
-        />
+        <ResizeHandle orientation="horizontal" thickness={8} ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
+        <Box sx={{ height: consoleHeight, flexShrink: 0, display: 'flex' }}>
+          <ConsolePanel 
+            output={consoleOutput}
+            emptyMessage={t('lesson.waiting_execution')}
+            inputActive={inputActive}
+            onInputSubmit={submitInput}
+            inputLabel={consoleInputLabel}
+            inputPlaceholder={consoleInputPlaceholder}
+          />
+        </Box>
+        {/* Espai de la barra de botons fixa de sota */}
+        <Box sx={{ height: 70, flexShrink: 0 }} />
 
         <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
           <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1, p: 1 }}>
@@ -863,8 +824,8 @@ export default function LessonPage() {
             {activeTab === 0 && (
               <Box sx={{ p: 2 }}>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 900, mb: 3, color: mode === 'light' ? '#000' : 'inherit' }}>{getText(currentProblem?.subtitle)}</Typography>
-                <Box sx={{ p: 1, bgcolor: alpha(theme.palette.primary.main, 0.05), mt: 5 }}>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '1rem', color: mode === 'light' ? '#000' : 'inherit' }}>{currentProblem?.text || ''}</Typography>
+                <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2 }}>
+                  <MarkdownContent>{statementMarkdown}</MarkdownContent>
                 </Box>
               </Box>
             )}
@@ -961,16 +922,17 @@ export default function LessonPage() {
         <Box onMouseDown={handleDragStart('col1')} sx={{width: 4,flexShrink: 0,cursor: 'col-resize',bgcolor: mode === 'light' ? 'black' : '#8400ff','&:hover': { bgcolor: '#8400ff' },transition: 'background-color 0.15s',}}/>
 
         
-        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* COLUMNA 2: EDITOR + VISUALITZACIÓ EN DIRECTE*/}
+        <Box ref={editorColumnRef} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* COLUMNA 2: EDITOR + VISUALITZACIÓ EN DIRECTE*/}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* SECCIÓ SUPERIOR: SPLIT DE CODI I VISUALITZACIÓ EN DIRECTE */}
            {/* Capçalera: cobreix l'editor i la visualització */}
-            <Box sx={{ height: 60, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>
+            <Box sx={{ height: 60, px: compactHeader ? 1 : 2, gap: 1, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
+              {/* Els botons de la dreta no s'encongeixen mai: si falta espai, cedeix aquesta part */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 2, minWidth: 0, overflow: 'hidden' }}>
+                {!compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
               </Box>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
                 <Tooltip title={resetTooltip} arrow>
                   <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: '1px solid #444', borderRadius: 1, width: 32, height: 32, '&:hover': { bgcolor: '#333' } }}>
                     <RotateCcw size={16} color="red"/>
@@ -978,17 +940,29 @@ export default function LessonPage() {
                 </Tooltip>
                 {selectedLanguage === 'python' && (
                   <Tooltip title={testTooltip} arrow>
-                    <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                      {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
-                    </Button>
+                    {compactHeader ? (
+                      <IconButton onClick={handleLocalRun} aria-label={testTooltip} sx={{ border: '1px solid', borderColor: isRunning ? '#f87171' : '#666', borderRadius: 1, width: 32, height: 32, color: '#fff', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                        {isRunning ? <Square size={12} fill="#fff"/> : <Play size={14} fill="#fff"/>}
+                      </IconButton>
+                    ) : (
+                      <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                        {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
+                      </Button>
+                    )}
                   </Tooltip>
                 )}
                 <Tooltip title={submitTooltip} arrow>
                   {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
                   <Box component="span" sx={{ display: 'inline-flex' }}>
-                    <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
-                      {t('lesson.run', 'Enviar')}
-                    </Button>
+                    {compactHeader ? (
+                      <IconButton onClick={handleRunTests} disabled={!canSubmit} aria-label={submitTooltip} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', width: 40, height: 32, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
+                        <CloudUpload size={17}/>
+                      </IconButton>
+                    ) : (
+                      <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#e0e0e0' } }}>
+                        {t('lesson.run', 'Enviar')}
+                      </Button>
+                    )}
                   </Box>
                 </Tooltip>
               </Stack>
@@ -1028,18 +1002,16 @@ export default function LessonPage() {
           </Box>
 
           {/* CONSOLA */}
-          <Box sx={{ height: 180, flexShrink: 0, display: 'flex' }}>
-            <Box sx={{ flex: 1, minWidth: 0, display: 'flex' }}>
-              <ConsolePanel 
-                output={consoleOutput}
-                emptyMessage={t('lesson.waiting_execution', "Esperant l'execució del codi...")}
-              />
-            </Box>
-            {showStdin && (
-              <Box sx={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', borderLeft: '1px solid #333', borderTop: '1px solid', borderTopColor: mode === 'light' ? '#000' : 'divider' }}>
-                <StdinBox value={stdinText} onChange={setStdinText} label={stdinLabel} placeholder={stdinPlaceholder} rows={6} />
-              </Box>
-            )}
+          <ResizeHandle orientation="horizontal" ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
+          <Box sx={{ height: consoleHeight, flexShrink: 0, display: 'flex' }}>
+            <ConsolePanel 
+              output={consoleOutput}
+              emptyMessage={t('lesson.waiting_execution', "Esperant l'execució del codi...")}
+              inputActive={inputActive}
+              onInputSubmit={submitInput}
+              inputLabel={consoleInputLabel}
+              inputPlaceholder={consoleInputPlaceholder}
+            />
           </Box>
         </Box>
       </Box>

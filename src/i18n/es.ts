@@ -313,16 +313,18 @@ export default {
     stop_tooltip: "Detiene el programa (p. ej. si se ha quedado en un bucle infinito)",
     submit_blocked_running: "Espera a que termine el programa para enviar",
     submit_blocked_empty: "Escribe código para poder enviar",
-    stdin_label: "Entrada",
-    stdin_placeholder: "Una línea para cada input()",
-    stdin_eof_hint: "El programa pide más datos con input() de los que hay en «Entrada»: escribe una línea para cada input().",
-    python_loading: "Cargando Python… (la primera vez puede tardar unos segundos)",
+    python_loading: "Cargando Python… {{percent}}% (solo la primera vez)",
     python_load_error: "No se ha podido cargar Python. Comprueba la conexión y vuelve a intentarlo.",
     output_truncated: "Salida recortada: solo se muestran las primeras {{count}} líneas.",
     run_no_output: "El programa se ha ejecutado sin mostrar nada. Para ver un resultado, usa print().",
     run_finished: "Ejecución finalizada.",
     run_stopped: "Ejecución detenida.",
     run_timeout: "Detenido: ha tardado más de {{seconds}} s. ¿Quizás hay un bucle infinito?",
+    input_unavailable: "input() no funciona en este navegador (p. ej. en modo privado). Vuelve a cargar la página y, si continúa, prueba otro navegador.",
+    console_input_label: "Respuesta para input()",
+    console_input_placeholder: "Escribe la respuesta y pulsa Enter",
+    reset_confirm: "¿Seguro que quieres volver a empezar el código?",
+    resize_console: "Cambia el tamaño de la consola",
     hide_live_render: "Ocultar la visualización"
   }
 };

@@ -309,16 +309,18 @@ export default {
     stop_tooltip: "Stop the program (e.g. if it is stuck in an infinite loop)",
     submit_blocked_running: "Wait for the program to finish before submitting",
     submit_blocked_empty: "Write some code to submit",
-    stdin_label: "Input",
-    stdin_placeholder: "One line for each input()",
-    stdin_eof_hint: "The program asks for more data with input() than there is in «Input»: write one line for each input().",
-    python_loading: "Loading Python… (the first time can take a few seconds)",
+    python_loading: "Loading Python… {{percent}}% (first time only)",
     python_load_error: "Python could not be loaded. Check your connection and try again.",
     output_truncated: "Output truncated: only the first {{count}} lines are shown.",
     run_no_output: "The program ran without showing anything. Use print() to see a result.",
     run_finished: "Execution finished.",
     run_stopped: "Execution stopped.",
     run_timeout: "Stopped: it took more than {{seconds}} s. Is there an infinite loop?",
+    input_unavailable: "input() does not work in this browser (e.g. in private mode). Reload the page and, if it keeps happening, try another browser.",
+    console_input_label: "Answer for input()",
+    console_input_placeholder: "Type your answer and press Enter",
+    reset_confirm: "Are you sure you want to start the code over?",
+    resize_console: "Resize the console",
     hide_live_render: "Hide the preview"
   }
 };

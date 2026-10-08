@@ -307,16 +307,18 @@ export default {
     stop_tooltip: "Atura el programa (p. ex. si s'ha quedat en un bucle infinit)",
     submit_blocked_running: "Espera que acabi el programa per enviar",
     submit_blocked_empty: "Escriu codi per poder enviar",
-    stdin_label: "Entrada",
-    stdin_placeholder: "Una línia per a cada input()",
-    stdin_eof_hint: "El programa demana més dades amb input() de les que hi ha a «Entrada»: escriu-hi una línia per a cada input().",
-    python_loading: "Carregant Python… (la primera vegada pot trigar uns segons)",
+    python_loading: "Carregant Python… {{percent}}% (només la primera vegada)",
     python_load_error: "No s'ha pogut carregar Python. Comprova la connexió i torna-ho a provar.",
     output_truncated: "Sortida retallada: només es mostren les primeres {{count}} línies.",
     run_no_output: "El programa s'ha executat sense mostrar res. Per veure un resultat, fes servir print().",
     run_finished: "Execució finalitzada.",
     run_stopped: "Execució aturada.",
     run_timeout: "Aturat: ha trigat més de {{seconds}} s. Potser hi ha un bucle infinit?",
+    input_unavailable: "input() no funciona en aquest navegador (p. ex. en mode privat). Torna a carregar la pàgina i, si continua, prova un altre navegador.",
+    console_input_label: "Resposta per a input()",
+    console_input_placeholder: "Escriu la resposta i prem Enter",
+    reset_confirm: "Segur que vols tornar a començar el codi?",
+    resize_console: "Canvia la mida de la consola",
     hide_live_render: "Amaga la visualització"
   }
 };

@@ -37,6 +37,10 @@ export const mapProblem = (p: any) => ({
   subtitle: p.title,
   // `undefined` quan l'API no envia l'enunciat (llista del curs): el problema s'ha de demanar sencer
   text: 'statementHtml' in p || 'statement_ca' in p ? (p.statement_ca || p.statementHtml || '') : undefined,
+  // Enunciat en Markdown per idioma (el mostra LessonPage en l'idioma de l'alumne)
+  statement: 'statement_ca' in p || 'statement_es' in p || 'statement_en' in p
+    ? { ca: p.statement_ca || '', es: p.statement_es || '', en: p.statement_en || '' }
+    : undefined,
   problemSlug: p.slug,
   type: p.type,
   precode: p.precode,
