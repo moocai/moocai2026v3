@@ -83,25 +83,24 @@ async function idbPrune() {
 
 /**
  * URL de l'avatar d'un altre membre d'un curs:
- * `/courses/<slug>/members/<username>/avatar/`. El username pot portar `.`, `@`,
- * `+`..., així que es codifica.
+ * `/courses/<slug>/members/<user_id>/avatar/`. Els usuaris s'identifiquen per
+ * l'**id** (el `user_id` de les files del leaderboard), no pel username.
  */
-export function userAvatarUrl(username: string, slug: string): string {
-  return `/api/v1/courses/${encodeURIComponent(slug)}/members/${encodeURIComponent(username)}/avatar/`;
+export function userAvatarUrl(userId: string, slug: string): string {
+  return `/api/v1/courses/${encodeURIComponent(slug)}/members/${encodeURIComponent(userId)}/avatar/`;
 }
 
 /**
  * URL de l'avatar de l'usuari autenticat (`/users/me/avatar/`).
- * El `?u=<username>` no canvia la petició però sí la clau de la memòria cau, de
- * manera que un navegador compartit no mostra l'avatar de l'usuari anterior.
+ * El `?u=<id>` no canvia la petició però sí la clau de la memòria cau, de manera
+ * que un navegador compartit no mostra l'avatar de l'usuari anterior.
  */
 export function myAvatarUrl(): string | null {
   try {
     const raw = localStorage.getItem('currentStudent');
     if (!raw) return null;
-    const student = JSON.parse(raw);
-    const key = student?.username ?? student?.id;
-    return key ? `/api/v1/users/me/avatar/?u=${encodeURIComponent(String(key))}` : null;
+    const id = JSON.parse(raw)?.id;
+    return id ? `/api/v1/users/me/avatar/?u=${encodeURIComponent(String(id))}` : null;
   } catch {
     return null;
   }

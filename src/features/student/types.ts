@@ -1,7 +1,5 @@
 export interface Student {
-  /** Identificador local de l'usuari (el username; l'API ja no retorna ids). */
   id: string;
-  username?: string;
   name: string;
   code?: string;
   email: string;

@@ -41,7 +41,7 @@ Aquest document recull **totes les APIs REST** que consumeix l'aplicació fronte
 | GET | `/orgs/` | Llista d'organitzacions. Accepta array o `{ results }`. | Token | `profileService.fetchOrganizations` |
 | GET | `/users/me/avatar/` | Avatar de l'usuari (string o `{ avatar }`). Es llegeix com a imatge via `avatarCache` (`myAvatarUrl`/`preloadImage`), no amb una crida de servei. | Token | `avatarCache` |
 | PATCH | `/users/me/avatar/` | Puja avatar. Body **FormData** `avatar`. Respon **204** → `Promise<void>`; la imatge es torna a carregar amb `avatarCache`. | Token | `profileService.updateMyAvatar` |
-| GET | `/courses/{slug}/members/{username}/avatar/` | Avatar d'un altre membre del curs (rànquing). `slug` i `username` es codifiquen amb `encodeURIComponent`. Es llegeix com a imatge via `avatarCache` (`userAvatarUrl`). | Token | `avatarCache` |
+| GET | `/courses/{slug}/members/{user_id}/avatar/` | Avatar d'un altre membre del curs (rànquing), amb el `user_id` de la fila del leaderboard. `slug` i `user_id` es codifiquen amb `encodeURIComponent`. Es llegeix com a imatge via `avatarCache` (`userAvatarUrl`). | Token | `avatarCache` |
 | POST | `/users/invite/` | Convida un usuari per correu. Body JSON `{ email }`. | Token | `api.inviteUser` |
 
 ---
@@ -161,4 +161,4 @@ Totes les respostes d'error de l'API (4xx i 5xx) tenen la forma
 `{ "detail": "...", "code": "...", "errors": { "camp": ["missatge"] } }`.
 `apiErrorMessages()` (`httpClient.ts`) en treu els missatges de `errors` i, si no n'hi ha,
 el `detail`; el fan servir registre, perfil, enviament de codi i invitacions.
-Login i registre ja no retornen `user.id`: `currentStudent.id` és el `username`.
+Els usuaris s'identifiquen per l'**id** (`id` / `user_id`) a totes les URLs, mai pel username.

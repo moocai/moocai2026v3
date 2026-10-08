@@ -87,7 +87,7 @@ function writeLastCourse(slug: string | undefined, scope: string) {
 }
 
 /** Una fila del leaderboard. */
-type RankedStudent = { id: string; name: string; username?: string; points: number };
+type RankedStudent = { id: string; name: string; username?: string; userId?: string; points: number };
 
 function toRanking(data: any[]): RankedStudent[] {
   const firstNumber = (row: any, keys: string[]): number => {
@@ -104,6 +104,8 @@ function toRanking(data: any[]): RankedStudent[] {
         id: String(user?.id ?? user?.user_id ?? user?.username ?? i),
         name: String(user?.username ?? user?.name ?? user?.full_name ?? user?.first_name ?? row?.username ?? '?'),
         username: String(user?.username ?? user?.name ?? ''),
+        // Id de l'usuari: és el que identifica el membre a les URLs (avatar).
+        userId: (user?.user_id ?? user?.id) != null ? String(user?.user_id ?? user?.id) : undefined,
         points: firstNumber(row, ['points', 'score', 'total_points', 'total_score', 'stars', 'grade']),
       };
     })
@@ -293,9 +295,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       const data = await authService.login(username, password);
       const role = 'student';
       const student: Student = {
-        // L'API ja no retorna l'id de l'usuari: el username és l'identificador.
-        id: data?.user?.username || username,
-        username: data?.user?.username || username,
+        id: data?.user?.id != null ? String(data.user.id) : username,
         name: data?.user?.name || username,
         email: data?.user?.email || username,
         role,
@@ -429,8 +429,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       // de immediat i no saturen la connexió amb centenars de peticions.
       const rankingAvatars = rankedList
         .slice(0, LEADERBOARD_VISIBLE)
-        .filter((s): s is RankedStudent & { username: string } => Boolean(s.username))
-        .map(s => userAvatarUrl(s.username, currentSlug!));
+        .filter((s): s is RankedStudent & { userId: string } => Boolean(s.userId))
+        .map(s => userAvatarUrl(s.userId, currentSlug!));
       void Promise.all(rankingAvatars.map(url => preloadImage(url)));
     } catch {
       // Si falla la petició es conserva el rànquing anterior (no el buidem)
@@ -736,7 +736,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                                 <Stack key={s.id || index} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', overflow: 'hidden' }}>
                                     <ProtectedAvatar 
-                                      src={s.username && currentCourse?.slug ? userAvatarUrl(s.username, currentCourse.slug) : undefined}
+                                      src={s.userId && currentCourse?.slug ? userAvatarUrl(s.userId, currentCourse.slug) : undefined}
                                       alt={s.name}
                                       sx={{
                                         width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
