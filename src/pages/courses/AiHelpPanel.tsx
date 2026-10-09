@@ -38,9 +38,11 @@ function HintCard({ hint }: { hint: AiHint }) {
  * Pestanya IA: les pistes d'IA del problema (com a algorien, la més recent primer) i la
  * revisió del codi un cop resolt. Les pistes es demanen des d'aquí o des del botó de l'editor.
  */
-export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints, generating, hintError, remaining, onLoadHints, onRequestHint }: {
+export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints, generating, hintError, remaining, hintsAvailable, onLoadHints, onRequestHint }: {
   courseId: string; topicSlug: string; lessonId: string;
   hints: AiHint[]; loadingHints: boolean; generating: boolean; hintError: string | null; remaining: number | null;
+  /** El curs permet pistes d'IA a l'usuari */
+  hintsAvailable: boolean;
   onLoadHints: () => void; onRequestHint: () => void;
 }) {
   const { t } = useTranslation();
@@ -66,6 +68,11 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      {!hintsAvailable ? (
+        <Typography sx={{ fontSize: '0.85rem', color: 'text.secondary' }}>
+          {t('lesson.hints_unavailable', 'Les pistes d\'IA no estan disponibles en aquest curs.')}
+        </Typography>
+      ) : (<>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
         <Button variant="contained" onClick={onRequestHint} disabled={generating || remaining === 0} startIcon={generating ? <CircularProgress size={16} color="inherit" /> : <Bot size={16} />} sx={{ textTransform: 'none', fontWeight: 700 }}>
           {generating ? t('lesson.hint_generating', 'Generant la pista…') : t('lesson.hint_request', 'Demana una pista')}
@@ -79,6 +86,7 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
       <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', mt: -1 }}>
         {t('lesson.hint_explain', "La pista té en compte el codi que tens ara a l'editor.")}
       </Typography>
+      </>)}
 
       {hintError && (
         <Box sx={{ p: 1.5, borderRadius: 1, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.4)}` }}>

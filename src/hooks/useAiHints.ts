@@ -27,6 +27,8 @@ export function useAiHints(courseId?: string, topicSlug?: string, problemSlug?: 
   useEffect(() => {
     setHints([]); setError(null); setGenerating(false);
   }, [courseId, topicSlug, problemSlug]);
+  // Les que queden avui són per curs
+  useEffect(() => { setRemaining(null); }, [courseId]);
 
   const load = useCallback(async () => {
     if (!ready) return;

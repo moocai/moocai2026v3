@@ -41,8 +41,10 @@ function ToolButton({ title, onClick, disabled, children }: { title: string; onC
  * Eines de l'editor (com a algorien): pista d'IA, Python Tutor, dreceres, versions del codi
  * i zoom. Amb poc espai (`compact`) es plega en un menú "···".
  */
-export function EditorToolbar({ compact, onAiHint, aiBusy, hintsRemaining, onPythonTutor, onShortcuts, loadVersions, activeVersion, onPickVersion, onZoomIn, onZoomOut }: {
+export function EditorToolbar({ compact, showAiHint = true, onAiHint, aiBusy, hintsRemaining, onPythonTutor, onShortcuts, loadVersions, activeVersion, onPickVersion, onZoomIn, onZoomOut }: {
   compact: boolean;
+  /** El curs permet pistes d'IA a l'usuari (si no, el botó no es mostra) */
+  showAiHint?: boolean;
   onAiHint: () => void;
   aiBusy: boolean;
   hintsRemaining: number | null;
@@ -105,7 +107,7 @@ export function EditorToolbar({ compact, onAiHint, aiBusy, hintsRemaining, onPyt
       <>
         <ToolButton title={t('lesson.more_tools', 'Més eines')} onClick={(e) => setMoreAnchor(e.currentTarget)}><MoreHorizontal size={18} /></ToolButton>
         <Menu anchorEl={moreAnchor} open={!!moreAnchor} onClose={close} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
-          <MenuItem onClick={() => { close(); onAiHint(); }} disabled={aiBusy || hintsRemaining === 0}><ListItemIcon>{aiIcon}</ListItemIcon>{aiTitle}</MenuItem>
+          {showAiHint && <MenuItem onClick={() => { close(); onAiHint(); }} disabled={aiBusy || hintsRemaining === 0}><ListItemIcon>{aiIcon}</ListItemIcon>{aiTitle}</MenuItem>}
           <MenuItem onClick={() => { close(); onPythonTutor(); }}><ListItemIcon><GraduationCap size={17} /></ListItemIcon>{t('lesson.python_tutor', 'Obre a Python Tutor')}</MenuItem>
           <MenuItem onClick={(e) => { const anchor = moreAnchor ?? e.currentTarget; close(); openVersions(anchor); }}><ListItemIcon><History size={17} /></ListItemIcon>{t('lesson.version_title', 'Carrega una versió')}</MenuItem>
           <MenuItem onClick={() => { close(); onShortcuts(); }}><ListItemIcon><Keyboard size={17} /></ListItemIcon>{t('lesson.shortcuts_title', 'Dreceres de teclat')}</MenuItem>
@@ -119,12 +121,14 @@ export function EditorToolbar({ compact, onAiHint, aiBusy, hintsRemaining, onPyt
 
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.25 }}>
-      <ToolButton title={aiTitle} onClick={onAiHint} disabled={aiBusy || hintsRemaining === 0}>
-        <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4 }}>
-          {aiIcon}
-          {hintsRemaining !== null && <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>{hintsRemaining}</Typography>}
-        </Box>
-      </ToolButton>
+      {showAiHint && (
+        <ToolButton title={aiTitle} onClick={onAiHint} disabled={aiBusy || hintsRemaining === 0}>
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.4 }}>
+            {aiIcon}
+            {hintsRemaining !== null && <Typography component="span" sx={{ fontSize: 11, fontWeight: 800, lineHeight: 1 }}>{hintsRemaining}</Typography>}
+          </Box>
+        </ToolButton>
+      )}
       <ToolButton title={t('lesson.python_tutor', 'Obre a Python Tutor')} onClick={onPythonTutor}><GraduationCap size={17} /></ToolButton>
       <ToolButton title={t('lesson.shortcuts_title', 'Dreceres de teclat')} onClick={onShortcuts}><Keyboard size={17} /></ToolButton>
       <ToolButton title={t('lesson.version_title', 'Carrega una versió')} onClick={(e) => openVersions(e.currentTarget)}><History size={17} /></ToolButton>

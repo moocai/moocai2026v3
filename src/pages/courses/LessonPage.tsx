@@ -177,6 +177,7 @@ const FONT_SIZE_MAX = 32;
 const readFontSize = () => {
   try { const v = Number(localStorage.getItem(FONT_SIZE_KEY)); return v >= FONT_SIZE_MIN && v <= FONT_SIZE_MAX ? v : FONT_SIZE_DEFAULT; } catch { return FONT_SIZE_DEFAULT; }
 };
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/i.test(navigator.platform || navigator.userAgent);
 // Python Tutor (pythontutor.com): visualitza l'execució pas a pas, com a algorien
 const pythonTutorUrl = (code: string) =>
   `https://pythontutor.com/visualize.html#code=${encodeURIComponent(code)}&mode=display&cumulative=false&py=3&curInstr=0`;
@@ -252,6 +253,7 @@ export default function LessonPage() {
   const [activeVersion, setActiveVersion] = useState<CodeVersion['id'] | null>(null);
   // Shift+Enter executa el codi: el comandament de Monaco es registra un cop i crida la versió actual
   const runShortcutRef = useRef<() => void>(() => {});
+  const submitShortcutRef = useRef<() => void>(() => {});
   // Botó "Executar": Python real (Pyodide); input() es respon a la consola
   const { isRunning, inputActive, run: runPythonCode, stop: stopPythonCode, submitInput } = usePythonRun(setConsoleOutput, `${courseId}/${lessonId}`);
   const [status, setStatus] = useState<'idle' | 'pass' | 'fail'>('idle');
@@ -345,6 +347,14 @@ export default function LessonPage() {
       keybindingContext: 'editorTextFocus && !suggestWidgetVisible',
       run: () => runShortcutRef.current(),
     });
+    // Ctrl/⌘+Enter envia la solució (substitueix "insereix una línia a sota" de Monaco)
+    editor.addAction({
+      id: 'mooc.submit',
+      label: 'Submit',
+      keybindings: [mn.KeyMod.CtrlCmd | mn.KeyCode.Enter],
+      keybindingContext: 'editorTextFocus && !suggestWidgetVisible',
+      run: () => submitShortcutRef.current(),
+    });
     editor.focus();
   };
 
@@ -416,6 +426,11 @@ export default function LessonPage() {
 
   // Pistes d'IA: es mostren a la pestanya IA (com a algorien)
   const aiHints = useAiHints(courseId, currentTopicSlug, lessonId);
+  // Disponibilitat i pistes que queden avui, del detall del curs (`my_ai_hints`). Amb un
+  // backend que encara no l'envia, n'hi ha prou amb el límit del curs (0 = desactivades).
+  const courseAiHints = (course as any)?.my_ai_hints as { enabled: boolean; hints_remaining: number } | null | undefined;
+  const hintsAvailable = !!course && (course as any).max_ai_hints_per_day !== 0 && courseAiHints?.enabled !== false;
+  const hintsRemaining: number | null = aiHints.remaining ?? (courseAiHints?.enabled ? courseAiHints.hints_remaining : null);
 
   // Enviar: el servidor decideix si la solució és correcta; aquí només cal que hi hagi codi
   const canSubmit = userInput.trim().length > 0 && !isRunning;
@@ -806,6 +821,9 @@ export default function LessonPage() {
     void runPythonCode(userInputRef.current); // si n'hi havia un en marxa, s'atura i es torna a executar
   };
 
+  // Les mateixes condicions que el botó Enviar (no mentre s'executa ni amb l'editor buit)
+  submitShortcutRef.current = () => { if (canSubmit) void handleRunTests(); };
+
   // === Eines de l'editor ===
   const requestAiHint = () => {
     setActiveTab(3);
@@ -1121,7 +1139,7 @@ export default function LessonPage() {
                 <AiHelpPanel
                   courseId={courseId!} topicSlug={currentTopicSlug} lessonId={lessonId!}
                   hints={aiHints.hints} loadingHints={aiHints.loadingList} generating={aiHints.generating}
-                  hintError={aiHints.error} remaining={aiHints.remaining}
+                  hintError={aiHints.error} remaining={hintsRemaining} hintsAvailable={hintsAvailable}
                   onLoadHints={aiHints.load} onRequestHint={requestAiHint}
                 />
               </Box>
@@ -1167,7 +1185,7 @@ export default function LessonPage() {
                       )}
                     </Tooltip>
                   )}
-                  <Tooltip title={submitTooltip} arrow>
+                  <Tooltip title={canSubmit ? `${submitTooltip} (${IS_MAC ? '⌘' : 'Ctrl'}+Enter)` : submitTooltip} arrow>
                     {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
                     <Box component="span" sx={{ display: 'inline-flex' }}>
                       {compactHeader ? (
@@ -1189,8 +1207,9 @@ export default function LessonPage() {
                   <EditorToolbar
                     compact={compactHeader}
                     onAiHint={requestAiHint}
+                    showAiHint={hintsAvailable}
                     aiBusy={aiHints.generating}
-                    hintsRemaining={aiHints.remaining}
+                    hintsRemaining={hintsRemaining}
                     onPythonTutor={openPythonTutor}
                     onShortcuts={() => setShortcutsOpen(true)}
                     loadVersions={loadVersions}
