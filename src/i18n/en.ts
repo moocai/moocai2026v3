@@ -392,7 +392,7 @@ export default {
     review_done: "Review completed.",
     review_error: "The review could not be loaded. Check your connection.",
     points_already_solved: "You had already solved it: this submission doesn't add points.",
-    points_topic_closed: "This topic is no longer current: submissions don't add points.",
+    points_topic_closed: "Submissions don't add points anymore for this topic.",
     hide_live_render: "Hide the preview",
     close_topics: "Close topics",
     open_topics: "Open topics",

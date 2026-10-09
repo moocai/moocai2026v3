@@ -390,7 +390,7 @@ export default {
     review_done: "Revisió completada.",
     review_error: "No s'ha pogut obtenir la revisió. Comprova la connexió.",
     points_already_solved: "Ja l'havies resolt: aquest enviament no suma punts.",
-    points_topic_closed: "Aquest tema ja no està en curs: els enviaments no sumen punts.",
+    points_topic_closed: "Els enviaments d'aquest tema ja no sumen punts.",
     hide_live_render: "Amaga la visualització",
     close_topics: "Tanca els temes",
     open_topics: "Obre els temes",

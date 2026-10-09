@@ -396,7 +396,7 @@ export default {
     review_done: "Revisión completada.",
     review_error: "No se ha podido obtener la revisión. Comprueba la conexión.",
     points_already_solved: "Ya lo habías resuelto: este envío no suma puntos.",
-    points_topic_closed: "Este tema ya no está en curso: los envíos no suman puntos.",
+    points_topic_closed: "Los envíos de este tema ya no suman puntos.",
     hide_live_render: "Ocultar la visualización",
     close_topics: "Cerrar los temas",
     open_topics: "Abrir los temas",

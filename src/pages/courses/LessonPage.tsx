@@ -778,7 +778,7 @@ export default function LessonPage() {
         : passed && wasSolvedBefore
           ? { kind: 'info', text: t('lesson.points_already_solved', 'Ja l\'havies resolt: aquest enviament no suma punts.') }
           : passed && topicClosed
-            ? { kind: 'info', text: t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.') }
+            ? { kind: 'info', text: t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.") }
             : null;
       void refreshCoursePoints(course?.slug || courseId!, earned > 0 ? 4 : 0, 1000, result).then(() => {
         if (!student) return;
@@ -937,7 +937,7 @@ export default function LessonPage() {
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
               {topicClosed && (
-                <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.')}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.")}</Typography>
               )}
               <Box sx={{ maxHeight: '26vh', overflowY: 'auto' }}>
                 <MarkdownContent fontSize="0.85rem">{statementMarkdown}</MarkdownContent>
@@ -1091,7 +1091,7 @@ export default function LessonPage() {
                 {topicClosed && (
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', p: 1.25, mb: 1, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.4)}` }}>
                     <AlertTriangle size={16} color={theme.palette.warning.main} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.')}</Typography>
+                    <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.")}</Typography>
                   </Box>
                 )}
                 <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2 }}>
