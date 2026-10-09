@@ -139,6 +139,18 @@ const CONSOLE_HEIGHT_KEY = 'mooc_console_height';
 const readConsoleHeight = (fallback: number) => {
   try { const v = Number(localStorage.getItem(CONSOLE_HEIGHT_KEY)); return v > 0 ? v : fallback; } catch { return fallback; }
 };
+// Amplada inicial de la columna de l'enunciat (% de la pantalla, escriptori). Arrossegant la
+// barra entre columnes es pot canviar entre STATEMENT_MIN_PCT i STATEMENT_MAX_PCT, i es recorda.
+const STATEMENT_DEFAULT_PCT = 30;
+const STATEMENT_MIN_PCT = 15;
+const STATEMENT_MAX_PCT = 70;
+const STATEMENT_WIDTH_KEY = 'mooc_statement_width';
+const readStatementWidth = () => {
+  try {
+    const v = Number(localStorage.getItem(STATEMENT_WIDTH_KEY));
+    return v >= STATEMENT_MIN_PCT && v <= STATEMENT_MAX_PCT ? v : STATEMENT_DEFAULT_PCT;
+  } catch { return STATEMENT_DEFAULT_PCT; }
+};
 // Per sota d'aquesta amplada, els botons de l'editor es mostren només amb la icona
 const COMPACT_EDITOR_HEADER_PX = 640;
 
@@ -446,7 +458,7 @@ export default function LessonPage() {
   const [submissionsRefreshKey, setSubmissionsRefreshKey] = useState(0);
   const [peerSolutions, setPeerSolutions] = useState<any[]>([]);
   const [loadingPeers, setLoadingPeers] = useState(false);
-  const [col1Pct, setCol1Pct] = useState(25); // --- Resizable columns (desktop layout) ---
+  const [col1Pct, setCol1Pct] = useState(readStatementWidth); // --- Resizable columns (desktop layout) ---
   const containerRef = useRef<HTMLDivElement>(null);
   // Columna de l'editor: amplada (botons compactes si és estreta) i alçada de la consola
   const editorColumnRef = useRef<HTMLDivElement>(null);
@@ -479,8 +491,9 @@ export default function LessonPage() {
       if (!containerWidth) return;
       const deltaPct = ((e.clientX - startX) / containerWidth) * 100;
       let newPct = startPct + deltaPct;
-      newPct = Math.min(70, Math.max(15, newPct));
+      newPct = Math.min(STATEMENT_MAX_PCT, Math.max(STATEMENT_MIN_PCT, newPct));
       setCol1Pct(newPct);
+      try { localStorage.setItem(STATEMENT_WIDTH_KEY, String(Math.round(newPct))); } catch { /* sense emmagatzematge */ }
     };
     const handleMouseUp = () => {dragRef.current = null; document.body.style.cursor = '';document.body.style.userSelect = '';};
     document.addEventListener('mousemove', handleMouseMove);
@@ -491,7 +504,9 @@ export default function LessonPage() {
     };
   }, []);
 
-  const tabScale = Math.min(1.3, Math.max(0.6, col1Pct / 30));
+  // Les pestanyes s'encongeixen si la columna és més estreta que l'amplada inicial, però no
+  // creixen si és més ampla (amb la columna molt ampla la lletra quedava massa gran)
+  const tabScale = Math.min(1, Math.max(0.6, col1Pct / STATEMENT_DEFAULT_PCT));
   const tabFontSize = Math.round(13 * tabScale * 12) / 10;
   const tabIconSize = Math.max(8, Math.round(10 * tabScale));
 
