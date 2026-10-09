@@ -45,6 +45,9 @@ export const mapProblem = (p: any) => ({
   type: p.type,
   precode: p.precode,
   solution: p.system_solution?.code || '',
+  // Solució de referència: el servidor només l'envia quan l'alumne la pot veure (problema
+  // resolt o tema ja tancat; mai en un examen). `undefined` = no se sap (llista sense detall).
+  systemSolution: 'system_solution' in p ? (p.system_solution?.code ?? null) : undefined,
   score: p.score,
   difficulty: p.difficulty,
   choices: p.choices,

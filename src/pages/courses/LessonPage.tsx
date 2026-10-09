@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
 import Editor, { DiffEditor } from '@monaco-editor/react';
@@ -9,12 +9,13 @@ import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTyp
 import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel, type ConsoleLine } from '../../components/ConsolePanel';
 import { MarkdownContent } from '../../components/MarkdownContent';
+import { CodeBlock } from '../../components/CodeBlock';
 import { ResizeHandle } from '../../components/ResizeHandle';
 import { preloadPython } from '../../services/pythonRunner';
 import { usePythonRun } from '../../hooks/usePythonRun';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
@@ -141,6 +142,42 @@ const readConsoleHeight = (fallback: number) => {
 // Per sota d'aquesta amplada, els botons de l'editor es mostren només amb la icona
 const COMPACT_EDITOR_HEADER_PX = 640;
 
+// === Estat de la solució de l'alumne (el corregeix el servidor) ===
+type SolutionStatus = 'accepted' | 'partially_rejected' | 'fully_rejected' | 'pending' | 'processing';
+const STATUS_STYLE: Record<SolutionStatus, { color: string; Icon: typeof CheckCircle2 }> = {
+  accepted: { color: '#22c55e', Icon: CheckCircle2 },
+  partially_rejected: { color: '#f59e0b', Icon: AlertTriangle },
+  fully_rejected: { color: '#f87171', Icon: XCircle },
+  pending: { color: '#9ca3af', Icon: Loader2 },
+  processing: { color: '#9ca3af', Icon: Loader2 },
+};
+
+/** Pastilla a la capçalera de l'editor: si el problema ja està resolt (o com va anar l'últim enviament). */
+function SolutionStatusChip({ status, submissions, lastSubmittedAt, compact }: { status?: string | null; submissions?: number; lastSubmittedAt?: string; compact?: boolean }) {
+  const { t, i18n } = useTranslation();
+  if (!status || !(status in STATUS_STYLE)) return null;
+  const { color, Icon } = STATUS_STYLE[status as SolutionStatus];
+  const label = {
+    accepted: t('lesson.status_accepted', 'Resolt'),
+    partially_rejected: t('lesson.status_partial', 'Parcialment correcte'),
+    fully_rejected: t('lesson.status_rejected', 'Incorrecte'),
+    pending: t('lesson.status_pending', 'Corregint…'),
+    processing: t('lesson.status_pending', 'Corregint…'),
+  }[status as SolutionStatus];
+  const details = [
+    submissions ? t('lesson.status_submissions', '{{count}} enviaments', { count: submissions }) : '',
+    lastSubmittedAt ? t('lesson.status_last_submitted', 'Últim: {{date}}', { date: new Date(lastSubmittedAt).toLocaleString(i18n.language) }) : '',
+  ].filter(Boolean).join(' · ');
+  return (
+    <Tooltip title={details ? `${label} · ${details}` : label} arrow>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: compact ? 0.6 : 1, py: 0.3, borderRadius: 999, border: '1px solid', borderColor: alpha(color, 0.6), bgcolor: alpha(color, 0.15), color, flexShrink: 0 }}>
+        <Icon size={13} />
+        {!compact && <Typography sx={{ fontSize: 10.5, fontWeight: 800, lineHeight: 1.2, whiteSpace: 'nowrap' }}>{label}</Typography>}
+      </Box>
+    </Tooltip>
+  );
+}
+
 // El servidor NO corregeix les activitats: una resposta 2xx vol dir "rebut".
 // Només es considera rebutjada si el servidor ho diu explícitament.
 function isRejectedResult(r: any): boolean {
@@ -164,6 +201,11 @@ export default function LessonPage() {
   const { data: course, isLoading: loading } = useCourse(courseId);
   const [currentUser] = useState<Student | null>(() => {const saved = localStorage.getItem('currentStudent'); return saved ? JSON.parse(saved) : null;  });
   const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
+  // Resultat de l'últim enviament d'aquesta visita (fins que el detail del servidor es refresca)
+  const [submittedStatus, setSubmittedStatus] = useState<{ status: string; submission_count?: number } | null>(null);
+  const queryClient = useQueryClient();
+  // Qui s'està executant a la consola: el codi de l'editor, la solució o la d'un company
+  const [runSource, setRunSource] = useState<string>('editor');
   // Botó "Executar": Python real (Pyodide); input() es respon a la consola
   const { isRunning, inputActive, run: runPythonCode, stop: stopPythonCode, submitInput } = usePythonRun(setConsoleOutput, `${courseId}/${lessonId}`);
   const [status, setStatus] = useState<'idle' | 'pass' | 'fail'>('idle');
@@ -285,7 +327,9 @@ export default function LessonPage() {
     course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId))?.id ?? '';
   // L'estructura del curs no porta enunciats: el problema obert es demana a part (1 petició).
   // Els tests no cal: es redirigeixen a TopicTestPage.
-  const needsDetail = !!outlineProblem && outlineProblem.text === undefined && outlineProblem.type !== 'test';
+  // Els problemes de codi es demanen sempre sencers: el detall porta l'estat propi (`my_solution`)
+  // i la solució de referència quan l'alumne ja la pot veure.
+  const needsDetail = !!outlineProblem && outlineProblem.type !== 'test';
   const { data: problemDetail } = useQuery({
     ...problemDetailQuery(courseId!, currentTopicSlug, lessonId!),
     enabled: needsDetail && !!currentTopicSlug,
@@ -294,6 +338,17 @@ export default function LessonPage() {
     if (!outlineProblem || !needsDetail) return outlineProblem;
     return problemDetail ? { ...outlineProblem, ...problemDetail } : undefined;
   }, [outlineProblem, needsDetail, problemDetail]);
+  // Estat de la solució (del servidor) i què es pot veure: la solució de referència arriba
+  // només quan el servidor la deixa veure (resolt, o tema tancat; mai en exàmens), i les
+  // dels companys amb la mateixa condició.
+  const mySolution = currentProblem?.mySolution;
+  const solutionStatus: string | null = submittedStatus?.status ?? mySolution?.status ?? null;
+  const solved = solutionStatus === 'accepted';
+  const referenceSolution: string | null = currentProblem?.systemSolution ?? null;
+  const solutionUnlocked = !!referenceSolution;
+  const peersUnlocked = solved || solutionUnlocked;
+  const submissionCount: number | undefined = submittedStatus?.submission_count ?? mySolution?.submission_count;
+
   // Enviar: el servidor decideix si la solució és correcta; aquí només cal que hi hagi codi
   const canSubmit = userInput.trim().length > 0 && !isRunning;
   // Enunciat en Markdown, en l'idioma de l'alumne
@@ -378,7 +433,6 @@ export default function LessonPage() {
   const codeStorageKey = currentUser ? `code_${currentUser.id}_${courseId}_${lessonId}` : `temp_code_${lessonId}`;
   const getGlobalProgressKey = () => `${courseId}_${lessonId}`;
   const [activeTab, setActiveTab] = useState(0);
-  const [unlocked, setUnlocked] = useState(false);
   const [submissionsRefreshKey, setSubmissionsRefreshKey] = useState(0);
   const [peerSolutions, setPeerSolutions] = useState<any[]>([]);
   const [loadingPeers, setLoadingPeers] = useState(false);
@@ -463,9 +517,11 @@ export default function LessonPage() {
       if (isPass) setStatus('pass'); else setStatus('idle');
       setConsoleOutput([]); setIsDirty(false); setWasSavedInSession(false); setShowResultModal(false); setBackHidden(false);
       setActiveTab(0);
-      setUnlocked(false);
+      setSubmittedStatus(null);
     }
-  }, [currentUser, courseId, lessonId, currentProblem]);
+    // Només en obrir un problema (o quan n'arriben les dades per primer cop): si el detall es
+    // torna a demanar (p. ex. després d'enviar), no s'ha d'esborrar el codi ni la consola.
+  }, [currentUser?.id, courseId, lessonId, !!currentProblem]);
 
   // Sense esborrany local de Python (un altre dispositiu, o s'ha sortit de la sessió, que l'esborra):
   // es recupera la còpia de seguretat del servidor, si l'alumne encara no ha tocat l'editor.
@@ -493,7 +549,7 @@ export default function LessonPage() {
     if (disposedLessonKeyRef.current && disposedLessonKeyRef.current !== key) {
       const m = monacoInstanceRef.current;
       if (m) {
-        ([PYTHON_FILE, REACT_FILE] as const).forEach((file) => {
+        ([PYTHON_FILE, REACT_FILE, 'teacher.py', 'student.py', 'm-teacher.py', 'm-student.py'] as const).forEach((file) => {
           const uri = m.Uri.parse(`${LESSON_URI_PREFIX}/${disposedLessonKeyRef.current}/${file}`);
           m.editor.getModel(uri)?.dispose();
         });
@@ -560,6 +616,29 @@ export default function LessonPage() {
     finally { setIsSaving(false); }
   };
 
+  // Missatges de consola per al resultat d'un enviament: estat i proves que han fallat
+  const describeSubmission = (result: any, passed: boolean): ConsoleLine[] => {
+    const lines: ConsoleLine[] = [];
+    const tests: any[] = Array.isArray(result?.test_results) ? result.test_results : [];
+    if (result?.feedback) lines.push(String(result.feedback));
+    if (result?.code_error) lines.push({ kind: 'stderr', text: String(result.code_error) });
+    if (tests.length) {
+      const ok = tests.filter((r) => r.passed).length;
+      lines.push(`${ok === tests.length ? '✅' : '❌'} ${t('lesson.checks_summary', 'Proves superades: {{passed}} de {{total}}', { passed: ok, total: tests.length })}`);
+      tests.filter((r) => !r.passed).slice(0, 5).forEach((r) => {
+        lines.push({ kind: 'stderr', text: t('lesson.check_failed', 'Prova {{n}} fallada', { n: r.order ?? '?' }) });
+        if (r.input) lines.push({ kind: 'info', text: `${t('lesson.check_input', 'Entrada')}: ${r.input}` });
+        if (r.expected != null) lines.push({ kind: 'info', text: `${t('lesson.check_expected', 'Esperat')}: ${r.expected}` });
+        if (r.actual != null) lines.push({ kind: 'info', text: `${t('lesson.check_actual', 'Obtingut')}: ${r.actual}` });
+        if (r.error) lines.push({ kind: 'stderr', text: String(r.error) });
+      });
+    }
+    if (passed) lines.push(`✅ ${t('lesson.status_accepted_long', 'Problema resolt! Ja pots veure la solució i les dels companys.')}`);
+    else if (result?.status === 'partially_rejected') lines.push(`❌ ${t('lesson.status_partial_long', "Gairebé: algunes proves no passen. Revisa-les i torna-ho a enviar.")}`);
+    else if (result?.status === 'fully_rejected') lines.push(`❌ ${t('lesson.status_rejected_long', 'La solució no és correcta. Revisa-la i torna-ho a enviar.')}`);
+    return lines;
+  };
+
   const handleRunTests = async () => {
     if (currentProblem?.type === 'test') {
       navigate(testPath(lessonId!), { replace: true });
@@ -570,11 +649,24 @@ export default function LessonPage() {
     try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, `📤 ${t('lesson.sending', 'Enviant al servidor...')}`]);
       const result = await courseService.submitChallenge(courseId!,topic.id,lessonId!,{code: userInputRef.current, language: selectedLanguage });
       setConsoleOutput(p => [...p, `✅ ${t('lesson.submitted', 'Resposta enviada al servidor')}`]);
-      const passed = !isRejectedResult(result);
+      // El servidor corregeix: `accepted` vol dir que passa totes les proves
+      const passed = result?.status ? result.status === 'accepted' : !isRejectedResult(result);
       console.debug('[Enviar] resposta del servidor', result, { passed });
-      const msg = result?.feedback || (passed ? `✅ ${t('lesson.completed', 'COMPLETAT!').trim()}` : null);
-      if (msg) setConsoleOutput(p => [...p, msg]);
-      setUnlocked(true);
+      setConsoleOutput(p => [...p, ...describeSubmission(result, passed)]);
+      if (result?.status) setSubmittedStatus({ status: result.status, submission_count: result.submission_count });
+      // Detall i llista del curs al dia: estat propi i, si s'ha resolt, la solució de referència
+      void queryClient.invalidateQueries({ queryKey: ['problem', courseId, currentTopicSlug, lessonId] });
+      if (result?.status) {
+        queryClient.setQueryData(['course', courseId], (old: any) => old && ({
+          ...old,
+          content: (old.content || []).map((tp: any) => ({
+            ...tp,
+            subTopics: (tp.subTopics || []).map((st: any) => (st.problemSlug === lessonId
+              ? { ...st, mySolution: { ...(st.mySolution || {}), status: result.status, submission_count: result.submission_count, last_submitted_at: new Date().toISOString() } }
+              : st)),
+          })),
+        }));
+      }
       // Només es marca com a completada (i suma punts) si el servidor l'ha donat per correcta
       await handleSaveProgress(passed);
       if (passed) {setStatus('pass'); confetti({ particleCount: 80, spread: 70, origin: { y: 0.7 } });
@@ -624,8 +716,18 @@ export default function LessonPage() {
     if (isRunning) { stopPythonCode(); return; }
     if (selectedLanguage !== 'python' || !userInputRef.current.trim()) return;
     setStatus('idle');
+    setRunSource('editor');
     void runPythonCode(userInputRef.current);
   };
+
+  // Executa a la consola la solució de referència o la d'un company (com a algorien)
+  const runOtherCode = (source: string, code: string) => {
+    if (isRunning) { stopPythonCode(); if (runSource === source) return; }
+    setRunSource(source);
+    void runPythonCode(code);
+  };
+  const runLabel = t('lesson.run_button', 'Executar');
+  const stopLabel = t('lesson.stop_button', 'Atura');
 
   const loadPeerSolutions = async () => {
     if (!courseId || !lessonId || !course) return;
@@ -641,7 +743,7 @@ export default function LessonPage() {
     } finally {setLoadingPeers(false);}
   };
 
-  useEffect(() => {if (activeTab === 2 && unlocked) {loadPeerSolutions();}}, [activeTab, unlocked, courseId, lessonId]);
+  useEffect(() => {if (activeTab === 2 && peersUnlocked) {loadPeerSolutions();}}, [activeTab, peersUnlocked, courseId, lessonId]);
 
   if (loading) return <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999 }}><CircularProgress color="secondary" /></Box>;
   if (!course) return null;
@@ -685,19 +787,23 @@ export default function LessonPage() {
             )}
           </Box>
           {/* SOLUCIÓ DEL PROFESSOR (MÒBIL) */}
-          {activeTab === 1 && unlocked && monaco && (
+          {activeTab === 1 && solutionUnlocked && monaco && (
             <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: '#1e1e1e', p: 1.5 }}>
               <Typography sx={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', mb: 1, color: '#c084fc' }}>
                 {t('lesson.teacher_solution_title', 'professor')}
               </Typography>
-              {currentProblem?.teacherSolution ? (
+              {referenceSolution ? (
                 <>
                   <Box sx={{ border: '1px solid #333', borderRadius: 1, overflow: 'hidden', mb: 1.5 }}>
                     <DiffEditor
-                      original={currentProblem.teacherSolution}
+                      original={referenceSolution}
                       modified={codeByLang.python}
                       originalModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/m-teacher.py`}
                       modifiedModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/m-student.py`}
+                      // Els models es disposen en canviar de problema (vegeu més amunt): si els disposés el
+                      // component en desmuntar-se, Monaco falla ("TextModel got disposed before DiffEditorWidget...")
+                      keepCurrentOriginalModel
+                      keepCurrentModifiedModel
                       language="python"
                       theme={getMonacoEditorTheme(mode)}
                       height="240px"
@@ -708,7 +814,7 @@ export default function LessonPage() {
                     {t('lesson.teacher_solution_full', 'Solució completa')}
                   </Typography>
                   <Typography sx={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'pre-wrap', color: '#ddd' }}>
-                    {currentProblem.teacherSolution}
+                    {referenceSolution}
                   </Typography>
                 </>
               ) : (
@@ -719,11 +825,12 @@ export default function LessonPage() {
             </Box>
           )}
 
-          <Box sx={{ display: activeTab === 1 && unlocked ? 'none' : 'flex', flexDirection: 'column', flex: 1, bgcolor: '#1e1e1e', overflow: 'hidden' }}>
+          <Box sx={{ display: activeTab === 1 && solutionUnlocked ? 'none' : 'flex', flexDirection: 'column', flex: 1, bgcolor: '#1e1e1e', overflow: 'hidden' }}>
             <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
               <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
+                <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact />
                 <EditorDiagnosticsBadge markers={diagnostics} />
                 {isReactCourse && (
                   <Tooltip title={liveRenderTooltip} arrow>
@@ -757,7 +864,7 @@ export default function LessonPage() {
           </Box>
 
           {/* VISUALITZACIÓ EN TEMPS REAL (MÒBIL) */}
-          {isReactCourse && showLiveRender && !(activeTab === 1 && unlocked) && (
+          {isReactCourse && showLiveRender && !(activeTab === 1 && solutionUnlocked) && (
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
               <Box sx={{ height: 30, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
                 <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.live_render', 'Visualització')}</Typography>
@@ -821,8 +928,8 @@ export default function LessonPage() {
         <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
           <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
-            <Tab label={t('lesson.tab_teacher_solution', 'Professor')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
-            <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!unlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
+            <Tab label={t('lesson.tab_teacher_solution', 'Solució')} icon={!solutionUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
+            <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!peersUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_ai_help', 'IA')} icon={<Sparkles size={tabIconSize} />} iconPosition="end" />
           </Tabs>
 
@@ -841,68 +948,77 @@ export default function LessonPage() {
             )}
 
             {activeTab === 1 && (
-              monaco && unlocked ? (
-                <Box sx={{ p: 2 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1.5, color: 'primary.main' }}>
-                    {t('lesson.teacher_solution_title', 'Solució del professor')}
-                  </Typography>
-                  {currentProblem?.teacherSolution ? (
-                    <>
+              solutionUnlocked && referenceSolution ? (
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <CodeBlock
+                    code={referenceSolution}
+                    header={t('lesson.teacher_solution_title', 'Solució de referència')}
+                    onRun={() => runOtherCode('solution', referenceSolution)}
+                    running={isRunning && runSource === 'solution'}
+                    runLabel={runLabel}
+                    stopLabel={stopLabel}
+                  />
+                  {monaco && codeByLang.python.trim() && (
+                    <Box>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1, color: 'primary.main' }}>
+                        {t('lesson.compare_with_mine', 'Compara-la amb el teu codi')}
+                      </Typography>
                       <Typography sx={{ fontSize: '0.7rem', mb: 1, color: 'text.secondary' }}>
                         {t('lesson.diff_hint', "Compara la teva solució (dreta) amb la del professor (esquerra).")}
                       </Typography>
-                      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', mb: 2 }}>
+                      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
                         <DiffEditor
-                          original={currentProblem.teacherSolution}
+                          original={referenceSolution}
                           modified={codeByLang.python}
                           originalModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/teacher.py`}
                           modifiedModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/student.py`}
+                          // Els models es disposen en canviar de problema (vegeu més amunt): si els disposés el
+                          // component en desmuntar-se, Monaco falla ("TextModel got disposed before DiffEditorWidget...")
+                          keepCurrentOriginalModel
+                          keepCurrentModifiedModel
                           language="python"
                           theme={getMonacoEditorTheme(mode)}
                           height="320px"
                           options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, automaticLayout: true, renderSideBySide: true, scrollBeyondLastLine: false }}
                         />
                       </Box>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1, color: 'primary.main' }}>
-                        {t('lesson.teacher_solution_full', 'Solució completa')}
-                      </Typography>
-                      <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
-                        {currentProblem.teacherSolution}
-                      </Typography>
-                    </>
-                  ) : (
-                    <Typography sx={{ fontFamily: 'monospace', fontSize: '0.85rem', whiteSpace: 'pre-wrap' }}>
-                      {t('lesson.no_solution_available', 'No hi ha solució disponible per aquest exercici.')}
-                    </Typography>
+                    </Box>
                   )}
                 </Box>
               ) : (<LockedTabMessage text={t('lesson.locked_teacher_solution', "Completa l'exercici correctament per desbloquejar la solució del professor.")} />)
             )}
 
             {activeTab === 2 && (
-              unlocked ? (
-                <Box sx={{ p: 2 }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1.5, color: 'primary.main' }}>
-                    {t('lesson.other_solutions_title', 'Estudiants')}
+              peersUnlocked ? (
+                <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', color: 'primary.main' }}>
+                    {t('lesson.other_solutions_title', 'Solucions dels companys')}
                   </Typography>
-                  {loadingPeers ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>) 
+                  {loadingPeers ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>)
                   : peerSolutions.length === 0 ? (
                     <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary' }}>
                       {t('lesson.no_other_solutions', 'No hi ha solucions d\'estudiants.')}
                     </Typography>
                   ) : (
-                    peerSolutions.map((s: any, i: number) => (
-                      <Box key={i} sx={{ mb: 1.5, p: 1.5, borderRadius: 1, bgcolor: s.passed ? alpha(theme.palette.success.main, 0.06) : alpha(theme.palette.warning.main, 0.06), border: '1px solid', borderColor: s.passed ? alpha(theme.palette.success.main, 0.3) : alpha(theme.palette.warning.main, 0.3) }}>
-                        <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, mb: 0.5 }}>
-                          {s.passed ? '✅' : '📝'} {s.user?.name || s.username || s.studentName || s.student_email || t('lesson.student_fallback', 'Estudiant')}
-                        </Typography>
-                        {(s.code || s.content || s.source_code) && (
-                          <Typography sx={{ fontFamily: 'monospace', fontSize: '0.75rem', whiteSpace: 'pre-wrap', color: 'text.secondary' }}>
-                            {s.code || s.content || s.source_code}
-                          </Typography>
-                        )}
-                      </Box>
-                    ))
+                    peerSolutions.map((s: any, i: number) => {
+                      // Als alumnes, el servidor les envia anònimes (anonymous_N); el professorat hi veu el nom
+                      const anonymous = typeof s.username === 'string' && s.username.startsWith('anonymous_');
+                      const name = anonymous
+                        ? t('lesson.anonymous_n', 'Anònim {{n}}', { n: i + 1 })
+                        : [s.first_name, s.last_name].filter(Boolean).join(' ') || s.username || t('lesson.student_fallback', 'Estudiant');
+                      const code = s.code || '';
+                      return (
+                        <CodeBlock
+                          key={s.id ?? i}
+                          code={code}
+                          header={name}
+                          onRun={code ? () => runOtherCode(`peer-${i}`, code) : undefined}
+                          running={isRunning && runSource === `peer-${i}`}
+                          runLabel={runLabel}
+                          stopLabel={stopLabel}
+                        />
+                      );
+                    })
                   )}
                 </Box>
               ) : (<LockedTabMessage text={t('lesson.locked_other_solutions', "Completa l'exercici correctament per veure les solucions d'altres estudiants.")} />)
@@ -940,6 +1056,7 @@ export default function LessonPage() {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 2, minWidth: 0, overflow: 'hidden' }}>
                 {!compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
+                <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact={compactHeader} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
               </Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
