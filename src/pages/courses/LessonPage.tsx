@@ -10,6 +10,9 @@ import { ReactLivePreview } from '../../components/ReactLivePreview';
 import { ConsolePanel, type ConsoleLine } from '../../components/ConsolePanel';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CodeBlock } from '../../components/CodeBlock';
+import { EditorToolbar, type CodeVersion } from '../../components/EditorToolbar';
+import { ShortcutsDialog } from '../../components/ShortcutsDialog';
+import { useAiHints } from '../../hooks/useAiHints';
 import { ResizeHandle } from '../../components/ResizeHandle';
 import { preloadPython } from '../../services/pythonRunner';
 import { usePythonRun } from '../../hooks/usePythonRun';
@@ -166,8 +169,19 @@ const readStatementWidth = () => {
     return v >= STATEMENT_MIN_PCT && v <= STATEMENT_MAX_PCT ? v : STATEMENT_DEFAULT_PCT;
   } catch { return STATEMENT_DEFAULT_PCT; }
 };
+// Mida de la lletra de l'editor (botons de zoom), es recorda
+const FONT_SIZE_KEY = 'mooc_editor_font_size';
+const FONT_SIZE_DEFAULT = 18;
+const FONT_SIZE_MIN = 10;
+const FONT_SIZE_MAX = 32;
+const readFontSize = () => {
+  try { const v = Number(localStorage.getItem(FONT_SIZE_KEY)); return v >= FONT_SIZE_MIN && v <= FONT_SIZE_MAX ? v : FONT_SIZE_DEFAULT; } catch { return FONT_SIZE_DEFAULT; }
+};
+// Python Tutor (pythontutor.com): visualitza l'execució pas a pas, com a algorien
+const pythonTutorUrl = (code: string) =>
+  `https://pythontutor.com/visualize.html#code=${encodeURIComponent(code)}&mode=display&cumulative=false&py=3&curInstr=0`;
 // Per sota d'aquesta amplada, els botons de l'editor es mostren només amb la icona
-const COMPACT_EDITOR_HEADER_PX = 640;
+const COMPACT_EDITOR_HEADER_PX = 780;
 
 // === Estat de la solució de l'alumne (el corregeix el servidor) ===
 type SolutionStatus = 'accepted' | 'partially_rejected' | 'fully_rejected' | 'pending' | 'processing';
@@ -233,6 +247,11 @@ export default function LessonPage() {
   const queryClient = useQueryClient();
   // Qui s'està executant a la consola: el codi de l'editor, la solució o la d'un company
   const [runSource, setRunSource] = useState<string>('editor');
+  const [editorFontSize, setEditorFontSize] = useState(readFontSize);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [activeVersion, setActiveVersion] = useState<CodeVersion['id'] | null>(null);
+  // Shift+Enter executa el codi: el comandament de Monaco es registra un cop i crida la versió actual
+  const runShortcutRef = useRef<() => void>(() => {});
   // Botó "Executar": Python real (Pyodide); input() es respon a la consola
   const { isRunning, inputActive, run: runPythonCode, stop: stopPythonCode, submitInput } = usePythonRun(setConsoleOutput, `${courseId}/${lessonId}`);
   const [status, setStatus] = useState<'idle' | 'pass' | 'fail'>('idle');
@@ -317,6 +336,15 @@ export default function LessonPage() {
     // Manté l'estat de vista actualitzat per poder-lo desar/restaurar
     editor.onDidChangeCursorPosition(() => { viewStateRef.current[selectedLanguageRef.current] = editor.saveViewState(); });
     editor.onDidScrollChange(() => { viewStateRef.current[selectedLanguageRef.current] = editor.saveViewState(); });
+    // Shift+Enter executa el codi (com a algorien). No s'activa amb la llista de suggeriments
+    // oberta, on Shift+Enter ja vol dir "accepta el suggeriment alternatiu".
+    editor.addAction({
+      id: 'mooc.runPython',
+      label: 'Run',
+      keybindings: [mn.KeyMod.Shift | mn.KeyCode.Enter],
+      keybindingContext: 'editorTextFocus && !suggestWidgetVisible',
+      run: () => runShortcutRef.current(),
+    });
     editor.focus();
   };
 
@@ -385,6 +413,9 @@ export default function LessonPage() {
   const solutionUnlocked = !!referenceSolution;
   const peersUnlocked = solved || solutionUnlocked;
   const submissionCount: number | undefined = submittedStatus?.submission_count ?? mySolution?.submission_count;
+
+  // Pistes d'IA: es mostren a la pestanya IA (com a algorien)
+  const aiHints = useAiHints(courseId, currentTopicSlug, lessonId);
 
   // Enviar: el servidor decideix si la solució és correcta; aquí només cal que hi hagi codi
   const canSubmit = userInput.trim().length > 0 && !isRunning;
@@ -558,6 +589,7 @@ export default function LessonPage() {
       setConsoleOutput([]); setIsDirty(false); setWasSavedInSession(false); setShowResultModal(false); setBackHidden(false);
       setActiveTab(0);
       setSubmittedStatus(null);
+      setActiveVersion(null);
     }
     // Només en obrir un problema (o quan n'arriben les dades per primer cop): si el detall es
     // torna a demanar (p. ex. després d'enviar), no s'ha d'esborrar el codi ni la consola.
@@ -625,6 +657,7 @@ export default function LessonPage() {
       const globalProgress = JSON.parse(localStorage.getItem(progressKey) || '{}');
       const key = getGlobalProgressKey();
       localStorage.setItem(codeStorageKey, JSON.stringify(codeStorageRef.current));
+      localStorage.setItem(`${codeStorageKey}_ts`, String(Date.now()));
       // El codi Python també es desa al servidor: és el que queda en sortir de la sessió
       // (l'esborrany local s'esborra) i el que es veu des d'un altre dispositiu.
       const python = codeStorageRef.current.python;
@@ -766,6 +799,64 @@ export default function LessonPage() {
     setRunSource(source);
     void runPythonCode(code);
   };
+  runShortcutRef.current = () => {
+    if (selectedLanguage !== 'python' || !userInputRef.current.trim()) return;
+    setStatus('idle');
+    setRunSource('editor');
+    void runPythonCode(userInputRef.current); // si n'hi havia un en marxa, s'atura i es torna a executar
+  };
+
+  // === Eines de l'editor ===
+  const requestAiHint = () => {
+    setActiveTab(3);
+    void aiHints.generate(userInputRef.current, t('lesson.hint_error', "No s'ha pogut obtenir la pista. Torna-ho a provar."));
+  };
+  const openPythonTutor = () => { window.open(pythonTutorUrl(userInputRef.current), '_blank', 'noopener'); };
+  const zoomEditor = (delta: number) => setEditorFontSize((prev) => {
+    const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, prev + delta));
+    try { localStorage.setItem(FONT_SIZE_KEY, String(next)); } catch { /* sense emmagatzematge */ }
+    return next;
+  });
+  const editorOptions = (minimap: boolean) => ({ ...getMonacoEditorOptions(minimap), fontSize: editorFontSize, lineHeight: Math.round(editorFontSize * 4 / 3) });
+  // Versions del codi que es poden recuperar (com el selector d'algorien)
+  const loadVersions = async (): Promise<CodeVersion[]> => {
+    let local: CodeVersion = { id: 'local', code: null };
+    try {
+      const raw = localStorage.getItem(codeStorageKey);
+      const parsed = raw ? JSON.parse(raw) : null;
+      const code = typeof parsed === 'string' ? parsed : parsed?.python;
+      const ts = Number(localStorage.getItem(`${codeStorageKey}_ts`));
+      local = { id: 'local', code: code || null, at: ts ? new Date(ts).toISOString() : null };
+    } catch { /* esborrany il·legible */ }
+    const slug = resolveSlug(courseId!);
+    const [backup, submitted] = currentUser && currentTopicSlug
+      ? await Promise.all([
+        courseService.getCodeBackupVersion(slug, currentTopicSlug, lessonId!).catch(() => null),
+        courseService.getOwnSubmission(slug, currentTopicSlug, lessonId!).catch(() => null),
+      ])
+      : [null, null];
+    return [
+      local,
+      { id: 'backup', code: backup?.code || null, at: backup?.at },
+      { id: 'submitted', code: submitted?.code || null, at: submitted?.last_submitted_at },
+      { id: 'starter', code: currentProblem?.precode || null },
+    ];
+  };
+  // Es substitueix el contingut com una edició: Ctrl+Z la desfà
+  const pickVersion = (v: CodeVersion) => {
+    const editor = editorRef.current;
+    if (v.code == null) return;
+    const model = editor?.getModel();
+    if (editor && model) {
+      editor.pushUndoStop();
+      editor.executeEdits('version-picker', [{ range: model.getFullModelRange(), text: v.code }]);
+      editor.pushUndoStop();
+      editor.focus();
+    } else {
+      setCodeByLang((prev) => ({ ...prev, python: v.code! }));
+    }
+    setActiveVersion(v.id);
+  };
   const runLabel = t('lesson.run_button', 'Executar');
   const stopLabel = t('lesson.stop_button', 'Atura');
 
@@ -878,7 +969,7 @@ export default function LessonPage() {
                     onMount={handleEditorMount}
                     onValidate={handleValidate}
                       onChange={(value: string | undefined) => { setCodeByLang(prev => ({ ...prev, [selectedLanguage]: value || '' })); setIsDirty(true); setWasSavedInSession(false); if (!value || value.trim().length === 0) setConsoleOutput([]); }}
-                    options={getMonacoEditorOptions(false)}
+                    options={editorOptions(false)}
                   />
                 </Box>
               ) : (
@@ -1027,7 +1118,12 @@ export default function LessonPage() {
                 <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 2, color: 'primary.main' }}>
                   {t('lesson.tab_ai_help', 'IA')}
                 </Typography>
-                <AiHelpPanel courseId={courseId!} topicSlug={currentTopicSlug} lessonId={lessonId!} />
+                <AiHelpPanel
+                  courseId={courseId!} topicSlug={currentTopicSlug} lessonId={lessonId!}
+                  hints={aiHints.hints} loadingHints={aiHints.loadingList} generating={aiHints.generating}
+                  hintError={aiHints.error} remaining={aiHints.remaining}
+                  onLoadHints={aiHints.load} onRequestHint={requestAiHint}
+                />
               </Box>
             )}
           </Box>
@@ -1050,48 +1146,63 @@ export default function LessonPage() {
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* SECCIÓ SUPERIOR: SPLIT DE CODI I VISUALITZACIÓ EN DIRECTE */}
            {/* Capçalera: cobreix l'editor i la visualització */}
             <Box sx={{ height: 60, px: compactHeader ? 1 : 2, gap: 1, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
-              {/* Els botons de la dreta no s'encongeixen mai: si falta espai, cedeix aquesta part */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 2, minWidth: 0, overflow: 'hidden' }}>
+              {/* Esquerra: llenguatge i estat, i a continuació Executar i Enviar */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 1.5, minWidth: 0 }}>
                 {isReactCourse && !compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact={compactHeader} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-              </Box>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
-                <Tooltip title={resetTooltip} arrow>
-                  <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: '1px solid #444', borderRadius: 1, width: 32, height: 32, '&:hover': { bgcolor: '#333' } }}>
-                    <RotateCcw size={16} color="red"/>
-                  </IconButton>
-                </Tooltip>
-                {selectedLanguage === 'python' && (
-                  <Tooltip title={testTooltip} arrow>
-                    {compactHeader ? (
-                      <IconButton onClick={handleLocalRun} aria-label={testTooltip} sx={{ border: '1px solid', borderColor: isRunning ? '#f87171' : '#666', borderRadius: 1, width: 32, height: 32, color: '#fff', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                        {isRunning ? <Square size={12} fill="#fff"/> : <Play size={14} fill="#fff"/>}
-                      </IconButton>
-                    ) : (
-                      <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                        {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
-                      </Button>
-                    )}
+                <Box sx={{ width: '1px', height: 22, bgcolor: '#3f3f46', mx: compactHeader ? 0.25 : 0.75, flexShrink: 0 }} />
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
+                  {selectedLanguage === 'python' && (
+                    <Tooltip title={`${testTooltip} (Shift+Enter)`} arrow>
+                      {compactHeader ? (
+                        <IconButton onClick={handleLocalRun} aria-label={testTooltip} sx={{ border: '1px solid', borderColor: isRunning ? '#f87171' : '#666', borderRadius: 1, width: 32, height: 32, color: '#fff', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                          {isRunning ? <Square size={12} fill="#fff"/> : <Play size={14} fill="#fff"/>}
+                        </IconButton>
+                      ) : (
+                        <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                          {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
+                        </Button>
+                      )}
+                    </Tooltip>
+                  )}
+                  <Tooltip title={submitTooltip} arrow>
+                    {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
+                    <Box component="span" sx={{ display: 'inline-flex' }}>
+                      {compactHeader ? (
+                        <IconButton onClick={handleRunTests} disabled={!canSubmit} aria-label={submitTooltip} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', width: 40, height: 32, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
+                          <CloudUpload size={17}/>
+                        </IconButton>
+                      ) : (
+                        <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#e0e0e0' } }}>
+                          {t('lesson.run', 'Enviar')}
+                        </Button>
+                      )}
+                    </Box>
                   </Tooltip>
-                )}
-                <Tooltip title={submitTooltip} arrow>
-                  {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
-                  <Box component="span" sx={{ display: 'inline-flex' }}>
-                    {compactHeader ? (
-                      <IconButton onClick={handleRunTests} disabled={!canSubmit} aria-label={submitTooltip} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', width: 40, height: 32, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
-                        <CloudUpload size={17}/>
-                      </IconButton>
-                    ) : (
-                      <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#e0e0e0' } }}>
-                        {t('lesson.run', 'Enviar')}
-                      </Button>
-                    )}
-                  </Box>
-                </Tooltip>
-              </Stack>
+                </Stack>
+              </Box>
+              {/* Dreta: eines de l'editor (com a algorien) */}
+              {selectedLanguage === 'python' && (
+                <Box sx={{ flexShrink: 0 }}>
+                  <EditorToolbar
+                    compact={compactHeader}
+                    onAiHint={requestAiHint}
+                    aiBusy={aiHints.generating}
+                    hintsRemaining={aiHints.remaining}
+                    onPythonTutor={openPythonTutor}
+                    onShortcuts={() => setShortcutsOpen(true)}
+                    loadVersions={loadVersions}
+                    activeVersion={activeVersion}
+                    onPickVersion={pickVersion}
+                    onZoomIn={() => zoomEditor(2)}
+                    onZoomOut={() => zoomEditor(-2)}
+                  />
+                </Box>
+              )}
             </Box>
+            <ShortcutsDialog open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
               {/* L'Editor de Codi */}
@@ -1107,7 +1218,7 @@ export default function LessonPage() {
                       onMount={handleEditorMount}
                       onValidate={handleValidate}
                       onChange={(value: string | undefined) => { setCodeByLang(prev => ({ ...prev, [selectedLanguage]: value || '' })); setIsDirty(true); setWasSavedInSession(false); if (!value || value.trim().length === 0) setConsoleOutput([]); }}
-                      options={getMonacoEditorOptions(true)}
+                      options={editorOptions(true)}
                     />
                   </Box>
                 ) : (

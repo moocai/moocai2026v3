@@ -159,6 +159,29 @@ export const courseService = {
     return data;
   },
 
+  /** Còpia de seguretat del servidor amb la data; `null` si no n'hi ha. */
+  async getCodeBackupVersion(courseSlug: string, topicSlug: string, problemSlug: string): Promise<{ code: string; at: string | null } | null> {
+    try {
+      const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/backup/`);
+      return typeof data?.code === 'string' ? { code: data.code, at: data.last_submitted_at ?? null } : null;
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  },
+
+  /** Pistes d'IA que l'usuari ja ha demanat en aquest problema (la més recent primer). */
+  async getHints(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/hints/`);
+    return Array.isArray(data) ? data : (data?.results || []);
+  },
+
+  /** Demana una pista d'IA nova per al codi actual (consumeix una de les diàries). */
+  async createHint(courseSlug: string, topicSlug: string, problemSlug: string, code: string): Promise<any> {
+    const { data } = await apiClient.post(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/hints/`, { code });
+    return data;
+  },
+
   /** La submissió pròpia d'un problema de codi (estat, codi...); `null` si encara no n'hi ha. */
   async getOwnSubmission(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any | null> {
     try {
