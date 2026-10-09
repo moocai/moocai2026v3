@@ -357,7 +357,7 @@ export default {
     tab_other_solutions: "Alumnes",
     tab_ai_help: "IA",
     teacher_solution_title: "Solució de referència",
-    loading_problem: "Carregant el problema...",
+    loading_problem: "Carregant problema...",
     live_render: "Visualització",
     student_fallback: "Estudiant",
     console: "Consola",

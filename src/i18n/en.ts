@@ -359,7 +359,7 @@ export default {
     tab_other_solutions: "Students",
     tab_ai_help: "AI",
     teacher_solution_title: "Reference solution",
-    loading_problem: "Loading the problem...",
+    loading_problem: "Loading problem...",
     live_render: "Preview",
     student_fallback: "Student",
     console: "Console",

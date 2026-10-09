@@ -54,9 +54,24 @@ const REACT_FILE = 'React.tsx';
 const LESSON_URI_PREFIX = 'file:///lesson';
 
 function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: Partial<Record<EditorLang, EditorFileInfo>>; onChange: (v: EditorLang) => void }) {
+  const langs = Object.keys(files) as EditorLang[];
+  // Un sol fitxer (p. ex. un curs de Python): només informa del llenguatge, no és clicable
+  if (langs.length === 1) {
+    return (
+      <Box
+        sx={{
+          userSelect: 'none', px: 1, py: 0.3, borderRadius: 0.8, fontSize: 10.5, fontWeight: 700,
+          lineHeight: 1.4, whiteSpace: 'nowrap', fontFamily: "'Fira Code', 'Consolas', monospace",
+          color: '#c4b5fd', border: '1px solid #3f3f46', bgcolor: 'transparent',
+        }}
+      >
+        {files[langs[0]]!.label}
+      </Box>
+    );
+  }
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-      {(Object.keys(files) as EditorLang[]).map((lang) => {
+      {langs.map((lang) => {
         const file = files[lang]!;
         const active = value === lang;
         return (
@@ -775,7 +790,7 @@ export default function LessonPage() {
   if (!currentProblem) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999, flexDirection: 'column', gap: 2 }}>
       <CircularProgress color="secondary" />
-      <Typography>{t('lesson.loading_problem', 'Carregant el problema...')}</Typography>
+      <Typography>{t('lesson.loading_problem', 'Carregant problema...')}</Typography>
     </Box>
   );
 
@@ -835,7 +850,8 @@ export default function LessonPage() {
 
           <Box sx={{ display: activeTab === 1 && solutionUnlocked ? 'none' : 'flex', flexDirection: 'column', flex: 1, bgcolor: '#1e1e1e', overflow: 'hidden' }}>
             <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
-              <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 500 }}>{t('lesson.app_file')}</Typography>
+              {/* "Editor" només fa falta per distingir-lo de la visualització (cursos de React) */}
+              {isReactCourse ? <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 500 }}>{t('lesson.app_file')}</Typography> : <Box />}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact />
@@ -1036,7 +1052,7 @@ export default function LessonPage() {
             <Box sx={{ height: 60, px: compactHeader ? 1 : 2, gap: 1, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
               {/* Els botons de la dreta no s'encongeixen mai: si falta espai, cedeix aquesta part */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 2, minWidth: 0, overflow: 'hidden' }}>
-                {!compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
+                {isReactCourse && !compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact={compactHeader} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
