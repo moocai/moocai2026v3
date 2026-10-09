@@ -25,28 +25,10 @@ export default function Students() {
           courseService.getPublicCourses().catch(() => []),
         ]);
 
-        const withDetails = async (course: any) => {
-          try {
-            const detail = await courseService.getFullCourseDetail(course.slug!);
-            const topics = (detail.content || []).map((topic: any) => ({
-              id: topic.id ?? topic.slug,
-              title: topic.title,
-              lessons: (topic.subTopics || []).map((st: any) => ({
-                id: st.problemSlug,
-                title: st.subtitle,
-                type: st.type,
-                choices: st.choices,
-                precode: st.precode,
-              })),
-            }));
-            return { ...course, topics };
-          } catch { return course; }
-        };
-
-        const [assigned, pub] = await Promise.all([
-          Promise.all(assignedFromApi.map(withDetails)),
-          Promise.all(publicFromApi.map(withDetails)),
-        ]);
+        // Només calen les llistes (el selector mostra el títol): abans es baixava
+        // també el detall complet (temes + problemes) de cada curs i no es feia servir.
+        const assigned: any[] = assignedFromApi;
+        const pub: any[] = publicFromApi;
 
         // Combinar cursos asignados y públicos, eliminando duplicados
         const allCourses = [...assigned];

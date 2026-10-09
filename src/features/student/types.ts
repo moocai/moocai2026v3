@@ -36,4 +36,6 @@ export interface Course {
   isPublic?: boolean;
   active?: boolean;
   professors?: string[];
+  /** Rol de l'usuari al curs (`my_role`): 'student' | 'professor' | null. `undefined` si l'API no l'envia. */
+  myRole?: string | null;
 }

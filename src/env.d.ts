@@ -15,3 +15,7 @@ declare module "*?worker" {
   };
   export default workerConstructor;
 }
+/** Carpeta (relativa a la base de l'app) on es serveixen els fitxers de Pyodide. Vegeu vite.config.ts. */
+declare const __PYODIDE_DIR__: string;
+/** Mida en bytes dels fitxers de Pyodide que es descarreguen en carregar-lo (per al progrés). */
+declare const __PYODIDE_SIZES__: Record<string, number>;

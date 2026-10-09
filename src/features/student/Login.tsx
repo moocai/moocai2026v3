@@ -45,11 +45,16 @@ export function Login({
   const [registerLoading, setRegisterLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
 
+  // Les dades del registre (organitzacions, avatar per defecte) només es demanen
+  // quan s'obre el formulari de registre, no en carregar la pantalla de login.
+  const [registrationLoaded, setRegistrationLoaded] = useState(false);
   useEffect(() => {
+    if (view !== 'register' || registrationLoaded) return;
     let cancelled = false;
     loadRegistrationData()
       .then(data => {
         if (cancelled) return;
+        setRegistrationLoaded(true);
         setOrgs(data.organizations ?? []);
         setDefaultAvatar(data.default_avatar ?? '');
         if (data.default_organization_id) {
@@ -62,7 +67,7 @@ export function Login({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [view, registrationLoaded]);
 
   const fieldSx = { '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } };
 

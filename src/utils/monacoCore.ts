@@ -1,6 +1,9 @@
 // Entrada personalitzada de Monaco: inclou l'API de l'editor i totes les
 // contribucions (find, suggest, hover, diff, format...) però NOMÉS els
-// llenguatges i features que fem servir (Python i TypeScript/JSX).
+// llenguatges que fem servir (Python, i el resaltat de TypeScript/JSX).
+// El servei de llenguatge de TypeScript (IntelliSense + worker) és molt gran i
+// només el necessiten els cursos de React: viu a `monacoTypescript.ts` i es
+// carrega a part (`loadMonacoTypescript`).
 // Això redueix molt la mida del bundle respecte d'importar `monaco-editor`
 // sencer, que registra ~90 llenguatges.
 import * as editorApi from 'monaco-editor/editor/editor.api';
@@ -86,9 +89,6 @@ import 'monaco-editor/languages/definitions/python/register';
 import 'monaco-editor/languages/definitions/typescript/register';
 import 'monaco-editor/languages/definitions/javascript/register';
 
-// --- Feature de TypeScript/JSX (IntelliSense + worker) ---
-import * as typescript from 'monaco-editor/languages/features/typescript/register';
-
-// Embolcall: exposem l'API de l'editor juntament amb el namespace de TypeScript,
-// de manera que `monaco.typescript` estigui disponible (com a `monaco-editor` sencer).
-export const monaco = { ...editorApi, typescript } as typeof editorApi & { typescript: typeof typescript };
+// Embolcall mutable: `loadMonacoTypescript` hi afegeix `monaco.typescript`
+// (com a `monaco-editor` sencer) quan un curs de React el necessita.
+export const monaco: typeof editorApi & { typescript?: any } = { ...editorApi };

@@ -37,12 +37,12 @@ El component **ja està implementat** i fa ús real de `@monaco-editor/react` en
 | Estat | Aspecte | Detall |
 |---|---|---|
 | ✅ | **Component `Editor`** | Integrat amb `height="100%"`, `value` controlat i `onChange` (marca el codi com a *dirty*, actua l'autosave i neteja la consola si el codi queda buit). |
-| ✅ | **Selecció de llenguatge** | Unes **pestanyes de fitxer** (`python.py` / `React.tsx`) canvien de llenguatge en temps real. Per Python usa `language="python"` i per React `language="typescript"` amb model `.tsx` (resaltat JSX i tipus de TS reals). |
+| ✅ | **Selecció de llenguatge** | Es mostra només la pestanya del llenguatge del curs (`python.py` o `React.tsx`; si el curs no en diu res, Python). Per Python usa `language="python"` i per React `language="typescript"` amb model `.tsx` (resaltat JSX i tipus de TS reals). |
 | ✅ | **Tema** | Dinàmic: segueix el mode clar/fosc/fancy de l'aplicació (`useThemeMode`) via `getMonacoEditorTheme(mode)`. Els temes propis `mooc-light`, `mooc-dark` i `mooc-fancy` es registren amb `registerMonacoThemes` (`defineTheme`) i hereten la cor porpra `#8400ff`. |
 | ✅ | **Accés a la instància** | L'accés a la instància global es fa amb `loadMonaco()` (carregador propi, diferit i idempotent) en lloc del hook `useMonaco`, que dispararia `loader.init()` abans de la configuració local i cauria a la CDN. |
 | ✅ | **Opcions de l'editor** | `getMonacoEditorOptions(bool)` (a `src/utils/monaco.ts:43`) afegeix: *minimap* (activat/desactivat segons paràmetre), **`fontSize: 18`**, **`lineHeight: 24`**, `automaticLayout: true`, `quickSuggestions`, `suggestOnTriggerCharacters`, `acceptSuggestionOnEnter`, `tabCompletion`, `parameterHints`, `formatOnType` i `formatOnPaste`. |
 | ✅ | **Persistència** | El codi es guarda a `localStorage` (clau per usuari/lloc) com a objecte per fitxer i es recupera en carregar la lliçó (amb migració del format antic). També es desa i restaura l'estat de vista (cursor, selecció i *scroll*) de cada fitxer. |
-| ✅ | **Render en viu (Python)** | Per Python es mostra un missatge d'«no necessita renderitzar». |
+| ✅ | **Render en viu (Python)** | Python no té panell de render: l'editor ocupa tota l'amplada. El botó **Executar** fa córrer el codi amb Python real (Pyodide en un Web Worker, `src/services/pythonRunner.ts`). |
 | ✅ | **Render en viu (React real)** | El TSX s'executa de debò: es transpila amb el *worker* local de TypeScript de Monaco (`getEmitOutput`) i es renderitza amb React real de l'aplicació (`createRoot`), amb `PreviewErrorBoundary` i *debounce*. Ja no s'injecta HTML en un `<iframe>`. |
 | ✅ | **Multi-model (pestanyes)** | Un únic `<Editor>` amb un **model per fitxer**, amb prefix d'URI `file:///lesson` (`${prefix}/${courseId}/${lessonId}/${file}`; fitxers `python.py` i `React.tsx`). Canvi d'idioma en temps real i estats separats per fitxer (contingut, cursor, desfer/refer i *scroll*). Els models de la lliçó anterior es disposen en canviar de lliçó. |
 | ✅ | **`onMount` / accés a la instància** | `handleEditorMount` captura l'editor i la API global de Monaco (`editorRef` / `monacoInstanceRef`), restaura l'estat de vista desat i fa focus a l'editor. |
@@ -50,7 +50,7 @@ El component **ja està implementat** i fa ús real de `@monaco-editor/react` en
 | ✅ | **Validació (`onValidate`)** | `handleValidate` intercepta els marcadors en temps real i `EditorDiagnosticsBadge` mostra el recompte d'errors i avisos a la capçalera de l'editor. |
 | ✅ | **`DiffEditor`** | A la pestanya **Solució Profe** es compara el codi de l'alumne amb la `teacherSolution` del professor: colze a colze al desktop i en mode unificat (`renderSideBySide: false`) al mòbil, amb fallback si l'exercici no té solució. |
 | ✅ | **Càrrega local i diferida (`Loader`)** | `loadMonaco()` importa dinàmicament `monacoCore` (entrada pròpia: `editor.api` + contribucions i llenguatges necessaris) i la passa a `loader.config({ monaco })`. Els *workers* amb importacions `?worker` de Vite (`MonacoEnvironment.getWorker`), sense CDN. |
-| ✅ | **Optimització del bundle** | Monaco es descarrega només en obrir una lliçó i només amb els llenguatges/features necessaris (Python, TypeScript/JavaScript). El bundle inicial baixa de ~1,4 MB gzip a ~0,4 MB gzip; Monaco queda en un *chunk* a part (~1 MB gzip). |
+| ✅ | **Optimització del bundle** | Monaco es descarrega en segon pla quan s'obre la pestanya Programació (`preloadMonaco`) o en obrir una lliçó, i només amb els llenguatges/features necessaris. El servei de TypeScript (`monacoTypescript.ts`) només es carrega als cursos de React (`loadMonacoTypescript`). El bundle inicial baixa de ~1,4 MB gzip a ~0,4 MB gzip; Monaco queda en un *chunk* a part (~1 MB gzip). |
 
 ---
 
