@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
-import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
-import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack} from '@mui/material';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useParams, Link as RouterLink } from 'react-router-dom';
+import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, useMediaQuery, Tooltip, IconButton, Stack} from '@mui/material';
+// Selector de curs (desactivat): Menu, MenuItem, ListItemText, Divider
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CheckCircle2, XCircle, FileText, Download, Star, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {CheckCircle2, XCircle, FileText, Download, Star, AlertTriangle, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
+// Selector de curs (desactivat): Globe, Lock, UserCheck de lucide-react
+// import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
@@ -14,18 +16,19 @@ import { courseService } from '../../services/courseService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug } from '../../hooks/useCourse';
 import { preloadMonaco } from '../../utils/monaco';
-import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
+// import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
 type I18nField = { ca: string; es: string; en: string };
-type ScopeType = 'public' | 'private' | 'assigned';
+// Selector de curs desactivat: dins d'un curs no cal canviar-ne; per canviar de curs, el menú Cursos de la capçalera.
+// type ScopeType = 'public' | 'private' | 'assigned';
 
-const SCOPES: ScopeType[] = ['public', 'private', 'assigned'];
-const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
-  public: { labelKey: 'courses.scope_public', fallback: 'Públics' },
-  private: { labelKey: 'courses.scope_private', fallback: 'Privats' },
-  assigned: { labelKey: 'courses.scope_assigned', fallback: 'Assignats' },
-};
+// const SCOPES: ScopeType[] = ['public', 'private', 'assigned'];
+// const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
+  // public: { labelKey: 'courses.scope_public', fallback: 'Públics' },
+  // private: { labelKey: 'courses.scope_private', fallback: 'Privats' },
+  // assigned: { labelKey: 'courses.scope_assigned', fallback: 'Assignats' },
+// };
 
 // Les 4 pestanyes principals (mateix ordre que els índexs de mainTab)
 const TAB_ITEMS = [
@@ -38,57 +41,57 @@ const TAB_ITEMS = [
 type TopicNavItem = { id: string; title: string; done?: boolean; percent?: number; current?: boolean };
 type TopicFile = { id: number; name: string };
 
-function ScopeIcon({ scope }: { scope: ScopeType }) {switch (scope) {case 'public': return <Globe size={16} />; case 'private': return <Lock size={16} />; case 'assigned': return <UserCheck size={16} />;}}
+// function ScopeIcon({ scope }: { scope: ScopeType }) {switch (scope) {case 'public': return <Globe size={16} />; case 'private': return <Lock size={16} />; case 'assigned': return <UserCheck size={16} />;}}
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // selector de curs (desactivat)
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
-  const isTallScreen = useMediaQuery('(min-height: 900px)');
+  // const isTallScreen = useMediaQuery('(min-height: 900px)'); // selector de curs (desactivat)
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   const { data: course, isLoading: loading } = useCourse(courseId);
 
-  const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
-  const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
-  const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
+  // const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
+  // const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
+  // const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
-  // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
-  // és públic, es demanen les dues per deduir-ho.
-  const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
-  const scopeKnown = typeof publicFlag === 'boolean';
-  const switcherOpen = scopeAnchor != null;
-  const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
-  const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
-  const publicCourses: any[] = publicQuery.data ?? [];
-  const assignedCourses: any[] = assignedQuery.data ?? [];
+  // // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
+  // // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
+  // // és públic, es demanen les dues per deduir-ho.
+  // const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
+  // const scopeKnown = typeof publicFlag === 'boolean';
+  // const switcherOpen = scopeAnchor != null;
+  // const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
+  // const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
+  // const publicCourses: any[] = publicQuery.data ?? [];
+  // const assignedCourses: any[] = assignedQuery.data ?? [];
 
-  const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
-    if (currentScope === 'public') return list.filter(c => c.isPublic);
-    if (currentScope === 'private') return list.filter(c => !c.isPublic);
-    return list;
-  }, []);
+  // const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
+    // if (currentScope === 'public') return list.filter(c => c.isPublic);
+    // if (currentScope === 'private') return list.filter(c => !c.isPublic);
+    // return list;
+  // }, []);
 
-  const scope: ScopeType = useMemo(() => {
-    if (scopeKnown) return publicFlag ? 'public' : 'private';
-    const listed = [...publicCourses, ...assignedCourses].find(
-      (c) => c.id === courseId || c.slug === courseId
-    );
-    return listed?.isPublic ? 'public' : 'private';
-  }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
+  // const scope: ScopeType = useMemo(() => {
+    // if (scopeKnown) return publicFlag ? 'public' : 'private';
+    // const listed = [...publicCourses, ...assignedCourses].find(
+      // (c) => c.id === courseId || c.slug === courseId
+    // );
+    // return listed?.isPublic ? 'public' : 'private';
+  // }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
 
-  const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
+  // const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
 
-  const handleSelectCourse = (targetCourseId: string) => {
-    setSubMenuAnchor(null);
-    setScopeAnchor(null);
-    setActiveSubMenuScope(null);
-    navigate(`/courses/${targetCourseId}`);
-  };
+  // const handleSelectCourse = (targetCourseId: string) => {
+    // setSubMenuAnchor(null);
+    // setScopeAnchor(null);
+    // setActiveSubMenuScope(null);
+    // navigate(`/courses/${targetCourseId}`);
+  // };
 
   const [mainTab, setMainTab] = useState<number>(() => {
     const saved = localStorage.getItem(`mooc_tab_${courseId}`);
@@ -617,6 +620,7 @@ export default function CourseLessons() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
 
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'center' }, gap: { xs: 1, lg: 5 }, mt: { lg: 4 }, flexWrap: 'wrap' }}>
+            {/* Selector de curs desactivat: per canviar de curs, el menú Cursos de la capçalera.
             <Box sx={{display: 'inline-flex', alignItems: 'center', mb: { xs: 3, lg: 1 }, mt: { xs: isTallScreen ? 2 : 0, lg: 0 },bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 3 },flexWrap: 'wrap', maxWidth: '100%',}}>
                 <Button onClick={(e) => setScopeAnchor(e.currentTarget)} aria-haspopup="menu" aria-expanded={Boolean(scopeAnchor)} startIcon={<ScopeIcon scope={scope} />} endIcon={<ExpandMoreIcon fontSize="small" sx={{ transition: 'transform 0.2s', transform: scopeAnchor ? 'rotate(180deg)' : 'none' }} />} sx={{ textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.9rem', md: '1rem' }, color: '#00A896', minWidth: 0, flexShrink: 0, py: 0.75, pr: 0.5 }}>
                   {t(SCOPE_META[scope].labelKey, SCOPE_META[scope].fallback)}<Typography component="span" sx={{ ml: 1, px: 1, borderRadius: 999, bgcolor: 'action.hover', fontSize: '0.75rem', fontWeight: 900 }}>{visibleCourses.length}</Typography>
@@ -670,6 +674,7 @@ export default function CourseLessons() {
                   })}
                 </Menu>
               </Box>
+            */}
 
               <Typography variant="h2" sx={{fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },letterSpacing: '0.03em', mt: { xs: 1, lg: 0 }, mb: 2, lineHeight: 1.1}}>
                 {getText(course.title)}
