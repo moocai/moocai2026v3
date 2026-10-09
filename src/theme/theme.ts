@@ -25,7 +25,8 @@ export function getTheme(mode: ThemeMode): Theme {
           : {
               primary: { main: '#8400ff' },
               secondary: { main: '#ec4899' },
-              background: { default: 'white', paper: 'white' },
+              // Hex, no 'white': alpha() de MUI no accepta noms de color i peta la pàgina
+              background: { default: '#ffffff', paper: '#ffffff' },
             }),
     },
     typography: { fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif' },

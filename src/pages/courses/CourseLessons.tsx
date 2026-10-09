@@ -1,10 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
-import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
-import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack} from '@mui/material';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useParams, Link as RouterLink } from 'react-router-dom';
+import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, useMediaQuery, Tooltip, IconButton, Stack} from '@mui/material';
+// Selector de curs (desactivat): Menu, MenuItem, ListItemText, Divider
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CheckCircle2, XCircle, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import {CheckCircle2, XCircle, FileText, Download, Star, AlertTriangle, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
+// Selector de curs (desactivat): Globe, Lock, UserCheck de lucide-react
+// import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
@@ -14,18 +16,19 @@ import { courseService } from '../../services/courseService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug } from '../../hooks/useCourse';
 import { preloadMonaco } from '../../utils/monaco';
-import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
+// import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
 type I18nField = { ca: string; es: string; en: string };
-type ScopeType = 'public' | 'private' | 'assigned';
+// Selector de curs desactivat: dins d'un curs no cal canviar-ne; per canviar de curs, el menú Cursos de la capçalera.
+// type ScopeType = 'public' | 'private' | 'assigned';
 
-const SCOPES: ScopeType[] = ['public', 'private', 'assigned'];
-const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
-  public: { labelKey: 'courses.scope_public', fallback: 'Públics' },
-  private: { labelKey: 'courses.scope_private', fallback: 'Privats' },
-  assigned: { labelKey: 'courses.scope_assigned', fallback: 'Assignats' },
-};
+// const SCOPES: ScopeType[] = ['public', 'private', 'assigned'];
+// const SCOPE_META: Record<ScopeType, { labelKey: string; fallback: string }> = {
+  // public: { labelKey: 'courses.scope_public', fallback: 'Públics' },
+  // private: { labelKey: 'courses.scope_private', fallback: 'Privats' },
+  // assigned: { labelKey: 'courses.scope_assigned', fallback: 'Assignats' },
+// };
 
 // Les 4 pestanyes principals (mateix ordre que els índexs de mainTab)
 const TAB_ITEMS = [
@@ -35,59 +38,60 @@ const TAB_ITEMS = [
   { icon: Folder, labelKey: 'lesson.tab_files', fallback: 'Fitxers' },
 ];
 
-type TopicNavItem = { id: string; title: string; done?: boolean; percent?: number };
+type TopicNavItem = { id: string; title: string; done?: boolean; percent?: number; current?: boolean };
+type TopicFile = { id: number; name: string };
 
-function ScopeIcon({ scope }: { scope: ScopeType }) {switch (scope) {case 'public': return <Globe size={16} />; case 'private': return <Lock size={16} />; case 'assigned': return <UserCheck size={16} />;}}
+// function ScopeIcon({ scope }: { scope: ScopeType }) {switch (scope) {case 'public': return <Globe size={16} />; case 'private': return <Lock size={16} />; case 'assigned': return <UserCheck size={16} />;}}
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // selector de curs (desactivat)
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
-  const isTallScreen = useMediaQuery('(min-height: 900px)');
+  // const isTallScreen = useMediaQuery('(min-height: 900px)'); // selector de curs (desactivat)
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
   const { data: course, isLoading: loading } = useCourse(courseId);
 
-  const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
-  const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
-  const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
+  // const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
+  // const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
+  // const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
-  // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
-  // és públic, es demanen les dues per deduir-ho.
-  const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
-  const scopeKnown = typeof publicFlag === 'boolean';
-  const switcherOpen = scopeAnchor != null;
-  const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
-  const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
-  const publicCourses: any[] = publicQuery.data ?? [];
-  const assignedCourses: any[] = assignedQuery.data ?? [];
+  // // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
+  // // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
+  // // és públic, es demanen les dues per deduir-ho.
+  // const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
+  // const scopeKnown = typeof publicFlag === 'boolean';
+  // const switcherOpen = scopeAnchor != null;
+  // const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
+  // const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
+  // const publicCourses: any[] = publicQuery.data ?? [];
+  // const assignedCourses: any[] = assignedQuery.data ?? [];
 
-  const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
-    if (currentScope === 'public') return list.filter(c => c.isPublic);
-    if (currentScope === 'private') return list.filter(c => !c.isPublic);
-    return list;
-  }, []);
+  // const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
+    // if (currentScope === 'public') return list.filter(c => c.isPublic);
+    // if (currentScope === 'private') return list.filter(c => !c.isPublic);
+    // return list;
+  // }, []);
 
-  const scope: ScopeType = useMemo(() => {
-    if (scopeKnown) return publicFlag ? 'public' : 'private';
-    const listed = [...publicCourses, ...assignedCourses].find(
-      (c) => c.id === courseId || c.slug === courseId
-    );
-    return listed?.isPublic ? 'public' : 'private';
-  }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
+  // const scope: ScopeType = useMemo(() => {
+    // if (scopeKnown) return publicFlag ? 'public' : 'private';
+    // const listed = [...publicCourses, ...assignedCourses].find(
+      // (c) => c.id === courseId || c.slug === courseId
+    // );
+    // return listed?.isPublic ? 'public' : 'private';
+  // }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
 
-  const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
+  // const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
 
-  const handleSelectCourse = (targetCourseId: string) => {
-    setSubMenuAnchor(null);
-    setScopeAnchor(null);
-    setActiveSubMenuScope(null);
-    navigate(`/courses/${targetCourseId}`);
-  };
+  // const handleSelectCourse = (targetCourseId: string) => {
+    // setSubMenuAnchor(null);
+    // setScopeAnchor(null);
+    // setActiveSubMenuScope(null);
+    // navigate(`/courses/${targetCourseId}`);
+  // };
 
   const [mainTab, setMainTab] = useState<number>(() => {
     const saved = localStorage.getItem(`mooc_tab_${courseId}`);
@@ -140,10 +144,13 @@ export default function CourseLessons() {
 
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {try {const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null;} catch {return null;}});
   const contentRef = useRef<HTMLDivElement>(null);
+  const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const selectTopic = (id: string) => {
     setSelectedTopicId(id);
     setMobileNavOpen(false);
+    setFileError(null);
     try {
       localStorage.setItem(`mooc_selected_topic_${courseId}`, JSON.stringify(id));
     } catch {}
@@ -194,9 +201,10 @@ export default function CourseLessons() {
     else scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const getLessonProgress = (lesson: any): number => {
+  // % de problemes resolts del tema; `undefined` si el tema no té problemes (no hi ha res a completar)
+  const getLessonProgress = (lesson: any): number | undefined => {
     const completable = lesson.subTopics?.filter((s: any) => s.type === 'coding' || s.type === 'test') || [];
-    if (completable.length === 0) return 0;
+    if (completable.length === 0) return undefined;
     const done = completable.filter((s: any) => {
       const key = `${courseId}_${s.problemSlug || s.slug || lesson.id}`;
       return progress[key] === true;
@@ -290,16 +298,42 @@ export default function CourseLessons() {
   const syncTopicId = mainTab === 2 && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
-  // Teoria: només la del tema obert a la pestanya Teoria (abans es demanava la de tots els temes)
-  const theoryTopicId: string | undefined = mainTab === 0 && course?.content?.length
+  // Teoria i Fitxers: detall (teoria + fitxers) només del tema obert, no de tots els temes
+  const detailTopicId: string | undefined = (mainTab === 0 || mainTab === 3) && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
-  const theoryQuery = useQuery<string>({
-    queryKey: ['topic-theory', course?.id, theoryTopicId, lang],
-    queryFn: () => courseService.getTopicBySlug(course!.id, theoryTopicId!).then((d) => d?.theory_md || '').catch(() => ''),
-    enabled: !!course?.id && !!theoryTopicId,
+  const topicDetailQuery = useQuery<{ theory: string; files: TopicFile[] }>({
+    queryKey: ['topic-detail', course?.id, detailTopicId, lang],
+    queryFn: () => courseService.getTopicBySlug(course!.id, detailTopicId!).then((d) => ({
+      theory: d?.theory_md || '',
+      files: Array.isArray(d?.files) ? d.files : [],
+    })),
+    enabled: !!course?.id && !!detailTopicId,
     staleTime: 30 * 60 * 1000,
   });
+
+  const downloadFile = async (file: TopicFile) => {
+    if (!course?.id) return;
+    // Descarregar un fitxer demana sessió (encara que el curs sigui públic)
+    if (!isLoggedIn()) { setFileError(t('lesson.file_login_required', 'Inicia sessió per descarregar els fitxers.')); return; }
+    setDownloadingFileId(file.id);
+    setFileError(null);
+    try {
+      const blob = await courseService.downloadFile(course.id, file.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setFileError(t('lesson.file_download_error', "No s'ha pogut descarregar el fitxer."));
+    } finally {
+      setDownloadingFileId(null);
+    }
+  };
 
   // Amb el backend nou l'estructura del curs ja porta la resposta pròpia de cada test
   // (`my_solution`, aplicada en carregar-la): no cal tornar a demanar el tema.
@@ -381,8 +415,22 @@ export default function CourseLessons() {
       return (
         <Box key={item.id} component={motion.button} layout transition={{ type: 'spring', stiffness: 400, damping: 34 }} type="button" onClick={() => selectTopic(item.id)} aria-current={active ? 'true' : undefined}
           sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : 'divider', bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary',fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
-          <span>{item.title}</span>
-          {item.done ? (<CheckCircle2 size={16} color={active ? '#fff' : theme.palette.success.main} />) : item.percent !== undefined ? (<Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 800, opacity: 0.8, flexShrink: 0 }}>{item.percent}%</Typography>) : null}
+          <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Estrella com a algorien: plena si el tema dona punts (tema en curs), buida si no */}
+            {item.current !== undefined && (
+              <Tooltip title={item.current ? t('lesson.topic_gives_stars', 'Els problemes d\'aquest tema donen estrelles!') : t('lesson.topic_no_stars', 'Aquest tema no dona estrelles')} placement="top">
+                <Box component="span" sx={{ display: 'flex', flexShrink: 0 }}>
+                  <Star size={16} aria-label={item.current ? t('lesson.topic_gives_stars', 'Els problemes d\'aquest tema donen estrelles!') : t('lesson.topic_no_stars', 'Aquest tema no dona estrelles')}
+                    color={item.current ? '#facc15' : (active ? alpha('#fff', 0.7) : theme.palette.text.disabled)} fill={item.current ? '#facc15' : 'none'} />
+                </Box>
+              </Tooltip>
+            )}
+            <span>{item.title}</span>
+          </Box>
+          <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
+            {item.percent !== undefined && (<Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 800, opacity: 0.8 }}>{item.percent}%</Typography>)}
+            {item.done && (<CheckCircle2 size={16} color={active ? '#fff' : theme.palette.success.main} />)}
+          </Box>
         </Box>
       );
     });
@@ -421,15 +469,17 @@ export default function CourseLessons() {
     </Box>
   );
 
-  const buildTopicItems = (showProgress = true): TopicNavItem[] => allLessons.map((l) => ({id: l.id, title: getText(l.title), done: isTheoryDone(l.id), percent: showProgress ? getLessonProgress(l) : undefined})).sort((a, b) => Number(a.done === true) - Number(b.done === true));
-  const topicItems = buildTopicItems(mainTab !== 0);
+  const topicItems: TopicNavItem[] = allLessons
+    .map((l) => ({ id: l.id, title: getText(l.title), done: isTheoryDone(l.id), percent: getLessonProgress(l), current: typeof l.current === 'boolean' ? l.current : undefined }))
+    .sort((a, b) => Number(a.done === true) - Number(b.done === true));
   const activeTopicId: string | undefined = allLessons.find((l) => l.id === selectedTopicId)?.id ?? allLessons[0]?.id;
 
   const renderTheoryTab = () => {
     if (allLessons.length === 0) {return (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>);}
     const activeLesson = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const isDone = isTheoryDone(activeLesson.id);
-    const markdown = theoryQuery.data;
+    // Si el detall falla, es mostra com a tema sense teoria (no un spinner infinit)
+    const markdown = topicDetailQuery.isError ? '' : topicDetailQuery.data?.theory;
 
     return renderMasterDetail(topicItems, activeTopicId, (
       <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>
@@ -473,8 +523,13 @@ export default function CourseLessons() {
     return saved.correct ? true : 'wrong';
   };
 
-  const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'No hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'No hi ha tests per aquest curs.');
-    if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{emptyMessage}</Typography>;}
+  const renderExerciseTab = (type: 'coding' | 'test') => {
+    // Curs sense temes: el missatge és del curs; si no, és només del tema obert (n'hi pot haver en altres temes)
+    if (allLessons.length === 0) {
+      const courseMessage = type === 'coding' ? t('lesson.no_exercises', 'No hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'No hi ha tests per aquest curs.');
+      return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{courseMessage}</Typography>;
+    }
+    const emptyMessage = type === 'coding' ? t('lesson.no_topic_exercises', 'Aquest tema no té exercicis de programació.') : t('lesson.no_topic_tests', 'Aquest tema no té tests.');
 
     const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const subItems: any[] = (active.subTopics || []).filter((s: any) => s.type === type);
@@ -516,13 +571,42 @@ export default function CourseLessons() {
   };
 
   const renderFilesTab = () => {
-    const message = t('lesson.no_files', 'No hi ha fitxers disponibles per aquest curs.');
-    if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{message}</Typography>;}
+    if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{t('lesson.no_files', 'No hi ha fitxers disponibles per aquest curs.')}</Typography>;}
 
-    return renderMasterDetail(topicItems, activeTopicId, (
-      <Box sx={{border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', textAlign: 'center', py: 10, px: 3, color: 'text.secondary',}}>
+    const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
+    const files = topicDetailQuery.data?.files ?? [];
+    const renderEmpty = (message: string) => (
+      <Box sx={{ textAlign: 'center', py: 10, px: 3, color: 'text.secondary' }}>
         <FileText size={40} style={{ opacity: 0.5 }} />
         <Typography sx={{ mt: 2, fontWeight: 600, fontSize: '0.95rem' }}>{message}</Typography>
+      </Box>
+    );
+
+    return renderMasterDetail(topicItems, activeTopicId, (
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>{getText(active.title)}</Typography>
+        </Box>
+        {topicDetailQuery.isPending ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
+        ) : topicDetailQuery.isError ? (
+          renderEmpty(t('lesson.files_error', "No s'han pogut carregar els fitxers d'aquest tema."))
+        ) : files.length === 0 ? (
+          renderEmpty(t('lesson.no_topic_files', 'Aquest tema no té fitxers.'))
+        ) : (
+          <Box sx={{ px: 2.5, pb: 1 }}>
+            {fileError && (
+              <Typography role="alert" sx={{ color: 'error.main', fontSize: '0.9rem', pt: 1.5 }}>{fileError}</Typography>
+            )}
+            {files.map((file) => renderOverviewRow({
+              key: `file-${file.id}`,
+              icon: <FileText size={18} />,
+              label: file.name,
+              onClick: () => { if (downloadingFileId === null) void downloadFile(file); },
+              right: downloadingFileId === file.id ? <CircularProgress size={16} /> : <Download size={16} />,
+            }))}
+          </Box>
+        )}
       </Box>
     ));
   };
@@ -536,6 +620,7 @@ export default function CourseLessons() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
 
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'center' }, gap: { xs: 1, lg: 5 }, mt: { lg: 4 }, flexWrap: 'wrap' }}>
+            {/* Selector de curs desactivat: per canviar de curs, el menú Cursos de la capçalera.
             <Box sx={{display: 'inline-flex', alignItems: 'center', mb: { xs: 3, lg: 1 }, mt: { xs: isTallScreen ? 2 : 0, lg: 0 },bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 3 },flexWrap: 'wrap', maxWidth: '100%',}}>
                 <Button onClick={(e) => setScopeAnchor(e.currentTarget)} aria-haspopup="menu" aria-expanded={Boolean(scopeAnchor)} startIcon={<ScopeIcon scope={scope} />} endIcon={<ExpandMoreIcon fontSize="small" sx={{ transition: 'transform 0.2s', transform: scopeAnchor ? 'rotate(180deg)' : 'none' }} />} sx={{ textTransform: 'none', fontWeight: 800, fontSize: { xs: '0.9rem', md: '1rem' }, color: '#00A896', minWidth: 0, flexShrink: 0, py: 0.75, pr: 0.5 }}>
                   {t(SCOPE_META[scope].labelKey, SCOPE_META[scope].fallback)}<Typography component="span" sx={{ ml: 1, px: 1, borderRadius: 999, bgcolor: 'action.hover', fontSize: '0.75rem', fontWeight: 900 }}>{visibleCourses.length}</Typography>
@@ -589,6 +674,7 @@ export default function CourseLessons() {
                   })}
                 </Menu>
               </Box>
+            */}
 
               <Typography variant="h2" sx={{fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },letterSpacing: '0.03em', mt: { xs: 1, lg: 0 }, mb: 2, lineHeight: 1.1}}>
                 {getText(course.title)}

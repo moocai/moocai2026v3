@@ -56,7 +56,8 @@ Tots amb `Authorization: Token {token}` (afegit per l'interceptor d'`apiClient`)
 | GET | `/public/courses/` | Tots els cursos públics (no requereix autenticació al backend). |
 | GET | `/courses/{slug}/` | Detall d'un curs per slug. |
 | GET | `/courses/{slug}/topics/` | Temes d'un curs. |
-| GET | `/courses/{slug}/topics/{topic}/` | Detall d'un tema (teoria localitzada segons `i18n.language`). |
+| GET | `/courses/{slug}/topics/{topic}/` | Detall d'un tema (teoria localitzada segons `i18n.language` i llista de fitxers `files: [{ id, name }]`). El fan servir les pestanyes Teoria i Fitxers de `CourseLessons`. |
+| GET | `/courses/{slug}/files/{id}/download/` | Descarrega un fitxer del tema (blob). **Demana sessió**, també en cursos públics (401 sense token). `courseService.downloadFile`. |
 | GET | `/courses/{slug}/topics/{topic}/problems/` | Problemes d'un tema. |
 | GET | `/courses/{slug}/topics/{topic}/problems/{problem}/` | Detall d'un problema. |
 | POST | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia resposta. Body JSON: coding `{ code, language? }`, test `{ answers: [id, …] }`. |
