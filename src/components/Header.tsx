@@ -10,36 +10,9 @@ import { ThemeToggleButton } from './ThemeToggleButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
+// Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
+import { usePoints } from '../utils/pointsSync';
 const logo = '/img/logo.webp';
-
-const POINTS_PER_LESSON = 10;
-
-function usePoints() {
-  const [points, setPoints] = useState(0);
-
-  useEffect(() => {
-    const read = () => {
-      const saved = localStorage.getItem('currentStudent');
-      if (!saved) { setPoints(0); return; }
-      let id: string;
-      try { id = String(JSON.parse(saved).id ?? ''); } catch { setPoints(0); return; }
-      if (!id) { setPoints(0); return; }
-      const perStudent = JSON.parse(localStorage.getItem(`mooc_global_progress_${id}`) || '{}');
-      const shared = JSON.parse(localStorage.getItem('mooc_shared_all_progress') || '{}');
-      const merged = { ...(shared[id] || {}), ...perStudent };
-      setPoints(Object.values(merged).filter((v) => v === true).length * POINTS_PER_LESSON);
-    };
-    read();
-    window.addEventListener('lessonProgressUpdated', read);
-    window.addEventListener('auth-state-change', read);
-    return () => {
-      window.removeEventListener('lessonProgressUpdated', read);
-      window.removeEventListener('auth-state-change', read);
-    };
-  }, []);
-
-  return points;
-}
 
 /** Pastilla de punts, pensada per anar al costat de l'àvia. */
 function PointsBadge({ points }: { points: number }) {

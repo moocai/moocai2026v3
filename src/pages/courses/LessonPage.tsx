@@ -517,6 +517,9 @@ export default function LessonPage() {
   // Desa l'estat de vista (cursor/scroll) en desmuntar la pàgina
   useEffect(() => () => persistViewState(), []);
 
+  // El desament automàtic (cada 10 s mentre s'escriu) és silenciós: només s'avisa si falla,
+  // i un sol cop fins que torna a funcionar.
+  const saveErrorShownRef = useRef(false);
   const handleSaveProgress = async (isAutoSaveOnPass = false) => {
     if (!currentUser || !courseId || !lessonId) return;
     persistViewState();
@@ -525,7 +528,6 @@ export default function LessonPage() {
       const progressKey = `mooc_global_progress_${currentUser.id}`;
       const globalProgress = JSON.parse(localStorage.getItem(progressKey) || '{}');
       const key = getGlobalProgressKey();
-      const wasAlreadyComplete = globalProgress[key] === true;
       localStorage.setItem(codeStorageKey, JSON.stringify(codeStorageRef.current));
       // El codi Python també es desa al servidor: és el que queda en sortir de la sessió
       // (l'esborrany local s'esborra) i el que es veu des d'un altre dispositiu.
@@ -538,23 +540,22 @@ export default function LessonPage() {
       if (isAutoSaveOnPass) {
         globalProgress[key] = true;
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
-        if (!wasAlreadyComplete) {
-          setConsoleOutput(p => [...p, `🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: 10 })}`]);
-        }
       } else if (!globalProgress[key]) {
         globalProgress[key] = 'attempted';
         localStorage.setItem(progressKey, JSON.stringify(globalProgress));
       }
       localStorage.setItem(userKey(LAST_SESSION_KEY), JSON.stringify({courseId, lessonId, courseTitle: getText(course?.title), lessonTitle: getText(currentProblem?.subtitle), timestamp: Date.now()}));
       setIsDirty(false); setWasSavedInSession(true);
-      setConsoleOutput(p => [...p, `💾 ${t('lesson.synced', 'Sincronitzat!')}`]);
       await api.postProgress({ studentId: currentUser.id, courseId, lessonId, status: globalProgress[key] || false });
       window.dispatchEvent(new Event('lessonProgressUpdated'));
       document.dispatchEvent(new Event('lessonProgressUpdated'));
-      addNotification(t('notifications.progress_saved'), 'success');
+      saveErrorShownRef.current = false;
     } catch (err) {
-      addNotification(t('notifications.progress_error'), 'error');
-      setConsoleOutput(p => [...p, `⚠️ ${t('lesson.error_local', 'Error local')}`]);
+      console.error('Error en desar el progrés:', err);
+      if (!saveErrorShownRef.current) {
+        saveErrorShownRef.current = true;
+        addNotification(t('notifications.progress_error'), 'error');
+      }
     } 
     finally { setIsSaving(false); }
   };
@@ -583,9 +584,17 @@ export default function LessonPage() {
 
       // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
+      // Els punts guanyats són la diferència real del servidor (no un valor fix per activitat).
+      const student = getCurrentStudent();
+      const pointsBefore = student ? getTotalPoints(student.id) : 0;
       void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0, 1000, result).then(() => {
-        const st = getCurrentStudent();
-        if (st) setConsoleOutput(p => [...p, `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: getTotalPoints(st.id) })}`]);
+        if (!student) return;
+        const total = getTotalPoints(student.id);
+        const gained = total - pointsBefore;
+        setConsoleOutput(p => [...p,
+          ...(gained > 0 ? [`🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: gained })}`] : []),
+          `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: total })}`,
+        ]);
       });
 
       setSubmissionsRefreshKey(k => k + 1);
