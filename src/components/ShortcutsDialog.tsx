@@ -19,7 +19,7 @@ export function ShortcutsDialog({ open, onClose }: { open: boolean; onClose: () 
   const { t } = useTranslation();
   const rows: Array<[string, React.ReactNode]> = [
     [t('lesson.sc_run', 'Executar el codi'), <><Kbd>Shift</Kbd>+<Kbd>Enter</Kbd></>],
-    [t('lesson.sc_submit', 'Enviar la solució'), <><Kbd>{CTRL}</Kbd>+<Kbd>Enter</Kbd></>],
+    [t('lesson.sc_submit', 'Enviar el codi'), <><Kbd>{CTRL}</Kbd>+<Kbd>Enter</Kbd></>],
     [t('lesson.sc_comment', 'Comentar / descomentar'), <><Kbd>{CTRL}</Kbd>+<Kbd>/</Kbd></>],
     [t('lesson.sc_copy_line', 'Copiar / tallar / enganxar la línia'), <><Kbd>{CTRL}</Kbd>+<Kbd>C</Kbd>/<Kbd>X</Kbd>/<Kbd>V</Kbd></>],
     [t('lesson.sc_suggestion', 'Acceptar el suggeriment'), <Kbd>Tab</Kbd>],

@@ -64,6 +64,9 @@ const toContentTopic = (topic: any, problems: any[]) => ({
   problemCounts: topic.problem_counts,
   myProgress: topic.my_progress,
   hasLectureFiles: topic.has_lecture_files,
+  // Tema en curs: fora d'aquest període (o en exàmens) els enviaments no sumen punts
+  current: topic.current,
+  isExam: topic.is_exam,
   subTopics: Array.isArray(problems) ? problems.map(mapProblem) : [],
 });
 

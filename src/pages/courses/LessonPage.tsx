@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
 import Editor from '@monaco-editor/react';
@@ -417,6 +417,10 @@ export default function LessonPage() {
     staleTime: 5 * 60 * 1000,
   });
   const mySolution = currentProblem?.mySolution ?? (needsOwnSubmission ? ownSubmission : undefined);
+  // El tema del problema ja no és el que està en curs: els enviaments es corregeixen però no
+  // sumen punts (el servidor només els dona mentre el tema és actiu)
+  const currentTopic = course?.content?.find((tp: any) => tp.id === currentTopicSlug) as any;
+  const topicClosed = currentTopic?.current === false;
   const solutionStatus: string | null = submittedStatus?.status ?? mySolution?.status ?? null;
   const solved = solutionStatus === 'accepted';
   const referenceSolution: string | null = currentProblem?.systemSolution ?? null;
@@ -732,6 +736,7 @@ export default function LessonPage() {
       navigate(testPath(lessonId!), { replace: true });
       return;
     }
+    const wasSolvedBefore = solved;
     setConsoleOutput([`[${t('lesson.system', 'SISTEMA')}]: ${t('lesson.executing', 'Executant...')}`]);
     setStatus('idle');
     try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, `📤 ${t('lesson.sending', 'Enviant al servidor...')}`]);
@@ -764,16 +769,22 @@ export default function LessonPage() {
 
       // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
-      // Els punts guanyats són la diferència real del servidor (no un valor fix per activitat).
+      // Els punts guanyats els diu el servidor (`stars_earned`, només quan n'atorga): fora del
+      // període del tema, o si ja estava resolt, l'enviament no en suma.
       const student = getCurrentStudent();
-      const pointsBefore = student ? getTotalPoints(student.id) : 0;
-      void refreshCoursePoints(course?.slug || courseId!, passed ? 4 : 0, 1000, result).then(() => {
+      const earned = Number(result?.stars_earned) || 0;
+      const pointsNote: ConsoleLine | null = earned > 0
+        ? `🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: earned })}`
+        : passed && wasSolvedBefore
+          ? { kind: 'info', text: t('lesson.points_already_solved', 'Ja l\'havies resolt: aquest enviament no suma punts.') }
+          : passed && topicClosed
+            ? { kind: 'info', text: t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.') }
+            : null;
+      void refreshCoursePoints(course?.slug || courseId!, earned > 0 ? 4 : 0, 1000, result).then(() => {
         if (!student) return;
-        const total = getTotalPoints(student.id);
-        const gained = total - pointsBefore;
         setConsoleOutput(p => [...p,
-          ...(gained > 0 ? [`🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: gained })}`] : []),
-          `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: total })}`,
+          ...(pointsNote ? [pointsNote] : []),
+          `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: getTotalPoints(student.id) })}`,
         ]);
       });
 
@@ -925,6 +936,9 @@ export default function LessonPage() {
           <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0 }}>
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
+              {topicClosed && (
+                <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.')}</Typography>
+              )}
               <Box sx={{ maxHeight: '26vh', overflowY: 'auto' }}>
                 <MarkdownContent fontSize="0.85rem">{statementMarkdown}</MarkdownContent>
               </Box>
@@ -1063,7 +1077,7 @@ export default function LessonPage() {
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
             <Tab label={t('lesson.tab_teacher_solution', 'Solució')} icon={!solutionUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!peersUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
-            <Tab label={t('lesson.tab_ai_help', 'IA')} icon={<Sparkles size={tabIconSize} />} iconPosition="end" />
+            <Tab label={t('lesson.tab_ai_help', 'IA')} />
           </Tabs>
 
           <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider' }}>
@@ -1074,6 +1088,12 @@ export default function LessonPage() {
             {activeTab === 0 && (
               <Box sx={{ p: 2 }}>
                 <Typography sx={{ fontSize: '1rem', fontWeight: 900, mb: 3, color: mode === 'light' ? '#000' : 'inherit' }}>{getText(currentProblem?.subtitle)}</Typography>
+                {topicClosed && (
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', p: 1.25, mb: 1, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.4)}` }}>
+                    <AlertTriangle size={16} color={theme.palette.warning.main} style={{ flexShrink: 0, marginTop: 2 }} />
+                    <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed', 'Aquest tema ja no està en curs: els enviaments no sumen punts.')}</Typography>
+                  </Box>
+                )}
                 <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2 }}>
                   <MarkdownContent>{statementMarkdown}</MarkdownContent>
                 </Box>

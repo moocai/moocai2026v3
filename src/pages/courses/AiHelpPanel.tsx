@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Box, Button, Typography, CircularProgress, alpha, useTheme, Collapse } from '@mui/material';
 import { Bot, ChevronDown, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { api } from '../../services/api';
+// import { api } from '../../services/api'; // revisió IA (desactivada)
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { CodeBlock } from '../../components/CodeBlock';
 import type { AiHint } from '../../hooks/useAiHints';
@@ -47,10 +47,11 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
+  useEffect(() => { onLoadHints(); }, [courseId, topicSlug, lessonId]);
+
+  /* Revisió IA del codi (desactivada fins que estigui implementada al servidor):
   const [review, setReview] = useState<string | null>(null);
   const [loadingReview, setLoadingReview] = useState(false);
-
-  useEffect(() => { onLoadHints(); }, [courseId, topicSlug, lessonId]);
 
   const fetchAiReview = async () => {
     if (!courseId || !lessonId || !topicSlug) return;
@@ -65,6 +66,7 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
       setLoadingReview(false);
     }
   };
+  */
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -104,6 +106,7 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
         hints.map((h) => <HintCard key={h.id} hint={h} />)
       )}
 
+      {/* Revisió IA del codi: desactivada fins que estigui implementada al servidor.
       <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1, color: 'primary.main' }}>
           {t('lesson.review_title', 'Revisió del codi')}
@@ -119,6 +122,7 @@ export function AiHelpPanel({ courseId, topicSlug, lessonId, hints, loadingHints
           </Button>
         )}
       </Box>
+      */}
     </Box>
   );
 }
