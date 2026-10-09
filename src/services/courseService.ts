@@ -159,6 +159,17 @@ export const courseService = {
     return data;
   },
 
+  /** La submissió pròpia d'un problema de codi (estat, codi...); `null` si encara no n'hi ha. */
+  async getOwnSubmission(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any | null> {
+    try {
+      const list = await this.getChallengeSubmissions(courseSlug, topicSlug, problemSlug);
+      return list[0] ?? null;
+    } catch (err) {
+      if (isNotFound(err)) return null;
+      throw err;
+    }
+  },
+
   async getChallengeSubmissions(courseSlug: string, topicSlug: string, problemSlug: string): Promise<any[]> {
     const { data } = await apiClient.get(`/courses/${courseSlug}/topics/${topicSlug}/problems/${problemSlug}/submissions/`);
     // L'esquema diu llista, però és la submission pròpia: s'accepta també un objecte sol

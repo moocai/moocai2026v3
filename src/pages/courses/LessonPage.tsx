@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, Sparkles, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
-import Editor, { DiffEditor } from '@monaco-editor/react';
+import Editor from '@monaco-editor/react';
 import { api } from '../../services/api';
 import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
 import { ReactLivePreview } from '../../components/ReactLivePreview';
@@ -341,7 +341,17 @@ export default function LessonPage() {
   // Estat de la solució (del servidor) i què es pot veure: la solució de referència arriba
   // només quan el servidor la deixa veure (resolt, o tema tancat; mai en exàmens), i les
   // dels companys amb la mateixa condició.
-  const mySolution = currentProblem?.mySolution;
+  // Al professorat (i a qui pot veure el contingut ocult) el detall no li porta `my_solution`:
+  // llavors l'estat propi es demana a la seva submissió (una petició, només en aquest cas).
+  const needsOwnSubmission = !!currentProblem && currentProblem.type !== 'test' && currentProblem.mySolution === undefined
+    && !!currentUser && !!currentTopicSlug;
+  const { data: ownSubmission } = useQuery({
+    queryKey: ['own-submission', courseId, currentTopicSlug, lessonId],
+    queryFn: () => courseService.getOwnSubmission(resolveSlug(courseId!), currentTopicSlug, lessonId!),
+    enabled: needsOwnSubmission,
+    staleTime: 5 * 60 * 1000,
+  });
+  const mySolution = currentProblem?.mySolution ?? (needsOwnSubmission ? ownSubmission : undefined);
   const solutionStatus: string | null = submittedStatus?.status ?? mySolution?.status ?? null;
   const solved = solutionStatus === 'accepted';
   const referenceSolution: string | null = currentProblem?.systemSolution ?? null;
@@ -549,7 +559,7 @@ export default function LessonPage() {
     if (disposedLessonKeyRef.current && disposedLessonKeyRef.current !== key) {
       const m = monacoInstanceRef.current;
       if (m) {
-        ([PYTHON_FILE, REACT_FILE, 'teacher.py', 'student.py', 'm-teacher.py', 'm-student.py'] as const).forEach((file) => {
+        ([PYTHON_FILE, REACT_FILE] as const).forEach((file) => {
           const uri = m.Uri.parse(`${LESSON_URI_PREFIX}/${disposedLessonKeyRef.current}/${file}`);
           m.editor.getModel(uri)?.dispose();
         });
@@ -651,11 +661,11 @@ export default function LessonPage() {
       setConsoleOutput(p => [...p, `✅ ${t('lesson.submitted', 'Resposta enviada al servidor')}`]);
       // El servidor corregeix: `accepted` vol dir que passa totes les proves
       const passed = result?.status ? result.status === 'accepted' : !isRejectedResult(result);
-      console.debug('[Enviar] resposta del servidor', result, { passed });
       setConsoleOutput(p => [...p, ...describeSubmission(result, passed)]);
       if (result?.status) setSubmittedStatus({ status: result.status, submission_count: result.submission_count });
       // Detall i llista del curs al dia: estat propi i, si s'ha resolt, la solució de referència
       void queryClient.invalidateQueries({ queryKey: ['problem', courseId, currentTopicSlug, lessonId] });
+      void queryClient.invalidateQueries({ queryKey: ['own-submission', courseId, currentTopicSlug, lessonId] });
       if (result?.status) {
         queryClient.setQueryData(['course', courseId], (old: any) => old && ({
           ...old,
@@ -793,30 +803,13 @@ export default function LessonPage() {
                 {t('lesson.teacher_solution_title', 'professor')}
               </Typography>
               {referenceSolution ? (
-                <>
-                  <Box sx={{ border: '1px solid #333', borderRadius: 1, overflow: 'hidden', mb: 1.5 }}>
-                    <DiffEditor
-                      original={referenceSolution}
-                      modified={codeByLang.python}
-                      originalModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/m-teacher.py`}
-                      modifiedModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/m-student.py`}
-                      // Els models es disposen en canviar de problema (vegeu més amunt): si els disposés el
-                      // component en desmuntar-se, Monaco falla ("TextModel got disposed before DiffEditorWidget...")
-                      keepCurrentOriginalModel
-                      keepCurrentModifiedModel
-                      language="python"
-                      theme={getMonacoEditorTheme(mode)}
-                      height="240px"
-                      options={{ readOnly: true, minimap: { enabled: false }, fontSize: 12, automaticLayout: true, renderSideBySide: false, scrollBeyondLastLine: false }}
-                    />
-                  </Box>
-                  <Typography sx={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: '#c084fc' }}>
-                    {t('lesson.teacher_solution_full', 'Solució completa')}
-                  </Typography>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: 11, whiteSpace: 'pre-wrap', color: '#ddd' }}>
-                    {referenceSolution}
-                  </Typography>
-                </>
+                <CodeBlock
+                  code={referenceSolution}
+                  onRun={() => runOtherCode('solution', referenceSolution)}
+                  running={isRunning && runSource === 'solution'}
+                  runLabel={runLabel}
+                  stopLabel={stopLabel}
+                />
               ) : (
                 <Typography sx={{ fontSize: 11, color: '#aaa' }}>
                   {t('lesson.no_solution_available', 'No hi ha solució disponible per aquest exercici.')}
@@ -958,32 +951,6 @@ export default function LessonPage() {
                     runLabel={runLabel}
                     stopLabel={stopLabel}
                   />
-                  {monaco && codeByLang.python.trim() && (
-                    <Box>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, textTransform: 'uppercase', mb: 1, color: 'primary.main' }}>
-                        {t('lesson.compare_with_mine', 'Compara-la amb el teu codi')}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.7rem', mb: 1, color: 'text.secondary' }}>
-                        {t('lesson.diff_hint', "Compara la teva solució (dreta) amb la del professor (esquerra).")}
-                      </Typography>
-                      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-                        <DiffEditor
-                          original={referenceSolution}
-                          modified={codeByLang.python}
-                          originalModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/teacher.py`}
-                          modifiedModelPath={`${LESSON_URI_PREFIX}/${courseId}/${lessonId}/student.py`}
-                          // Els models es disposen en canviar de problema (vegeu més amunt): si els disposés el
-                          // component en desmuntar-se, Monaco falla ("TextModel got disposed before DiffEditorWidget...")
-                          keepCurrentOriginalModel
-                          keepCurrentModifiedModel
-                          language="python"
-                          theme={getMonacoEditorTheme(mode)}
-                          height="320px"
-                          options={{ readOnly: true, minimap: { enabled: false }, fontSize: 13, automaticLayout: true, renderSideBySide: true, scrollBeyondLastLine: false }}
-                        />
-                      </Box>
-                    </Box>
-                  )}
                 </Box>
               ) : (<LockedTabMessage text={t('lesson.locked_teacher_solution', "Completa l'exercici correctament per desbloquejar la solució del professor.")} />)
             )}

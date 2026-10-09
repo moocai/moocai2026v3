@@ -148,8 +148,6 @@ export async function refreshCoursePoints(
       const res: any = await courseService.getCourseLeaderboard(courseSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
       const own = findOwnPoints(list, student);
-      console.debug('[Punts] leaderboard després d\'enviar', { intent: i, courseSlug, punts: own, abans: before });
-      if (own == null) console.debug('[Punts] No es troba l\'alumne al leaderboard', { student, courseSlug, sample: JSON.stringify(list.slice(0, 3)) });
       if (own != null) {
         last = own;
         setCoursePoints(student.id, courseSlug, own);

@@ -422,7 +422,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     try {
       const res: any = await courseService.getCourseLeaderboard(currentSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
-      console.debug('[Leaderboard] resposta del backend', { curs: currentSlug, files: list.length, mostra: JSON.stringify(list.slice(0, 3)) });
       syncOwnPointsFromList(currentSlug, list, Array.isArray(res) ? undefined : res?.me); // header i leaderboard comparteixen els mateixos punts
       const rankedList = toRanking(list);
       setRanking(rankedList);
