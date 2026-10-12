@@ -61,7 +61,12 @@ export default {
     hours: "hores",
     code_correct: "Problemes de programació",
     continue_activity: "Continuar l'activitat",
-    tests_correct: "Tests correctes"
+    tests_correct: "Tests correctes",
+    your_stats: "Les teves estadístiques",
+    points_label: "Punts",
+    tests_correct_hint: "{{answered}} contestats de {{total}}",
+    ai_hints_left: "Pistes d'IA avui",
+    more_statistics: "Més estadístiques"
   },
   home: {
     enrolled_title: "Els meus cursos",

@@ -61,7 +61,12 @@ export default {
     hours: "horas",
     code_correct: "Problemas de programación",
     continue_activity: "Continuar la actividad",
-    tests_correct: "Tests correctos"
+    tests_correct: "Tests correctos",
+    your_stats: "Tus estadísticas",
+    points_label: "Puntos",
+    tests_correct_hint: "{{answered}} contestados de {{total}}",
+    ai_hints_left: "Pistas de IA hoy",
+    more_statistics: "Más estadísticas"
   },
   home: {
     enrolled_title: "Mis cursos",

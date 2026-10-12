@@ -16,15 +16,24 @@ export function recordCourseActivity(courseSlug: string) {
   } catch { /* mode privat */ }
 }
 
-/** El curs de l'última activitat si és prou recent (de l'usuari amb sessió); si no, `null`. */
-export function recentCourse(now = Date.now()): string | null {
+function readActivity(): { slug: string; at: number } | null {
   try {
     const saved = JSON.parse(localStorage.getItem(userKey(LAST_COURSE_KEY)) || 'null');
-    if (typeof saved?.slug !== 'string' || typeof saved?.at !== 'number') return null;
-    return now - saved.at <= RECENT_COURSE_MAX_AGE_MS ? saved.slug : null;
+    return typeof saved?.slug === 'string' && typeof saved?.at === 'number' ? saved : null;
   } catch {
     return null;
   }
+}
+
+/** El curs de l'última activitat si és prou recent (de l'usuari amb sessió); si no, `null`. */
+export function recentCourse(now = Date.now()): string | null {
+  const saved = readActivity();
+  return saved && now - saved.at <= RECENT_COURSE_MAX_AGE_MS ? saved.slug : null;
+}
+
+/** El curs de l'última activitat, sigui de quan sigui (o `null` si no n'hi ha). */
+export function lastActiveCourse(): string | null {
+  return readActivity()?.slug ?? null;
 }
 
 /** Registra l'activitat al curs `courseSlug` en obrir una pàgina seva. */
