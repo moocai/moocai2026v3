@@ -2,13 +2,12 @@ import { useParams, Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft } from 'lucide-react';
-import { Box, Button, Chip, CircularProgress, Container, Stack, Typography } from '@mui/material';
-import { ArrowForward as ArrowForwardIcon, CheckCircleOutlined as CheckIcon, AssignmentOutlined as SurveyIcon } from '@mui/icons-material';
+import { Box, Button, CircularProgress, Container, Stack, Typography } from '@mui/material';
+import { ArrowForward as ArrowForwardIcon, AssignmentOutlined as SurveyIcon } from '@mui/icons-material';
 import { useThemeMode } from '../../hooks/useTheme';
 import { resolveSlug } from '../../hooks/useCourse';
 import { useAllCourses } from '../../hooks/useCourses';
 import { surveyService } from '../../services/surveyService';
-import { isSurveyAnswered } from '../../utils/answeredSurveys';
 import { getLocalizedText } from '../../utils/formatters';
 
 const ACCENT = '#00685d';
@@ -56,7 +55,6 @@ export default function SurveysPage() {
         ) : (
           <Stack spacing={2} sx={{ pb: 4 }}>
             {surveys.data.map((survey) => {
-              const answered = isSurveyAnswered(slug, survey.slug);
               const open = () => navigate(`/courses/${courseId}/surveys/${encodeURIComponent(survey.slug)}`);
               return (
                 <Stack
@@ -67,18 +65,15 @@ export default function SurveysPage() {
                 >
                   <SurveyIcon sx={{ color: ACCENT, fontSize: 28, display: { xs: 'none', sm: 'block' } }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Stack direction="row" sx={{ alignItems: 'center', flexWrap: 'wrap', columnGap: 1, rowGap: 0.5 }}>
-                      <Typography sx={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{survey.name}</Typography>
-                      {answered && <Chip icon={<CheckIcon />} label={t('surveys.answered')} color="success" size="small" variant="outlined" sx={{ fontWeight: 700 }} />}
-                    </Stack>
+                    <Typography sx={{ fontWeight: 800, overflowWrap: 'anywhere' }}>{survey.name}</Typography>
                     {survey.description && (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                         {survey.description}
                       </Typography>
                     )}
                   </Box>
-                  <Button variant={answered ? 'outlined' : 'contained'} size="small" onClick={open} endIcon={<ArrowForwardIcon fontSize="small" />} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>
-                    {answered ? t('surveys.answer_again') : t('surveys.answer')}
+                  <Button variant="contained" size="small" onClick={open} endIcon={<ArrowForwardIcon fontSize="small" />} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>
+                    {t('surveys.answer')}
                   </Button>
                 </Stack>
               );

@@ -9,7 +9,6 @@ import { useThemeMode } from '../../hooks/useTheme';
 import { resolveSlug } from '../../hooks/useCourse';
 import { surveyService } from '../../services/surveyService';
 import { apiErrorMessages } from '../../services/httpClient';
-import { isSurveyAnswered, markSurveyAnswered } from '../../utils/answeredSurveys';
 
 const ACCENT = '#00685d';
 
@@ -28,12 +27,8 @@ export default function SurveyPage() {
   });
   const submit = useMutation({
     mutationFn: () => surveyService.submitAnswer(slug, surveySlug, answer.trim()),
-    onSuccess: () => {
-      markSurveyAnswered(slug, surveySlug);
-      setAnswer('');
-    },
+    onSuccess: () => setAnswer(''),
   });
-  const answeredBefore = isSurveyAnswered(slug, surveySlug);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -77,20 +72,12 @@ export default function SurveyPage() {
                   <CheckIcon sx={{ color: 'success.main', fontSize: 48 }} />
                   <Typography variant="h6" sx={{ fontWeight: 800 }}>{t('surveys.thanks_title')}</Typography>
                   <Typography variant="body2" color="text.secondary">{t('surveys.thanks_text')}</Typography>
-                  <Stack direction="row" spacing={1.5} sx={{ pt: 1 }}>
-                    <Button component={RouterLink} to={`/courses/${courseId}/surveys`} variant="contained" sx={{ textTransform: 'none', fontWeight: 700 }}>
-                      {t('surveys.back_to_surveys')}
-                    </Button>
-                    <Button onClick={() => submit.reset()} sx={{ textTransform: 'none', fontWeight: 700 }}>
-                      {t('surveys.answer_again')}
-                    </Button>
-                  </Stack>
+                  <Button component={RouterLink} to={`/courses/${courseId}/surveys`} variant="contained" sx={{ textTransform: 'none', fontWeight: 700, mt: 1 }}>
+                    {t('surveys.back_to_surveys')}
+                  </Button>
                 </Stack>
               ) : (
                 <Box component="form" onSubmit={handleSubmit}>
-                  {answeredBefore && (
-                    <Alert severity="info" sx={{ mb: 2 }}>{t('surveys.already_answered')}</Alert>
-                  )}
                   <TextField
                     label={t('surveys.your_answer')}
                     placeholder={t('surveys.placeholder')}

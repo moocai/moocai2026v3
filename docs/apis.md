@@ -82,10 +82,9 @@ Tots amb token (`apiClient`). Els avisos els publica el professorat a algorien; 
 | POST | `/notifications/mark-read/` | Body `{ ids?: number[] }` → `{ marked_read }`. Sense `ids`, tots els no llegits. Els d'altres cursos s'ignoren. | `notificationService.markRead` |
 | GET | `/courses/{slug}/surveys/` | Enquestes del curs en ordre (l'alumnat només rep les obertes): `[{ slug, name, description, active }]`. | `surveyService.list` |
 | GET | `/courses/{slug}/surveys/{survey}/` | Detall; **404** si està tancada. | `surveyService.get` |
-| POST | `/courses/{slug}/surveys/{survey}/answers/` | Body `{ answer }` → 201. La resposta és **anònima** (no es guarda qui l'ha enviada). | `surveyService.submitAnswer` |
+| POST | `/courses/{slug}/surveys/{survey}/answers/` | Body `{ answer }` → 201. La resposta és **anònima** (no es guarda qui l'ha enviada), així que la interfície no marca quines enquestes ha contestat l'alumne. | `surveyService.submitAnswer` |
 
 - **Campana** (`NotificationBell`): `useNotificationFeed` (React Query, `['notification-feed']`) es refresca cada minut i en tornar a la pestanya; el servidor no fa push. Els avisos importants sense llegir s'obren en un diàleg que només es tanca confirmant-los (`mark-read` amb el seu id).
-- **Enquestes contestades:** l'API no diu quines ha contestat l'alumne (respostes anònimes), així que es recorden a `localStorage` (`mooc_answered_surveys_<idAlumne>`, `utils/answeredSurveys.ts`): només en aquest navegador.
 
 ---
 
