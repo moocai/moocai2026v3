@@ -2,7 +2,7 @@ import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useQueryClient} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
-import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, AccessTime as AccessTimeIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon} from '@mui/icons-material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, Star as StarIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -18,7 +18,7 @@ import { courseImages } from '../../data/courses';
 import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 import { userKey } from '../../services/topicTestAnswers';
-import { recentCourse } from '../../utils/lastCourse';
+import { recentCourse, lastActiveCourse } from '../../utils/lastCourse';
 import { resolveSlug } from '../../hooks/useCourse';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
@@ -31,6 +31,12 @@ const getProgress = (studentId: string): Record<string, boolean> => {
 };
 
 const NO_COURSES: Course[] = [];
+
+// Selector d'àmbit i de curs (Públics/Privats/Assignats + pestanyes de cursos), amagat de
+// moment sense esborrar-lo: el tauler mostra el curs on l'usuari ha treballat per última
+// vegada. Es fa amb un interruptor i no comentant-lo perquè el codi que només fa servir ell
+// (estat, menú, reiniciar el curs...) seguiria compilant-se i no donaria errors de no usat.
+const SHOW_COURSE_SWITCHER = false;
 
 /** Les tres llistes de cursos que es poden veure als tabs. */
 export type CourseScope = 'public' | 'private' | 'assigned';
@@ -136,7 +142,8 @@ export default function StudentDashboard() {
   const [courseTabIndex, setCourseTabIndex] = useState(0);
   // L'àmbit es recupera de seguida (sense esperar les llistes): així només es
   // demana la llista de cursos públics si realment és la que es veu.
-  const [scope, setScope] = useState<CourseScope>(() => savedScope(readLastCourse()));
+  // Sense el selector de cursos, el tauler és dels cursos propis (els públics no tenen rànquing ni progrés)
+  const [scope, setScope] = useState<CourseScope>(() => (SHOW_COURSE_SWITCHER ? savedScope(readLastCourse()) : 'assigned'));
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
   const [restored, setRestored] = useState(false);
@@ -375,11 +382,14 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     matches: (l: any) => boolean,
     budget: number,
     progress: Record<string, boolean>,
+    // Del servidor (per tema): problemes resolts d'aquest tipus; si no n'hi ha, el progrés local
+    serverDone?: (topicId: string) => number | undefined,
   ) => {
     const all: TopicSummary[] = getCourseTopics(course)
       .map((topic, i) => {
         const lessons = (topic.lessons || []).filter(matches);
-        const done = lessons.filter((l: any) => progress[`${course.id}_${l.id}`] === true).length;
+        const done = serverDone?.(String(topic.id))
+          ?? lessons.filter((l: any) => progress[`${course.id}_${l.id}`] === true).length;
         return {
           key: String(topic.id ?? `topic-${i}`),
           id: topic.id != null ? String(topic.id) : '',
@@ -413,13 +423,15 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   useEffect(() => {
     if (restored || !isLoggedIn) return;
     const saved = readLastCourse();
-    if (saved && savedScope(saved) !== scope) {
+    if (SHOW_COURSE_SWITCHER && saved && savedScope(saved) !== scope) {
       setScope(savedScope(saved));
       return;
     }
     const query = scope === 'public' ? publicQuery : assignedQuery;
     if (!query.isFetched) return;
-    const idx = saved ? visibleCourses.findIndex((c) => c.slug === saved.slug) : -1;
+    // Sense selector: el curs on ha treballat per última vegada; si no, el que mirava al tauler
+    const slug = SHOW_COURSE_SWITCHER ? saved?.slug : (lastActiveCourse() ?? saved?.slug);
+    const idx = slug ? visibleCourses.findIndex((c) => c.slug === slug) : -1;
     if (idx >= 0) setCourseTabIndex(idx);
     setRestored(true);
   }, [restored, isLoggedIn, scope, visibleCourses, publicQuery.isFetched, assignedQuery.isFetched]);
@@ -514,31 +526,29 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return () => window.removeEventListener(POINTS_EVENT, apply);
   }, [currentSlug, selectedStudentId, selectedStudent?.name]);
 
-  const stats = useMemo(() => {
-    const empty = { streak: 0, successRate: 0, remainingHours: 0, codeDone: 0, codeTotal: 0, testRate: 0 };
-    const course = currentCourseWithDetail;
-    if (!course || !selectedStudent) return empty;
-
-    const lessons = getFlatLessons(course);
-    const codeLessons = lessons.filter((l) => !isTestLesson(l));
-    const testLessons = lessons.filter((l) => isTestLesson(l));
-    const progress = getProgress(selectedStudent.id);
-    const isDone = (l: any) => progress[`${course.id}_${l.id}`] === true;
-
-    const codeTotal = codeLessons.length;
-    const codeDone = codeLessons.filter(isDone).length;
-    const testTotal = testLessons.length;
-    const testDone = testLessons.filter(isDone).length;
-
-    const successRate = codeTotal > 0 ? Math.round((codeDone / codeTotal) * 100) : 0;
-    const testRate = testTotal > 0 ? Math.round((testDone / testTotal) * 100) : 0;
-    const remainingHours = Math.round((codeTotal - codeDone) * 0.5 * 10) / 10;
-
-    const raw = localStorage.getItem(`mooc_streak_${selectedStudent.id}`);
-    const streak = raw ? parseInt(raw, 10) || 0 : 0;
-
-    return { streak, successRate, remainingHours, codeDone, codeTotal, testRate };
-  }, [currentCourseWithDetail, selectedStudent, dbProgress]);
+  // Les mateixes xifres que el servidor (progrés propi per tema i pistes d'IA del curs), no les
+  // del navegador: `null` si el backend no les envia.
+  const serverStats = useMemo(() => {
+    const detail = detailQuery.data;
+    const topics: any[] = detail?.content ?? [];
+    if (!topics.some((topic) => topic.problemCounts && topic.myProgress)) return null;
+    const sum = { codingTotal: 0, codingAccepted: 0, testTotal: 0, testsAnswered: 0, testsCorrect: 0 };
+    for (const topic of topics) {
+      sum.codingTotal += topic.problemCounts?.coding ?? 0;
+      sum.testTotal += topic.problemCounts?.test ?? 0;
+      sum.codingAccepted += topic.myProgress?.coding_accepted ?? 0;
+      sum.testsAnswered += topic.myProgress?.tests_answered ?? 0;
+      sum.testsCorrect += topic.myProgress?.tests_correct ?? 0;
+    }
+    const total = sum.codingTotal + sum.testTotal;
+    const completed = sum.codingAccepted + sum.testsAnswered;
+    return {
+      ...sum,
+      // Com la barra de "Els meus cursos": problemes resolts (acceptats o tests contestats) sobre el total
+      progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+      hints: detail?.my_ai_hints?.enabled ? detail.my_ai_hints : null,
+    };
+  }, [detailQuery.data]);
 
   const loading =
     assignedQuery.isLoading ||
@@ -554,11 +564,18 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   );
 
   const currentCourse = currentCourseWithDetail;
-  const currentProgress = currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
+  const currentProgress = serverStats
+    ? serverStats.progress
+    : currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
+  const myPoints = ranking.find((r) => r.id === selectedStudent?.id || r.name === selectedStudent?.name)?.points
+    ?? (currentCourse?.slug && selectedStudent ? getBackendPoints(selectedStudent.id)[currentCourse.slug] : undefined);
   const progressData = selectedStudent ? getProgress(selectedStudent.id) : {};
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
-  const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData) : null;
-  const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData) : null;
+  const topicProgress = new Map<string, any>(
+    (detailQuery.data?.content ?? []).filter((topic: any) => topic.myProgress).map((topic: any) => [String(topic.id), topic.myProgress]),
+  );
+  const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData, (id) => topicProgress.get(id)?.coding_accepted) : null;
+  const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData, (id) => topicProgress.get(id)?.tests_answered) : null;
 
   const handleStatsClick = () => {
     navigate(`/courses/${currentCourse?.slug}/stats`);
@@ -596,6 +613,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                 />
             ) : (
               <>
+                {SHOW_COURSE_SWITCHER && (
                 <Box sx={{
                   display: 'inline-flex', alignItems: 'center', mb: 5, mt: tabsTopSpace,
                   bgcolor: 'background.paper', borderRadius: 999, border: '2px solid', borderColor: '#00685d', px: { xs: 2, md: 5 },
@@ -687,6 +705,15 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                     </IconButton>
                   )}
                 </Box>
+                )}
+
+                {!SHOW_COURSE_SWITCHER && currentCourse && (
+                  // Sense el selector, el nom del curs diu de quin curs són les estadístiques
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: { xs: 2, md: 3 }, mt: { xs: 0, md: 1 } }}>
+                    <ProtectedAvatar src={courseAvatarUrl(currentCourse)} alt={getText(currentCourse.title) || currentCourse.slug} sx={{ width: 36, height: 36 }} />
+                    <Typography component="h1" variant="h5" sx={{ fontWeight: 900 }}>{getText(currentCourse.title) || currentCourse.slug}</Typography>
+                  </Stack>
+                )}
 
                 {currentCourse ? (
                   <Box sx={{ display: 'flex', flexDirection: 'column' }}>
@@ -718,13 +745,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                           ) : (
                             <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                           )}
-                          <Typography
-                            variant="caption"
-                            onClick={handleStatsClick}
-                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                          >
-                            {t('dashboard.view_stats')}
-                          </Typography>
                         </DashboardCard>
                       </Grid>
 
@@ -741,13 +761,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                           ) : (
                             <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                           )}
-                          <Typography
-                            variant="caption"
-                            onClick={handleStatsClick}
-                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                          >
-                            {t('dashboard.view_stats')}
-                          </Typography>
                         </DashboardCard>
                       </Grid>
 
@@ -785,41 +798,37 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                       </Grid>
 
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.more_stats')} compact={!isMdUp}>
-                          <Stack
-                            direction={{ xs: 'row', md: 'column' }}
-                            spacing={{ xs: 2, md: 1.25 }}
-                            sx={{ flex: 1, py: { xs: 2, md: 1 }, width: '100%', justifyContent: 'space-evenly', flexWrap: { xs: 'wrap', md: 'nowrap' } }}
-                          >
-                            <Divider orientation="vertical" flexItem sx={{ display: { xs: 'none', md: 'none' } }} />
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                                {t('dashboard.code_correct', 'Problemes de programació')}:{' '}
-                                <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>
-                                  {stats.codeDone}/{stats.codeTotal}
-                                </Box>
-                              </Typography>
-                            </Box>
-                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
-
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <FactCheckOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                                {t('dashboard.tests_correct', 'Tests correctes')}:{' '}
-                                <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>
-                                  {stats.testRate}%
-                                </Box>
-                              </Typography>
-                            </Box>
-                            <Divider sx={{ display: { xs: 'none', md: 'block' } }} />
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <AccessTimeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />
-                              <Typography variant="body2" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-                                {t('dashboard.remaining')}: <Box component="span" sx={{ color: '#00685d', fontWeight: 700 }}>{stats.remainingHours}</Box> {t('dashboard.hours')}
-                              </Typography>
-                            </Box>
+                        <DashboardCard title={t('dashboard.your_stats')} compact={!isMdUp}>
+                          <Stack spacing={{ xs: 1, md: 1.25 }} sx={{ flex: 1, py: 1, width: '100%' }}>
+                            <StatRow icon={<StarIcon sx={{ color: '#f5b301', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.points_label')} value={myPoints ?? '—'} />
+                            {serverStats ? (
+                              <>
+                                {serverStats.codingTotal > 0 && (
+                                  <StatRow icon={<CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.code_correct')} value={`${serverStats.codingAccepted}/${serverStats.codingTotal}`} />
+                                )}
+                                {serverStats.testTotal > 0 && (
+                                  <StatRow
+                                    icon={<FactCheckOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />}
+                                    label={t('dashboard.tests_correct')}
+                                    value={`${serverStats.testsCorrect}/${serverStats.testsAnswered}`}
+                                    hint={t('dashboard.tests_correct_hint', { answered: serverStats.testsAnswered, total: serverStats.testTotal })}
+                                  />
+                                )}
+                                {serverStats.hints && (
+                                  <StatRow icon={<AutoAwesomeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.ai_hints_left')} value={`${serverStats.hints.hints_remaining}/${serverStats.hints.max_per_day}`} />
+                                )}
+                              </>
+                            ) : (
+                              <Typography variant="caption" color="text.secondary">{t('dashboard.no_data')}</Typography>
+                            )}
                           </Stack>
+                          <Typography
+                            variant="caption"
+                            onClick={handleStatsClick}
+                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
+                          >
+                            {t('dashboard.more_statistics')}
+                          </Typography>
                         </DashboardCard>
                       </Grid>
                     </Grid>
@@ -913,6 +922,18 @@ function TopicList({ topics, hidden, icon: Icon, onOpen, moreLabel }: {
         </Typography>
       )}
     </Stack>
+  );
+}
+
+function StatRow({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint?: string }) {
+  return (
+    <Tooltip title={hint || ''} arrow placement="top" disableHoverListener={!hint}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+        {icon}
+        <Typography variant="body2" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{label}</Typography>
+        <Typography variant="body2" sx={{ color: '#00685d', fontWeight: 800, fontSize: { xs: '0.8rem', md: '0.95rem' } }}>{value}</Typography>
+      </Box>
+    </Tooltip>
   );
 }
 

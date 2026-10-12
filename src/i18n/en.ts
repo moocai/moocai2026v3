@@ -61,7 +61,12 @@ export default {
     hours: "hours",
     code_correct: "Programming problems",
     continue_activity: "Continue the activity",
-    tests_correct: "Correct tests"
+    tests_correct: "Correct tests",
+    your_stats: "Your stats",
+    points_label: "Points",
+    tests_correct_hint: "{{answered}} answered out of {{total}}",
+    ai_hints_left: "AI hints today",
+    more_statistics: "More statistics"
   },
   home: {
     enrolled_title: "My courses",
