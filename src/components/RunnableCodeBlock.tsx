@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
-import { Box, IconButton, Tooltip } from '@mui/material';
+import { Box, Button, IconButton, Tooltip } from '@mui/material';
 import { Play, RotateCcw, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ConsolePanel, type ConsoleLine } from './ConsolePanel';
@@ -45,8 +45,22 @@ export function RunnableCodeBlock({ code }: { code: string }) {
 
   return (
     <Box sx={{ my: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden', bgcolor: '#1e1e1e' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, px: 1.25, py: 0.5, bgcolor: '#111', borderBottom: '1px solid #333', minHeight: 36 }}>
-        <Box component="span" sx={{ flex: 1, color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Fira Code', 'Consolas', monospace" }}>Python</Box>
+      {/* Executar a l'esquerra, al costat del codi (com les cel·les de Jupyter): a la dreta quedava
+          massa lluny en pantalles grans */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, bgcolor: '#111', borderBottom: '1px solid #333', minHeight: 36 }}>
+        <Button
+          size="small"
+          onClick={() => (isRunning ? stop() : void run(value))}
+          startIcon={isRunning ? <Square size={12} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
+          sx={{
+            textTransform: 'none', fontWeight: 700, fontSize: '0.8rem', minWidth: 0, px: 1.25, py: 0.25, borderRadius: 1,
+            color: isRunning ? '#f87171' : '#fff', bgcolor: isRunning ? 'transparent' : '#8400ff',
+            border: '1px solid', borderColor: isRunning ? '#f87171' : '#8400ff',
+            '&:hover': { bgcolor: isRunning ? '#2a1414' : '#6d00d4' },
+          }}
+        >
+          {isRunning ? stopLabel : runLabel}
+        </Button>
         {edited && (
           <Tooltip title={resetLabel} arrow>
             <IconButton size="small" onClick={() => setValue(code)} aria-label={resetLabel} sx={{ color: '#e5e7eb', '&:hover': { bgcolor: '#222' } }}>
@@ -54,11 +68,7 @@ export function RunnableCodeBlock({ code }: { code: string }) {
             </IconButton>
           </Tooltip>
         )}
-        <Tooltip title={isRunning ? stopLabel : runLabel} arrow>
-          <IconButton size="small" onClick={() => (isRunning ? stop() : void run(value))} aria-label={isRunning ? stopLabel : runLabel} sx={{ color: isRunning ? '#f87171' : '#e5e7eb', '&:hover': { bgcolor: '#222' } }}>
-            {isRunning ? <Square size={13} fill="currentColor" /> : <Play size={15} fill="currentColor" />}
-          </IconButton>
-        </Tooltip>
+        <Box component="span" sx={{ ml: 'auto', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Fira Code', 'Consolas', monospace" }}>Python</Box>
       </Box>
 
       <Box sx={{ height }}>

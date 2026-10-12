@@ -385,7 +385,6 @@ export default {
     python_load_error: "No s'ha pogut carregar Python. Comprova la connexió i torna-ho a provar.",
     output_truncated: "Sortida retallada: només es mostren les primeres {{count}} línies.",
     run_no_output: "El programa s'ha executat sense mostrar res. Per veure un resultat, fes servir print().",
-    run_finished: "Execució finalitzada.",
     run_stopped: "Execució aturada.",
     run_timeout: "Aturat: ha trigat més de {{seconds}} s. Potser hi ha un bucle infinit?",
     input_unavailable: "input() no funciona en aquest navegador (p. ex. en mode privat). Torna a carregar la pàgina i, si continua, prova un altre navegador.",

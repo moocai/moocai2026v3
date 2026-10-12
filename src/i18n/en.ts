@@ -387,7 +387,6 @@ export default {
     python_load_error: "Python could not be loaded. Check your connection and try again.",
     output_truncated: "Output truncated: only the first {{count}} lines are shown.",
     run_no_output: "The program ran without showing anything. Use print() to see a result.",
-    run_finished: "Execution finished.",
     run_stopped: "Execution stopped.",
     run_timeout: "Stopped: it took more than {{seconds}} s. Is there an infinite loop?",
     input_unavailable: "input() does not work in this browser (e.g. in private mode). Reload the page and, if it keeps happening, try another browser.",

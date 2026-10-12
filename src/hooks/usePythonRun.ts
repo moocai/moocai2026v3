@@ -99,7 +99,6 @@ export function usePythonRun(setLines: (lines: ConsoleLine[]) => void, resetKey?
     if (st.truncated) st.lines.push(info(t('lesson.output_truncated', 'Sortida retallada: només es mostren les primeres {{count}} línies.', { count: MAX_CONSOLE_LINES })));
     if (result.status === 'ok') {
       if (!st.lines.length) st.lines.push(info(t('lesson.run_no_output', "El programa s'ha executat sense mostrar res. Per veure un resultat, fes servir print().")));
-      st.lines.push(info(t('lesson.run_finished', 'Execució finalitzada.')));
     } else if (result.status === 'stopped') {
       st.lines.push(info(t('lesson.run_stopped', 'Execució aturada.')));
     } else if (result.status === 'timeout') {

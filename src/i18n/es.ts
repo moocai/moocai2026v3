@@ -395,7 +395,6 @@ export default {
     python_load_error: "No se ha podido cargar Python. Comprueba la conexión y vuelve a intentarlo.",
     output_truncated: "Salida recortada: solo se muestran las primeras {{count}} líneas.",
     run_no_output: "El programa se ha ejecutado sin mostrar nada. Para ver un resultado, usa print().",
-    run_finished: "Ejecución finalizada.",
     run_stopped: "Ejecución detenida.",
     run_timeout: "Detenido: ha tardado más de {{seconds}} s. ¿Quizás hay un bucle infinito?",
     input_unavailable: "input() no funciona en este navegador (p. ej. en modo privado). Vuelve a cargar la página y, si continúa, prueba otro navegador.",
