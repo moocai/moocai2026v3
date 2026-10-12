@@ -89,6 +89,11 @@ export default {
     stats_diff_none: "Encara no has fet res en aquest tema",
     stats_row_tooltip: "{{topic}} · tu: {{you}}% · mitjana de la classe: {{avg}}% · {{done}}/{{total}} fets",
     stats_value_tooltip: "El teu resultat en aquest tema: {{you}}%",
+    next_up: "Què toca ara",
+    next_up_solve: "Resol-lo",
+    next_up_answer: "Contesta",
+    next_up_not_accepted: "encara no acceptat",
+    next_up_all_done: "Has fet tots els problemes disponibles. Molt bé!",
   },
   home: {
     enrolled_title: "Els meus cursos",

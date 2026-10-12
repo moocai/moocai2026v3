@@ -2,8 +2,8 @@ import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate, useSearchParams, Link as RouterLink} from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import {useQueryClient} from '@tanstack/react-query';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
-import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, QuizOutlined as QuizOutlinedIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
+import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, QuizOutlined as QuizOutlinedIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -21,6 +21,7 @@ import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../uti
 import { userKey } from '../../services/topicTestAnswers';
 import { recentCourse, lastActiveCourse } from '../../utils/lastCourse';
 import { TopicProgressChart, type TopicProgressItem } from '../../features/student/TopicProgressChart';
+import { useSeriesColors } from '../../features/student/chartColors';
 import { resolveSlug } from '../../hooks/useCourse';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
@@ -137,9 +138,12 @@ export default function StudentDashboard() {
   const courseParam = searchParams.get('course');
   const { addNotification } = useNotifications();
   const { mode } = useThemeMode();
+  const seriesColors = useSeriesColors();
   const [, setActionLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [dbProgress, setDbProgress] = useState<Record<string, boolean>>({});
+  // Progrés local: el valor no es llegeix aquí, però en carregar-lo es torna a pintar (el % de
+  // reserva, sense dades del servidor, el llegeix del navegador)
+  const [, setDbProgress] = useState<Record<string, boolean>>({});
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState(false);
@@ -369,16 +373,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return Math.max(1, Math.round((done / totalLessons) * 100));
   };
 
-  const TEST_TYPE_VALUES = ['test', 'quiz', 'exam', 'multiple_choice'];
-  const isTestLesson = (lesson: any) =>
-    TEST_TYPE_VALUES.includes(String(lesson?.type || '').toLowerCase()) ||
-    (Array.isArray(lesson?.choices) && lesson.choices.length > 0);
-  const isCodeLesson = (lesson: any) => !isTestLesson(lesson);
-
-  const getFlatLessons = (course: Course) => {
-    const topics = getCourseTopics(course);
-    return topics.flatMap(topic => (topic.lessons || []).map(lesson => ({ ...lesson, topicTitle: topic.title })));
-  };
 
   const currentCourses = scope === 'public' ? publicCourses : assignedCourses;
   const currentCourseWithDetail = filterByScope(currentCourses, scope)[courseTabIndex] || null;
@@ -552,7 +546,29 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const currentProgress = serverStats
     ? serverStats.progress
     : currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
-  const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
+  // "Següent": el primer problema de programació sense acceptar i el primer test sense contestar,
+  // començant pel tema en curs (o l'últim) i, si ja està fet, pels anteriors (del més recent).
+  // Amb l'estat propi de cada problema que envia el servidor; `null` si no l'envia.
+  const nextUp = (() => {
+    const content: any[] = detailQuery.data?.content ?? [];
+    const subs = content.flatMap((topic: any) => topic.subTopics || []);
+    if (!subs.length || subs.every((p: any) => p.mySolution === undefined)) return null;
+    const currentIdx = content.findIndex((topic: any) => topic.current);
+    const start = currentIdx >= 0 ? currentIdx : content.length - 1;
+    const order = [content[start], ...content.slice(0, start).reverse()].filter(Boolean);
+    const find = (isTest: boolean, pending: (p: any) => boolean) => {
+      for (const topic of order) {
+        const problem = (topic.subTopics || []).find((p: any) => (p.type === 'test') === isTest && pending(p));
+        if (problem) return { slug: problem.problemSlug, title: getText(problem.subtitle), topic: getText(topic.title), topicId: String(topic.id), attempted: !!problem.mySolution };
+      }
+      return null;
+    };
+    return {
+      coding: find(false, (p) => p.mySolution?.status !== 'accepted'),
+      test: find(true, (p) => !p.mySolution),
+    };
+  })();
+
   // Gràfic per tema, amb les xifres del servidor (només els temes amb algun problema)
   const chartTopics: TopicProgressItem[] = (detailQuery.data?.content ?? [])
     .filter((topic: any) => topic.problemCounts && (topic.problemCounts.coding > 0 || topic.problemCounts.test > 0))
@@ -809,47 +825,37 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                       </Grid>
                     </Grid>
 
-                    <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper', order: { xs: 2, md: 0 } }}>
-                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-                          {t('dashboard.continue_studying')}
-                        </Typography>
-                        <Button
-                          onClick={() => navigate(`/courses/${currentCourse.slug}`)}
-                          endIcon={<ArrowForwardIcon fontSize="small" />}
-                          sx={{ textTransform: 'none', fontWeight: 900 }}
-                        >
-                          {t('dashboard.view_full_course')}
-                        </Button>
-                      </Stack>
-                      <Stack spacing={2}>
-                        {(() => {
-                          const attemptedLessons = flatLessons.filter((lesson: any) => selectedStudent && dbProgress[`${currentCourse.id}_${lesson.id}`]);
-                          return attemptedLessons.length > 0 ? attemptedLessons.slice(-5).reverse().map((lesson: any, idx: number) => {
-                            const isCompleted = dbProgress[`${currentCourse.id}_${lesson.id}`] === true;
-                            return (
-                            <Stack key={lesson.id || idx} direction="row" spacing={{ xs: 1, md: 2 }} sx={{ alignItems: 'center' }}>
-                              {isCodeLesson(lesson) ? <LaptopMacIcon sx={{ color: 'text.secondary', fontSize: { xs: 18, md: 24 } }} /> : <MenuBookIcon sx={{ color: 'text.secondary', fontSize: { xs: 18, md: 24 } }} />}
-                              <Typography variant="body2" sx={{ width: { xs: 90, md: 220, xl: 280 }, fontSize: { xs: '0.75rem', md: '0.875rem' } }} noWrap>{getText(lesson.title)}</Typography>
-                              <Tooltip title={t('dashboard.continue_activity', 'Continuar l\'activitat')} arrow placement="top">
-                                <IconButton size="small" onClick={() => navigate(`/courses/${currentCourse.slug}/${lesson.id}`)}>
-                                  <InfoOutlinedIcon fontSize="small" />
-                                </IconButton>
-                              </Tooltip>
-                              <LinearProgress variant="determinate" value={isCompleted ? 100 : 50} sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'action.disabledBackground' }} />
-                              <Typography variant="body2" sx={{ width: 44, textAlign: 'right', fontSize: { xs: '0.75rem', md: '0.875rem' } }} color="text.secondary">{isCompleted ? '100%' : '50%'}</Typography>
-                            </Stack>
-                            );
-                          }) : (
-                            <Typography variant="body2" color="text.secondary">
-                              {flatLessons.length === 0
-                                ? t('dashboard.no_lessons')
-                                : t('dashboard.no_attempted_lessons')}
-                            </Typography>
-                          );
-                        })()}
-                      </Stack>
-                    </Box>
+                    {/* Què toca ara: el següent problema de programació i el següent test per fer */}
+                    {nextUp && (
+                      <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper', order: { xs: 2, md: 0 } }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>{t('dashboard.next_up')}</Typography>
+                        {nextUp.coding || nextUp.test ? (
+                          <Stack divider={<Divider flexItem />} spacing={1.25}>
+                            {nextUp.coding && (
+                              <NextUpRow
+                                icon={<CodeIcon sx={{ color: seriesColors.coding }} />}
+                                kind={t('dashboard.chart_code')}
+                                item={nextUp.coding}
+                                status={nextUp.coding.attempted ? t('dashboard.next_up_not_accepted') : undefined}
+                                action={t('dashboard.next_up_solve')}
+                                onOpen={() => navigate(`/courses/${currentCourse.slug}/${nextUp.coding!.slug}`)}
+                              />
+                            )}
+                            {nextUp.test && (
+                              <NextUpRow
+                                icon={<FactCheckOutlinedIcon sx={{ color: seriesColors.tests }} />}
+                                kind={t('dashboard.chart_tests')}
+                                item={nextUp.test}
+                                action={t('dashboard.next_up_answer')}
+                                onOpen={() => navigate(`/courses/${currentCourse.slug}/test/${nextUp.test!.slug}?topic=${encodeURIComponent(nextUp.test!.topicId)}`)}
+                              />
+                            )}
+                          </Stack>
+                        ) : (
+                          <Typography variant="body2" color="text.secondary">{t('dashboard.next_up_all_done')}</Typography>
+                        )}
+                      </Box>
+                    )}
                   </Box>
                 ) : (
                   <Typography color="text.secondary">{t('dashboard.no_courses')}</Typography>
@@ -859,6 +865,25 @@ const isMdUp = useMediaQuery('(max-height:900px)');
         </Box>
       </Container>
     </Box>
+  );
+}
+
+function NextUpRow({ icon, kind, item, status, action, onOpen }: {
+  icon: React.ReactNode; kind: string; item: { title: string; topic: string }; status?: string; action: string; onOpen: () => void;
+}) {
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+      {icon}
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>{item.title}</Typography>
+        <Typography variant="caption" color="text.secondary" noWrap component="div">
+          {kind} · {item.topic}{status ? ` · ${status}` : ''}
+        </Typography>
+      </Box>
+      <Button variant="outlined" size="small" onClick={onOpen} endIcon={<ArrowForwardIcon fontSize="small" />} sx={{ textTransform: 'none', fontWeight: 700, flexShrink: 0 }}>
+        {action}
+      </Button>
+    </Stack>
   );
 }
 
