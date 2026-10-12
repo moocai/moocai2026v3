@@ -72,6 +72,23 @@ Tots amb `Authorization: Token {token}` (afegit per l'interceptor d'`apiClient`)
 
 ---
 
+## 2b. Avisos i enquestes
+
+Tots amb token (`apiClient`). Els avisos els publica el professorat a algorien; aquí només es llegeixen.
+
+| Mètode | Endpoint | Descripció | Servei |
+|--------|----------|------------|--------|
+| GET | `/notifications/` | Avisos de **tots** els cursos de l'usuari, del més nou al més antic: `[{ id, course: { slug, name }, text (Markdown), is_important, created_at, is_read }]`. Sense paginar. | `notificationService.getFeed` |
+| POST | `/notifications/mark-read/` | Body `{ ids?: number[] }` → `{ marked_read }`. Sense `ids`, tots els no llegits. Els d'altres cursos s'ignoren. | `notificationService.markRead` |
+| GET | `/courses/{slug}/surveys/` | Enquestes del curs en ordre (l'alumnat només rep les obertes): `[{ slug, name, description, active }]`. | `surveyService.list` |
+| GET | `/courses/{slug}/surveys/{survey}/` | Detall; **404** si està tancada. | `surveyService.get` |
+| POST | `/courses/{slug}/surveys/{survey}/answers/` | Body `{ answer }` → 201. La resposta és **anònima** (no es guarda qui l'ha enviada). | `surveyService.submitAnswer` |
+
+- **Campana** (`NotificationBell`): `useNotificationFeed` (React Query, `['notification-feed']`) es refresca cada minut i en tornar a la pestanya; el servidor no fa push. Els avisos importants sense llegir s'obren en un diàleg que només es tanca confirmant-los (`mark-read` amb el seu id).
+- **Enquestes contestades:** l'API no diu quines ha contestat l'alumne (respostes anònimes), així que es recorden a `localStorage` (`mooc_answered_surveys_<idAlumne>`, `utils/answeredSurveys.ts`): només en aquest navegador.
+
+---
+
 ## 3. `api.ts` — híbrid (localStorage + client compartit)
 
 Definit a `src/services/api.ts`; les crides HTTP van sobre l'`apiClient` de `httpClient.ts` (token i gestió de 401 automàtics). La majoria de mètodes **no fan HTTP**; sí en fan `get` i `inviteUser`.
@@ -137,6 +154,11 @@ Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldr
 | 20 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | courseService | ✅ |
 | 21 | GET | `/api/v1/courses/{slug}/students/overview/` | courseService | ✅ |
 | 22 | GET | `/api/v1/public/stats/` | statsService | ⚠️ **previst, no existeix** |
+| 23 | GET | `/api/v1/notifications/` | notificationService | ❌ |
+| 24 | POST | `/api/v1/notifications/mark-read/` | notificationService | ❌ |
+| 25 | GET | `/api/v1/courses/{slug}/surveys/` | surveyService | ❌ |
+| 26 | GET | `/api/v1/courses/{slug}/surveys/{survey}/` | surveyService | ❌ |
+| 27 | POST | `/api/v1/courses/{slug}/surveys/{survey}/answers/` | surveyService | ❌ |
 
 **Estat dels tests:** el projecte **no té cap infraestructura de test ni cap fitxer de test**. La columna «Testejat?» reflecteix l'ús observat en manual/dev, no tests automatitzats.
 

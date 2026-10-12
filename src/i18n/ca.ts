@@ -176,6 +176,37 @@ export default {
     save: "Desa els canvis"
   },
 
+  notification_center: {
+    title: "Avisos",
+    unread_count: "{{count}} sense llegir",
+    mark_all_read: "Marca-ho tot com a llegit",
+    see_all: "Veure tots els avisos",
+    empty: "Encara no hi ha cap avís.",
+    important: "Important",
+    new: "Nou",
+    all_courses: "Tots els cursos",
+    got_it: "Entesos",
+    load_error: "No s'han pogut carregar els avisos."
+  },
+  surveys: {
+    title: "Enquestes",
+    empty: "Ara mateix no hi ha cap enquesta oberta.",
+    load_error: "No s'han pogut carregar les enquestes.",
+    answer: "Respon",
+    answered: "Contestada",
+    answer_again: "Torna a respondre",
+    already_answered: "Ja has contestat aquesta enquesta. Si vols, pots enviar una altra resposta.",
+    your_answer: "La teva resposta",
+    placeholder: "Escriu la teva resposta…",
+    anonymous_hint: "Les respostes són anònimes: el professorat no veu qui les ha escrit.",
+    submit: "Envia",
+    submitting: "Enviant…",
+    submit_error: "No s'ha pogut enviar la resposta. Torna-ho a provar.",
+    thanks_title: "Gràcies per la teva resposta!",
+    thanks_text: "La resposta s'ha enviat al professorat del curs.",
+    back_to_surveys: "Torna a les enquestes",
+    not_found: "Aquesta enquesta està tancada o no existeix."
+  },
   notifications: {
     progress_saved: "Progrés desat correctament ✅",
     progress_error: "Error en desar el progrés ⚠️",

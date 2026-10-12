@@ -184,6 +184,37 @@ export default {
     save: "Guardar los cambios"
   },
 
+  notification_center: {
+    title: "Avisos",
+    unread_count: "{{count}} sin leer",
+    mark_all_read: "Marcar todo como leído",
+    see_all: "Ver todos los avisos",
+    empty: "Todavía no hay ningún aviso.",
+    important: "Importante",
+    new: "Nuevo",
+    all_courses: "Todos los cursos",
+    got_it: "Entendido",
+    load_error: "No se han podido cargar los avisos."
+  },
+  surveys: {
+    title: "Encuestas",
+    empty: "Ahora mismo no hay ninguna encuesta abierta.",
+    load_error: "No se han podido cargar las encuestas.",
+    answer: "Responder",
+    answered: "Contestada",
+    answer_again: "Volver a responder",
+    already_answered: "Ya has contestado esta encuesta. Si quieres, puedes enviar otra respuesta.",
+    your_answer: "Tu respuesta",
+    placeholder: "Escribe tu respuesta…",
+    anonymous_hint: "Las respuestas son anónimas: el profesorado no ve quién las ha escrito.",
+    submit: "Enviar",
+    submitting: "Enviando…",
+    submit_error: "No se ha podido enviar la respuesta. Inténtalo de nuevo.",
+    thanks_title: "¡Gracias por tu respuesta!",
+    thanks_text: "La respuesta se ha enviado al profesorado del curso.",
+    back_to_surveys: "Volver a las encuestas",
+    not_found: "Esta encuesta está cerrada o no existe."
+  },
   notifications: {
     progress_saved: "Progreso guardado correctamente ✅",
     progress_error: "Error al guardar el progreso ⚠️",

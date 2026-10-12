@@ -7,6 +7,9 @@ import LessonTopic from './pages/courses/${courseId}/${lesson.id}/LessonTopic';
 import TopicTestPage from './pages/courses/TopicTestPage';
 import StudentDashboard from './pages/dashboards/StudentDashboard';
 import ProfilePage from './pages/ProfilePage';
+import NotificationsPage from './pages/NotificationsPage';
+import SurveysPage from './pages/courses/SurveysPage';
+import SurveyPage from './pages/courses/SurveyPage';
 import RendimentDashboard from './features/student/RendimentDashboard';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
@@ -39,6 +42,9 @@ function App() {
           <Route path="/courses/:courseId/test/:challengeSlug" element={<TopicTestPage />} />
           <Route path="/courses/:courseId/exam/:challengeSlug" element={<LegacyExamRedirect />} />
           <Route path="/courses/:courseId/stats" element={<RendimentDashboard />} />
+          <Route path="/courses/:courseId/surveys" element={<SurveysPage />} />
+          <Route path="/courses/:courseId/surveys/:surveySlug" element={<SurveyPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

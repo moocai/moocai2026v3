@@ -178,6 +178,37 @@ export default {
     save: "Save changes"
   },
 
+  notification_center: {
+    title: "Notifications",
+    unread_count: "{{count}} unread",
+    mark_all_read: "Mark all as read",
+    see_all: "See all notifications",
+    empty: "No notifications yet.",
+    important: "Important",
+    new: "New",
+    all_courses: "All courses",
+    got_it: "Got it",
+    load_error: "Couldn't load the notifications."
+  },
+  surveys: {
+    title: "Surveys",
+    empty: "There are no open surveys right now.",
+    load_error: "Couldn't load the surveys.",
+    answer: "Answer",
+    answered: "Answered",
+    answer_again: "Answer again",
+    already_answered: "You have already answered this survey. You can send another answer if you want.",
+    your_answer: "Your answer",
+    placeholder: "Write your answer…",
+    anonymous_hint: "Answers are anonymous: teachers don't see who wrote them.",
+    submit: "Send",
+    submitting: "Sending…",
+    submit_error: "Couldn't send your answer. Try again.",
+    thanks_title: "Thanks for your answer!",
+    thanks_text: "Your answer has been sent to the course teachers.",
+    back_to_surveys: "Back to surveys",
+    not_found: "This survey is closed or doesn't exist."
+  },
   notifications: {
     progress_saved: "Progress saved successfully ✅",
     progress_error: "Error saving progress ⚠️",
