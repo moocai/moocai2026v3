@@ -11,7 +11,7 @@ export default {
     dashboard: {
     last_session: "Última sessió",
     continue: "Continuar",
-    title: "Panell de l'Alumne",
+    title: "Tauler",
     subtitle: "Gestiona el teu aprenentatge i consulta el teu progrés",
     my_progress: "El meu Progrés",
     my_courses: "Els meus cursos",
@@ -62,8 +62,8 @@ export default {
     code_correct: "Problemes de programació",
     continue_activity: "Continuar l'activitat",
     tests_correct: "Tests correctes",
+    tests_answered: "Tests contestats",
     your_stats: "Les teves estadístiques",
-    tests_correct_hint: "{{answered}} contestats de {{total}}",
     ai_hints_left: "Pistes d'IA avui",
     more_statistics: "Més estadístiques",
     topic_progress: "Progrés per tema",
@@ -73,13 +73,7 @@ export default {
     no_code_problems: "Sense problemes de programació",
     no_test_problems: "Sense tests",
     chart_bar_tooltip: "{{topic}} · {{kind}}: {{done}}/{{total}} ({{pct}}%)",
-    topics_completed: "Temes acabats",
-    topics_completed_hint: "Temes amb tots els problemes resolts",
-    ranking_position: "Posició al rànquing",
     chart_older_topics: "+{{count}} temes anteriors",
-    above_average: "Per sobre de la mitjana en {{above}} de {{total}} temes",
-    above_average_label: "Per sobre de la mitjana",
-    above_average_hint: "Temes on el teu resultat supera la mitjana de la classe"
   },
   home: {
     enrolled_title: "Els meus cursos",

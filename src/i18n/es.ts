@@ -11,7 +11,7 @@ export default {
     dashboard: {
     last_session: "Última sesión",
     continue: "Continuar",
-    title: "Panel del Alumno",
+    title: "Panel",
     subtitle: "Gestiona tu aprendizaje y consulta tu progreso",
     my_progress: "Mi Progreso",
     my_courses: "Mis cursos",
@@ -62,8 +62,8 @@ export default {
     code_correct: "Problemas de programación",
     continue_activity: "Continuar la actividad",
     tests_correct: "Tests correctos",
+    tests_answered: "Tests contestados",
     your_stats: "Tus estadísticas",
-    tests_correct_hint: "{{answered}} contestados de {{total}}",
     ai_hints_left: "Pistas de IA hoy",
     more_statistics: "Más estadísticas",
     topic_progress: "Progreso por tema",
@@ -73,13 +73,7 @@ export default {
     no_code_problems: "Sin problemas de programación",
     no_test_problems: "Sin tests",
     chart_bar_tooltip: "{{topic}} · {{kind}}: {{done}}/{{total}} ({{pct}}%)",
-    topics_completed: "Temas terminados",
-    topics_completed_hint: "Temas con todos los problemas resueltos",
-    ranking_position: "Posición en el ranking",
     chart_older_topics: "+{{count}} temas anteriores",
-    above_average: "Por encima de la media en {{above}} de {{total}} temas",
-    above_average_label: "Por encima de la media",
-    above_average_hint: "Temas en los que tu resultado supera la media de la clase"
   },
   home: {
     enrolled_title: "Mis cursos",
