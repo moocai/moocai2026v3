@@ -2,8 +2,7 @@ import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { useParams, Link as RouterLink } from 'react-router-dom';
 import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, useMediaQuery, Tooltip, IconButton, Stack} from '@mui/material';
 // Selector de curs (desactivat): Menu, MenuItem, ListItemText, Divider
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownContent } from '../../components/MarkdownContent';
 import {CheckCircle2, XCircle, FileText, Download, Star, AlertTriangle, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
 // Selector de curs (desactivat): Globe, Lock, UserCheck de lucide-react
 // import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -500,7 +499,7 @@ export default function CourseLessons() {
         )}
 
         {markdown === undefined ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
-        ) : markdown ? (<Box sx={markdownSx}><ReactMarkdown remarkPlugins={[remarkGfm]}>{markdown}</ReactMarkdown></Box>
+        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx}>{markdown}</MarkdownContent>
         ) : (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>
         )}
 
