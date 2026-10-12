@@ -530,7 +530,7 @@ export default function CourseLessons() {
       const courseMessage = type === 'coding' ? t('lesson.no_exercises', 'No hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'No hi ha tests per aquest curs.');
       return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{courseMessage}</Typography>;
     }
-    const emptyMessage = type === 'coding' ? t('lesson.no_topic_exercises', 'Aquest tema no té exercicis de programació.') : t('lesson.no_topic_tests', 'Aquest tema no té tests.');
+    const emptyMessage = type === 'coding' ? t('lesson.no_topic_exercises', 'Aquest tema no té problemes de programació.') : t('lesson.no_topic_tests', 'Aquest tema no té tests.');
 
     const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const subItems: any[] = (active.subTopics || []).filter((s: any) => s.type === type);
