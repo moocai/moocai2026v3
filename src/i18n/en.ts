@@ -64,9 +64,11 @@ export default {
     tests_correct: "Correct tests"
   },
   home: {
+    enrolled_title: "My courses",
     featured_title: "Featured Courses",
     featured_subtitle: "Start your journey with our top-rated courses. Hands-on projects included.",
     no_courses: "Login to see courses available",
+    no_courses_available: "You don't have access to any course yet.",
     why_choose_title: "Why Choose MOOC 2026?",
     features: {
       code_title: "Enterprise Grade Code",
@@ -109,7 +111,7 @@ export default {
     telegram: "Telegram",
     access: "Log in"
   },
-  course: {by: "by", enroll: "View course syllabus"},
+  course: {by: "by", enroll: "View course syllabus", go_to_course: "Go to course", percent_completed: "{{percent}}% completed"},
   common: {error_loading: "Error loading data"},
   
   profile: {

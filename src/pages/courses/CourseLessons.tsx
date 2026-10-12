@@ -15,6 +15,7 @@ import { courseService } from '../../services/courseService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug } from '../../hooks/useCourse';
 import { preloadMonaco } from '../../utils/monaco';
+import { useRecordCourseActivity } from '../../utils/lastCourse';
 // import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
@@ -44,6 +45,7 @@ type TopicFile = { id: number; name: string };
 
 export default function CourseLessons() {
   const { courseId } = useParams<{ courseId: string }>();
+  useRecordCourseActivity(courseId);
   // const navigate = useNavigate(); // selector de curs (desactivat)
   const { t, i18n } = useTranslation();
   const theme = useTheme();
