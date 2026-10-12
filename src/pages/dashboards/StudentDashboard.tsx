@@ -2,7 +2,7 @@ import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useQueryClient} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
-import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, Star as StarIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, TaskAlt as TaskAltIcon, EmojiEvents as EmojiEventsIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -19,6 +19,7 @@ import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 import { userKey } from '../../services/topicTestAnswers';
 import { recentCourse, lastActiveCourse } from '../../utils/lastCourse';
+import { TopicProgressChart, type TopicProgressItem } from '../../features/student/TopicProgressChart';
 import { resolveSlug } from '../../hooks/useCourse';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
@@ -146,6 +147,8 @@ export default function StudentDashboard() {
   const [scope, setScope] = useState<CourseScope>(() => (SHOW_COURSE_SWITCHER ? savedScope(readLastCourse()) : 'assigned'));
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
+  // Posició pròpia al rànquing del curs (la del servidor; `null` si no és alumne o no se sap)
+  const [myPosition, setMyPosition] = useState<number | null>(null);
   const [restored, setRestored] = useState(false);
   const queryClient = useQueryClient();
 
@@ -187,10 +190,8 @@ export default function StudentDashboard() {
   );
 
 const isMdUp = useMediaQuery('(max-height:900px)');
-  const isLgUp = useMediaQuery('(min-width:1200px)');
   const isFhdUp = useMediaQuery('(min-width:1800px)');
   const isQhdUp = useMediaQuery('(min-width:2300px)');
-  const lessonsSliceLimit = isMdUp ? 5 : (isQhdUp ? 13 : (isFhdUp || isLgUp ? 7 : 5));
   const isTallScreen = useMediaQuery('(min-height:1200px)');
   /* marge superior segons la mida del monitor: en 2560x1440 hi ha molt espai
      i en 1920x1080 en volem una mica més que en pantalls petites. */
@@ -377,31 +378,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return topics.flatMap(topic => (topic.lessons || []).map(lesson => ({ ...lesson, topicTitle: topic.title })));
   };
 
-  const getTopicSummaries = (
-    course: Course,
-    matches: (l: any) => boolean,
-    budget: number,
-    progress: Record<string, boolean>,
-    // Del servidor (per tema): problemes resolts d'aquest tipus; si no n'hi ha, el progrés local
-    serverDone?: (topicId: string) => number | undefined,
-  ) => {
-    const all: TopicSummary[] = getCourseTopics(course)
-      .map((topic, i) => {
-        const lessons = (topic.lessons || []).filter(matches);
-        const done = serverDone?.(String(topic.id))
-          ?? lessons.filter((l: any) => progress[`${course.id}_${l.id}`] === true).length;
-        return {
-          key: String(topic.id ?? `topic-${i}`),
-          id: topic.id != null ? String(topic.id) : '',
-          title: getText(topic.title) || getText(course.title),
-          total: lessons.length,
-          done,
-        };
-      })
-      .filter((topic) => topic.total > 0);
-    return { topics: all.slice(0, budget), hidden: Math.max(0, all.length - budget) };
-  };
-
   const currentCourses = scope === 'public' ? publicCourses : assignedCourses;
   const currentCourseWithDetail = filterByScope(currentCourses, scope)[courseTabIndex] || null;
 
@@ -449,6 +425,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     if (!currentSlug || !selectedStudentId || !isOwnCourse) {
       // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
       setRanking((prev) => (prev.length ? [] : prev));
+      setMyPosition(null);
       return;
     }
     try {
@@ -457,6 +434,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       syncOwnPointsFromList(currentSlug, list, Array.isArray(res) ? undefined : res?.me); // header i leaderboard comparteixen els mateixos punts
       const rankedList = toRanking(list);
       setRanking(rankedList);
+      setMyPosition(Array.isArray(res) ? null : (res?.me?.position ?? null));
 
       // Només demanem els avatars que es veuen: així els de dalt surten
       // de immediat i no saturen la connexió amb centenars de peticions.
@@ -540,12 +518,19 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       sum.testsAnswered += topic.myProgress?.tests_answered ?? 0;
       sum.testsCorrect += topic.myProgress?.tests_correct ?? 0;
     }
+    // Temes acabats: tots els seus problemes resolts (programació acceptada i tests contestats)
+    const withProblems = topics.filter((topic) => (topic.problemCounts?.coding ?? 0) + (topic.problemCounts?.test ?? 0) > 0);
+    const topicsCompleted = withProblems.filter((topic) =>
+      (topic.myProgress?.coding_accepted ?? 0) >= (topic.problemCounts?.coding ?? 0)
+      && (topic.myProgress?.tests_answered ?? 0) >= (topic.problemCounts?.test ?? 0)).length;
     const total = sum.codingTotal + sum.testTotal;
     const completed = sum.codingAccepted + sum.testsAnswered;
     return {
       ...sum,
       // Com la barra de "Els meus cursos": problemes resolts (acceptats o tests contestats) sobre el total
       progress: total > 0 ? Math.round((completed / total) * 100) : 0,
+      topicsCompleted,
+      topicsTotal: withProblems.length,
       hints: detail?.my_ai_hints?.enabled ? detail.my_ai_hints : null,
     };
   }, [detailQuery.data]);
@@ -567,15 +552,17 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const currentProgress = serverStats
     ? serverStats.progress
     : currentCourse && selectedStudent ? getCourseProgress(currentCourse, selectedStudent.id) : 0;
-  const myPoints = ranking.find((r) => r.id === selectedStudent?.id || r.name === selectedStudent?.name)?.points
-    ?? (currentCourse?.slug && selectedStudent ? getBackendPoints(selectedStudent.id)[currentCourse.slug] : undefined);
-  const progressData = selectedStudent ? getProgress(selectedStudent.id) : {};
   const flatLessons = currentCourse ? getFlatLessons(currentCourse) : [];
-  const topicProgress = new Map<string, any>(
-    (detailQuery.data?.content ?? []).filter((topic: any) => topic.myProgress).map((topic: any) => [String(topic.id), topic.myProgress]),
-  );
-  const codeTopics = currentCourse ? getTopicSummaries(currentCourse, isCodeLesson, lessonsSliceLimit, progressData, (id) => topicProgress.get(id)?.coding_accepted) : null;
-  const testTopics = currentCourse ? getTopicSummaries(currentCourse, isTestLesson, lessonsSliceLimit, progressData, (id) => topicProgress.get(id)?.tests_answered) : null;
+  // Gràfic per tema, amb les xifres del servidor (només els temes amb algun problema)
+  const chartTopics: TopicProgressItem[] = (detailQuery.data?.content ?? [])
+    .filter((topic: any) => topic.problemCounts && (topic.problemCounts.coding > 0 || topic.problemCounts.test > 0))
+    .map((topic: any) => ({
+      id: String(topic.id),
+      title: getText(topic.title),
+      current: !!topic.current,
+      coding: { total: topic.problemCounts.coding, done: topic.myProgress?.coding_accepted ?? 0 },
+      tests: { total: topic.problemCounts.test, done: topic.myProgress?.tests_answered ?? 0 },
+    }));
 
   const handleStatsClick = () => {
     navigate(`/courses/${currentCourse?.slug}/stats`);
@@ -732,32 +719,10 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                         </DashboardCard>
                       </Grid>
 
-                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.code_problems')} compact={!isMdUp}>
-                          {codeTopics && codeTopics.topics.length > 0 ? (
-                            <TopicList
-                              topics={codeTopics.topics}
-                              hidden={codeTopics.hidden}
-                              icon={LaptopMacIcon}
-                              onOpen={(topicId) => openTopic(1, topicId)}
-                              moreLabel={t('dashboard.and_more', { count: codeTopics.hidden })}
-                            />
-                          ) : (
-                            <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
-                          )}
-                        </DashboardCard>
-                      </Grid>
-
-                      <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
-                        <DashboardCard title={t('dashboard.test_exercises')} compact={!isMdUp}>
-                          {testTopics && testTopics.topics.length > 0 ? (
-                            <TopicList
-                              topics={testTopics.topics}
-                              hidden={testTopics.hidden}
-                              icon={MenuBookIcon}
-                              onOpen={(topicId) => openTopic(2, topicId)}
-                              moreLabel={t('dashboard.and_more', { count: testTopics.hidden })}
-                            />
+                      <Grid size={{ xs: 12, sm: 12, md: 4.8, xl: 4.8 }}>
+                        <DashboardCard title={t('dashboard.topic_progress')} compact={!isMdUp}>
+                          {chartTopics.length > 0 ? (
+                            <TopicProgressChart topics={chartTopics} onOpen={(topicId, kind) => openTopic(kind === 'coding' ? 1 : 2, topicId)} />
                           ) : (
                             <Typography variant="caption" color="text.secondary">{t('dashboard.no_lessons')}</Typography>
                           )}
@@ -799,23 +764,29 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
                       <Grid size={{ xs: 12, sm: 6, md: 2.4, xl: 2.4 }}>
                         <DashboardCard title={t('dashboard.your_stats')} compact={!isMdUp}>
-                          <Stack spacing={{ xs: 1, md: 1.25 }} sx={{ flex: 1, py: 1, width: '100%' }}>
-                            <StatRow icon={<StarIcon sx={{ color: '#f5b301', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.points_label')} value={myPoints ?? '—'} />
+                          {/* Les files es reparteixen l'alçada de la targeta (sense un forat abans de l'enllaç) */}
+                          <Stack sx={{ flex: 1, py: 1, width: '100%', justifyContent: 'space-evenly', gap: 1 }}>
                             {serverStats ? (
                               <>
                                 {serverStats.codingTotal > 0 && (
-                                  <StatRow icon={<CodeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.code_correct')} value={`${serverStats.codingAccepted}/${serverStats.codingTotal}`} />
+                                  <StatRow icon={<CodeIcon sx={statIconSx} />} label={t('dashboard.code_correct')} value={`${serverStats.codingAccepted}/${serverStats.codingTotal}`} />
                                 )}
                                 {serverStats.testTotal > 0 && (
                                   <StatRow
-                                    icon={<FactCheckOutlinedIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />}
+                                    icon={<FactCheckOutlinedIcon sx={statIconSx} />}
                                     label={t('dashboard.tests_correct')}
-                                    value={`${serverStats.testsCorrect}/${serverStats.testsAnswered}`}
+                                    value={serverStats.testsAnswered > 0
+                                      ? `${serverStats.testsCorrect}/${serverStats.testsAnswered} (${Math.round((serverStats.testsCorrect / serverStats.testsAnswered) * 100)}%)`
+                                      : '—'}
                                     hint={t('dashboard.tests_correct_hint', { answered: serverStats.testsAnswered, total: serverStats.testTotal })}
                                   />
                                 )}
+                                <StatRow icon={<TaskAltIcon sx={statIconSx} />} label={t('dashboard.topics_completed')} value={`${serverStats.topicsCompleted}/${serverStats.topicsTotal}`} hint={t('dashboard.topics_completed_hint')} />
+                                {myPosition != null && (
+                                  <StatRow icon={<EmojiEventsIcon sx={statIconSx} />} label={t('dashboard.ranking_position')} value={`#${myPosition}`} />
+                                )}
                                 {serverStats.hints && (
-                                  <StatRow icon={<AutoAwesomeIcon sx={{ color: '#00685d', fontSize: { xs: 22, md: 26 } }} />} label={t('dashboard.ai_hints_left')} value={`${serverStats.hints.hints_remaining}/${serverStats.hints.max_per_day}`} />
+                                  <StatRow icon={<AutoAwesomeIcon sx={statIconSx} />} label={t('dashboard.ai_hints_left')} value={`${serverStats.hints.hints_remaining}/${serverStats.hints.max_per_day}`} />
                                 )}
                               </>
                             ) : (
@@ -886,44 +857,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   );
 }
 
-type TopicSummary = { key: string; id: string; title: string; total: number; done: number };
-
-function TopicList({ topics, hidden, icon: Icon, onOpen, moreLabel }: {
-  topics: TopicSummary[];
-  hidden: number;
-  icon: typeof LaptopMacIcon;
-  onOpen: (topicId: string) => void;
-  moreLabel: string;
-}) {
-  return (
-    <Stack spacing={{ xs: 1, xl: 1.5 }} sx={{ width: '100%', mt: 1 }}>
-      {topics.map((topic) => (
-        <Stack
-          key={topic.key}
-          direction="row" spacing={1}
-          sx={{ alignItems: 'center', width: '100%', cursor: 'pointer', transition: 'color 0.15s', '&:hover': { '& .MuiTypography-root': { color: '#8400ff' } } }}
-          onClick={() => onOpen(topic.id)}
-        >
-          <Icon sx={{ color: 'text.secondary', fontSize: 16 }} />
-          <Typography variant="caption" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', xl: '0.85rem' } }} noWrap>{topic.title}</Typography>
-          <LinearProgress
-            variant="determinate"
-            value={topic.total > 0 ? Math.round((topic.done / topic.total) * 100) : 0}
-            sx={{ width: 40, height: 6, borderRadius: 3, bgcolor: 'action.disabledBackground' }}
-          />
-        </Stack>
-      ))}
-      {hidden > 0 && (
-        <Typography
-          variant="caption"
-          sx={{ display: 'block', width: '100%', textAlign: 'left', color: 'text.secondary', fontSize: { xs: '0.7rem', xl: '0.75rem' } }}
-        >
-          {moreLabel}
-        </Typography>
-      )}
-    </Stack>
-  );
-}
+const statIconSx = { color: '#00685d', fontSize: { xs: 22, md: 26 } };
 
 function StatRow({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint?: string }) {
   return (

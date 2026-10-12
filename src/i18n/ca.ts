@@ -63,10 +63,21 @@ export default {
     continue_activity: "Continuar l'activitat",
     tests_correct: "Tests correctes",
     your_stats: "Les teves estadístiques",
-    points_label: "Punts",
     tests_correct_hint: "{{answered}} contestats de {{total}}",
     ai_hints_left: "Pistes d'IA avui",
-    more_statistics: "Més estadístiques"
+    more_statistics: "Més estadístiques",
+    topic_progress: "Progrés per tema",
+    chart_code: "Programació",
+    chart_tests: "Tests",
+    chart_none: "Sense problemes",
+    no_code_problems: "Sense problemes de programació",
+    no_test_problems: "Sense tests",
+    chart_bar_tooltip: "{{topic}} · {{kind}}: {{done}}/{{total}} ({{pct}}%)",
+    topics_completed: "Temes acabats",
+    topics_completed_hint: "Temes amb tots els problemes resolts",
+    ranking_position: "Posició al rànquing",
+    chart_previous: "Temes anteriors",
+    chart_next: "Temes següents"
   },
   home: {
     enrolled_title: "Els meus cursos",
