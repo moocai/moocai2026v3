@@ -18,6 +18,8 @@ import { courseImages } from '../../data/courses';
 import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
 import { userKey } from '../../services/topicTestAnswers';
+import { recentCourse } from '../../utils/lastCourse';
+import { resolveSlug } from '../../hooks/useCourse';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -289,6 +291,23 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return () => window.removeEventListener('auth-state-change', onAuthChange);
   }, [queryClient]);
 
+  // En iniciar sessió: a l'últim curs on s'ha fet alguna cosa (si fa poc i encara hi té
+  // accés); si no, a "Els meus cursos" de la pàgina de cursos.
+  const goAfterLogin = async () => {
+    const slug = recentCourse();
+    if (slug) {
+      const lists = await Promise.all([
+        queryClient.fetchQuery({ queryKey: ALL_COURSES_KEY, queryFn: () => courseService.getAllCourses() }),
+        queryClient.fetchQuery({ queryKey: PUBLIC_COURSES_KEY, queryFn: () => courseService.getPublicCourses() }),
+      ].map((p) => p.catch(() => [] as Course[])));
+      if (lists.flat().some((c) => c.slug === resolveSlug(slug))) {
+        navigate(`/courses/${slug}`);
+        return;
+      }
+    }
+    navigate('/', { state: { scrollTo: 'courses' } });
+  };
+
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setLoginLoading(true);
@@ -310,6 +329,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       setLoginLoading(false);
       addNotification(t('notifications.welcome', { name: student.name }), 'success');
       window.dispatchEvent(new Event('auth-state-change'));
+      await goAfterLogin();
     } catch (err: any) {
       setLoginError(true);
       setLoginLoading(false);
