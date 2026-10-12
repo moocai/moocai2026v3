@@ -501,7 +501,7 @@ export default function CourseLessons() {
         )}
 
         {markdown === undefined ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
-        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx}>{markdown}</MarkdownContent>
+        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx} runnablePython>{markdown}</MarkdownContent>
         ) : (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>
         )}
 

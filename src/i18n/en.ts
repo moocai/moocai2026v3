@@ -374,6 +374,7 @@ export default {
     no_solution_available: "There is no solution available for this exercise.",
     no_other_solutions: "There are no student solutions.",
     reset_tooltip: "Start over: restore the starter code",
+    theory_reset_code: "Restore the original code",
     submit_tooltip: "Submit your solution to the server",
     show_live_render: "Show the preview",
     run_button: "Run",

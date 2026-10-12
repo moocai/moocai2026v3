@@ -84,7 +84,7 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
         flexShrink: 0
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.console', 'Consola').toUpperCase()}</Typography>
+          <Typography component="span" sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.console', 'Consola').toUpperCase()}</Typography>
         </Box>
       </Box>
       {/* Clicar a la consola posa el cursor al camp d'entrada, com en un terminal */}

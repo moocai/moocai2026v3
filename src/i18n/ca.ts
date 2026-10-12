@@ -372,6 +372,7 @@ export default {
     no_solution_available: "No hi ha solució disponible per aquest exercici.",
     no_other_solutions: "No hi ha solucions d'estudiants.",
     reset_tooltip: "Torna a començar: recupera el codi inicial",
+    theory_reset_code: "Recupera el codi original",
     submit_tooltip: "Envia la teva solució al servidor",
     show_live_render: "Mostra la visualització",
     run_button: "Executar",

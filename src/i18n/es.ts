@@ -382,6 +382,7 @@ export default {
     no_solution_available: "No hay solución disponible para este ejercicio.",
     no_other_solutions: "No hay soluciones de estudiantes.",
     reset_tooltip: "Volver a empezar: recupera el código inicial",
+    theory_reset_code: "Recupera el código original",
     submit_tooltip: "Envía tu solución al servidor",
     show_live_render: "Mostrar la visualización",
     run_button: "Ejecutar",
