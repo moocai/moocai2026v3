@@ -63,10 +63,21 @@ export default {
     continue_activity: "Continuar la actividad",
     tests_correct: "Tests correctos",
     your_stats: "Tus estadísticas",
-    points_label: "Puntos",
     tests_correct_hint: "{{answered}} contestados de {{total}}",
     ai_hints_left: "Pistas de IA hoy",
-    more_statistics: "Más estadísticas"
+    more_statistics: "Más estadísticas",
+    topic_progress: "Progreso por tema",
+    chart_code: "Programación",
+    chart_tests: "Tests",
+    chart_none: "Sin problemas",
+    no_code_problems: "Sin problemas de programación",
+    no_test_problems: "Sin tests",
+    chart_bar_tooltip: "{{topic}} · {{kind}}: {{done}}/{{total}} ({{pct}}%)",
+    topics_completed: "Temas terminados",
+    topics_completed_hint: "Temas con todos los problemas resueltos",
+    ranking_position: "Posición en el ranking",
+    chart_previous: "Temas anteriores",
+    chart_next: "Temas siguientes"
   },
   home: {
     enrolled_title: "Mis cursos",
