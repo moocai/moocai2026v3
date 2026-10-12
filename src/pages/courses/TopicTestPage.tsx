@@ -210,7 +210,8 @@ export default function TopicTestPage() {
   }
 
   const title = topicTest.title || topicTest.name || getText(topicTest.subtitle) || currentTestSlug;
-  const statement = topicTest.statement_ca || topicTest.statement || topicTest.description || getText(topicTest.text) || '';
+  // `statement` arriba de mapProblem com a objecte per idioma ({ ca, es, en }): cal triar-ne el text
+  const statement = getText(topicTest.statement) || getText(topicTest.text) || '';
   const choices: any[] = topicTest.choices || [];
 
   const isMultiChoice = topicTest.choiceType
