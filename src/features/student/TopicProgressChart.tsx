@@ -1,4 +1,5 @@
-import { Box, Stack, Tooltip, Typography, useTheme } from '@mui/material';
+import { Box, Stack, Tooltip, Typography } from '@mui/material';
+import { useSeriesColors } from './chartColors';
 import { useTranslation } from 'react-i18next';
 
 /** Un tema del gràfic: problemes visibles i resolts de cada tipus (del servidor). */
@@ -10,9 +11,6 @@ export type TopicProgressItem = {
   tests: { total: number; done: number };
 };
 
-// Colors de les dues sèries, validats (separació per daltonisme i contrast) sobre el fons de
-// les targetes en clar i en fosc: programació = el color principal del tema, tests = verd blavós.
-const TESTS_COLOR = '#0d9488';
 
 /** Temes que hi caben sense fer créixer la targeta (la mateixa alçada que el rànquing). */
 const TOPIC_CHART_MAX = 5;
@@ -24,10 +22,10 @@ const TOPIC_CHART_MAX = 5;
  */
 export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressItem[]; onOpen: (topicId: string, kind: 'coding' | 'tests') => void }) {
   const { t } = useTranslation();
-  const theme = useTheme();
+  const colors = useSeriesColors();
   const series = [
-    { key: 'coding' as const, label: t('dashboard.chart_code'), color: theme.palette.primary.main, empty: t('dashboard.no_code_problems') },
-    { key: 'tests' as const, label: t('dashboard.chart_tests'), color: TESTS_COLOR, empty: t('dashboard.no_test_problems') },
+    { key: 'coding' as const, label: t('dashboard.chart_code'), color: colors.coding, empty: t('dashboard.no_code_problems') },
+    { key: 'tests' as const, label: t('dashboard.chart_tests'), color: colors.tests, empty: t('dashboard.no_test_problems') },
   ];
   const shown = [...topics].reverse().slice(0, TOPIC_CHART_MAX);
   const older = topics.length - shown.length;
