@@ -89,6 +89,11 @@ export default {
     stats_diff_none: "Todavía no has hecho nada en este tema",
     stats_row_tooltip: "{{topic}} · tú: {{you}}% · media de la clase: {{avg}}% · {{done}}/{{total}} hechos",
     stats_value_tooltip: "Tu resultado en este tema: {{you}}%",
+    next_up: "Lo siguiente",
+    next_up_solve: "Resolver",
+    next_up_answer: "Contestar",
+    next_up_not_accepted: "todavía no aceptado",
+    next_up_all_done: "Has hecho todos los problemas disponibles. ¡Muy bien!",
   },
   home: {
     enrolled_title: "Mis cursos",

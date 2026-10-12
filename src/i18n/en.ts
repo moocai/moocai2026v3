@@ -89,6 +89,11 @@ export default {
     stats_diff_none: "You have not done anything in this topic yet",
     stats_row_tooltip: "{{topic}} · you: {{you}}% · class average: {{avg}}% · {{done}}/{{total}} done",
     stats_value_tooltip: "Your result in this topic: {{you}}%",
+    next_up: "Next up",
+    next_up_solve: "Solve",
+    next_up_answer: "Answer",
+    next_up_not_accepted: "not accepted yet",
+    next_up_all_done: "You have done every problem available. Well done!",
   },
   home: {
     enrolled_title: "My courses",
