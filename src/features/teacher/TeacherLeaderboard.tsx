@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Box, Typography, Card, Avatar, Stack, Tabs, Tab, Chip, useTheme, Grid } from '@mui/material';
 import { Trophy, Medal, TrendingUp } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { StarScore } from '../../components/StarScore';
 import { courseService } from '../../services/courseService';
 
 interface StudentData {
@@ -240,7 +241,7 @@ export function TeacherLeaderboard() {
                         </Box>
 
                         <Chip
-                          label={`${student.totalPoints} ${t('teacher.puntos')}`}
+                          label={<StarScore value={student.totalPoints} size={14} />}
                           sx={{ 
                             fontWeight: 900, 
                             bgcolor: isTop3 ? medalColor : 'primary.main',

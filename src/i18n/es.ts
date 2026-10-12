@@ -32,7 +32,7 @@ export default {
     role_teacher: "Profesor",
     register_student: "Registrar Alumno",
     register_teacher: "Registrar Profesor",
-    points: "puntos",
+    points: "estrellas",
     leaderboard: "CLASIFICACIÓN",
     syllabus: "Temario",
     activities: "Laboratorio",
@@ -149,7 +149,9 @@ export default {
     percent_completed: "{{percent}}% completado"
   },
   common: {
-    error_loading: "Error al cargar los datos"
+    error_loading: "Error al cargar los datos",
+    stars_count_one: "{{count}} estrella",
+    stars_count_other: "{{count}} estrellas"
   },
   profile: {
     preferences: "Preferencias",
@@ -285,8 +287,7 @@ export default {
     corregirEjerciciosDesc: "Revisa y califica los ejercicios entregados",
     gestionarHackathonDesc: "Gestiona el hackathon actual",
     clasificacion: "Clasificación",
-    clasificacionDesc: "Ranking de alumnos por puntos",
-    puntos: "puntos",
+    clasificacionDesc: "Ranking de alumnos por estrellas",
     ejerciciosMin: "ejercicios",
     alumnosActivos: "Alumnos Activos",
     ejerciciosTotales: "Ejercicios Totales",
@@ -345,7 +346,6 @@ export default {
     save: "GUARDAR",
     saved: "GUARDADO",
     pending: "PENDIENTE",
-    points_label: "PUNTOS",
     no_instructions: "No hay instrucciones disponibles.",
     hide_hint: "Ocultar Pista",
     need_help: "¿Necesitas Ayuda?",
@@ -458,8 +458,8 @@ export default {
     review_request: "Revisión IA de tu solución aceptada",
     review_done: "Revisión completada.",
     review_error: "No se ha podido obtener la revisión. Comprueba la conexión.",
-    points_already_solved: "Ya lo habías resuelto: este envío no suma puntos.",
-    points_topic_closed: "Los envíos de este tema ya no suman puntos.",
+    points_already_solved: "Ya lo habías resuelto: este envío no suma estrellas.",
+    points_topic_closed: "Los envíos de este tema ya no suman estrellas.",
     hide_live_render: "Ocultar la visualización",
     close_topics: "Cerrar los temas",
     open_topics: "Abrir los temas",
@@ -484,8 +484,9 @@ export default {
     reset: "Reiniciar",
     diagnostics_errors: "Errores: {{count}}",
     diagnostics_warnings: "Avisos: {{count}}",
-    points_earned: "¡+{{points}} puntos!",
-    total_points: "Puntos totales: {{points}}",
+    points_earned_one: "¡+{{count}} estrella!",
+    points_earned_other: "¡+{{count}} estrellas!",
+    total_points: "Estrellas totales: {{count}}",
     sending: "Enviando al servidor...",
     submitted: "Respuesta enviada al servidor"
   },

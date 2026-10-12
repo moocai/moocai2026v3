@@ -5,32 +5,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha} from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
-import { Trophy } from 'lucide-react';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
 import { NotificationBell } from './NotificationBell';
+import { StarScore } from './StarScore';
 // Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
 import { usePoints } from '../utils/pointsSync';
 const logo = '/img/logo.webp';
 
-/** Pastilla de punts, pensada per anar al costat de l'àvia. */
+/** Pastilla d'estrelles (la puntuació), pensada per anar al costat de l'àvia. */
 function PointsBadge({ points }: { points: number }) {
-  const { t } = useTranslation();
   return (
     <Box
-      title={`${t('lesson.points_label')}: ${points}`}
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.5,
         px: 1, height: 32, borderRadius: 999, flexShrink: 0,
         bgcolor: alpha('#8400ff', 0.15), border: '1px solid', borderColor: alpha('#8400ff', 0.4),
       }}
     >
-      <Trophy size={16} color="#8400ff" />
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }}>
-        {points}
-      </Typography>
+      <StarScore value={points} sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }} />
     </Box>
   );
 }
