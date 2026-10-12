@@ -11,7 +11,7 @@ export default {
     dashboard: {
     last_session: "Last session",
     continue: "Continue",
-    title: "Student Dashboard",
+    title: "Dashboard",
     subtitle: "Manage your learning and check your progress",
     my_progress: "My Progress",
     my_courses: "My courses",
@@ -62,8 +62,8 @@ export default {
     code_correct: "Programming problems",
     continue_activity: "Continue the activity",
     tests_correct: "Correct tests",
+    tests_answered: "Tests answered",
     your_stats: "Your stats",
-    tests_correct_hint: "{{answered}} answered out of {{total}}",
     ai_hints_left: "AI hints today",
     more_statistics: "More statistics",
     topic_progress: "Progress by topic",
@@ -73,13 +73,7 @@ export default {
     no_code_problems: "No programming problems",
     no_test_problems: "No tests",
     chart_bar_tooltip: "{{topic}} · {{kind}}: {{done}}/{{total}} ({{pct}}%)",
-    topics_completed: "Topics completed",
-    topics_completed_hint: "Topics with every problem solved",
-    ranking_position: "Ranking position",
     chart_older_topics: "+{{count}} earlier topics",
-    above_average: "Above average in {{above}} of {{total}} topics",
-    above_average_label: "Above average",
-    above_average_hint: "Topics where your result beats the class average"
   },
   home: {
     enrolled_title: "My courses",

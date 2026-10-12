@@ -1,8 +1,9 @@
 import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
-import {useNavigate} from 'react-router-dom';
-import {useQuery, useQueryClient} from '@tanstack/react-query';
+import {useNavigate, useSearchParams, Link as RouterLink} from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
+import {useQueryClient} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
-import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, TaskAlt as TaskAltIcon, TrendingUp as TrendingUpIcon, EmojiEvents as EmojiEventsIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, QuizOutlined as QuizOutlinedIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -131,6 +132,9 @@ function toRanking(data: any[]): RankedStudent[] {
 export default function StudentDashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
+  // `?course=<slug>`: el tauler d'un curs concret (l'enllaç "Tauler" del menú des d'un curs)
+  const [searchParams] = useSearchParams();
+  const courseParam = searchParams.get('course');
   const { addNotification } = useNotifications();
   const { mode } = useThemeMode();
   const [, setActionLoading] = useState(false);
@@ -147,8 +151,6 @@ export default function StudentDashboard() {
   const [scope, setScope] = useState<CourseScope>(() => (SHOW_COURSE_SWITCHER ? savedScope(readLastCourse()) : 'assigned'));
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
-  // Posició pròpia al rànquing del curs (la del servidor; `null` si no és alumne o no se sap)
-  const [myPosition, setMyPosition] = useState<number | null>(null);
   const [restored, setRestored] = useState(false);
   const queryClient = useQueryClient();
 
@@ -406,11 +408,18 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     const query = scope === 'public' ? publicQuery : assignedQuery;
     if (!query.isFetched) return;
     // Sense selector: el curs on ha treballat per última vegada; si no, el que mirava al tauler
-    const slug = SHOW_COURSE_SWITCHER ? saved?.slug : (lastActiveCourse() ?? saved?.slug);
+    const slug = SHOW_COURSE_SWITCHER ? saved?.slug : (courseParam ?? lastActiveCourse() ?? saved?.slug);
     const idx = slug ? visibleCourses.findIndex((c) => c.slug === slug) : -1;
     if (idx >= 0) setCourseTabIndex(idx);
     setRestored(true);
   }, [restored, isLoggedIn, scope, visibleCourses, publicQuery.isFetched, assignedQuery.isFetched]);
+
+  // Ja dins del tauler, un altre `?course=` (p. ex. tornar enrere al navegador) canvia de curs
+  useEffect(() => {
+    if (!restored || !courseParam) return;
+    const idx = visibleCourses.findIndex((c) => c.slug === courseParam);
+    if (idx >= 0) setCourseTabIndex(idx);
+  }, [restored, courseParam, visibleCourses]);
 
   const selectedStudentId = selectedStudent?.id;
 
@@ -425,7 +434,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     if (!currentSlug || !selectedStudentId || !isOwnCourse) {
       // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
       setRanking((prev) => (prev.length ? [] : prev));
-      setMyPosition(null);
       return;
     }
     try {
@@ -434,7 +442,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       syncOwnPointsFromList(currentSlug, list, Array.isArray(res) ? undefined : res?.me); // header i leaderboard comparteixen els mateixos punts
       const rankedList = toRanking(list);
       setRanking(rankedList);
-      setMyPosition(Array.isArray(res) ? null : (res?.me?.position ?? null));
 
       // Només demanem els avatars que es veuen: així els de dalt surten
       // de immediat i no saturen la connexió amb centenars de peticions.
@@ -504,33 +511,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return () => window.removeEventListener(POINTS_EVENT, apply);
   }, [currentSlug, selectedStudentId, selectedStudent?.name]);
 
-  // Rendiment propi vs. mitjana de la classe per tema (només als cursos on és alumne)
-  const isStudentOfCurrent = visibleCourses.find((c) => c.slug === currentSlug)?.myRole === 'student';
-  const statisticsQuery = useQuery({
-    queryKey: ['course-statistics', currentSlug],
-    queryFn: () => courseService.getCourseStatistics(currentSlug!),
-    enabled: !!currentSlug && isStudentOfCurrent,
-    staleTime: 5 * 60 * 1000,
-    retry: 1,
-  });
-  // Temes on supera la mitjana: per tema, la mitjana dels seus resultats (programació i tests)
-  // contra la de la classe. Només temes on la classe ja ha fet alguna cosa.
-  const aboveAverage = useMemo(() => {
-    const data = statisticsQuery.data;
-    if (!data) return null;
-    const byTopic = new Map<string, { mine: number[]; avg: number[] }>();
-    for (const row of [...(data.coding_data ?? []), ...(data.test_data ?? [])]) {
-      const entry = byTopic.get(row.topic) ?? { mine: [], avg: [] };
-      entry.mine.push(Number(row.user_performance) || 0);
-      entry.avg.push(Number(row.class_average) || 0);
-      byTopic.set(row.topic, entry);
-    }
-    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
-    const topics = [...byTopic.values()].filter((e) => mean(e.avg) > 0);
-    if (topics.length === 0) return null;
-    return { above: topics.filter((e) => mean(e.mine) > mean(e.avg)).length, total: topics.length };
-  }, [statisticsQuery.data]);
-
   // Les mateixes xifres que el servidor (progrés propi per tema i pistes d'IA del curs), no les
   // del navegador: `null` si el backend no les envia.
   const serverStats = useMemo(() => {
@@ -545,19 +525,12 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       sum.testsAnswered += topic.myProgress?.tests_answered ?? 0;
       sum.testsCorrect += topic.myProgress?.tests_correct ?? 0;
     }
-    // Temes acabats: tots els seus problemes resolts (programació acceptada i tests contestats)
-    const withProblems = topics.filter((topic) => (topic.problemCounts?.coding ?? 0) + (topic.problemCounts?.test ?? 0) > 0);
-    const topicsCompleted = withProblems.filter((topic) =>
-      (topic.myProgress?.coding_accepted ?? 0) >= (topic.problemCounts?.coding ?? 0)
-      && (topic.myProgress?.tests_answered ?? 0) >= (topic.problemCounts?.test ?? 0)).length;
     const total = sum.codingTotal + sum.testTotal;
     const completed = sum.codingAccepted + sum.testsAnswered;
     return {
       ...sum,
       // Com la barra de "Els meus cursos": problemes resolts (acceptats o tests contestats) sobre el total
       progress: total > 0 ? Math.round((completed / total) * 100) : 0,
-      topicsCompleted,
-      topicsTotal: withProblems.length,
       hints: detail?.my_ai_hints?.enabled ? detail.my_ai_hints : null,
     };
   }, [detailQuery.data]);
@@ -722,20 +695,14 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                 )}
 
                 {!SHOW_COURSE_SWITCHER && currentCourse && (
-                  // Sense el selector, el nom del curs diu de quin curs són les estadístiques
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: { xs: 2, md: 3 }, mt: { xs: 0, md: 1 }, flexWrap: 'wrap', rowGap: 1 }}>
-                    <ProtectedAvatar src={courseAvatarUrl(currentCourse)} alt={getText(currentCourse.title) || currentCourse.slug} sx={{ width: 36, height: 36 }} />
-                    <Typography component="h1" variant="h5" sx={{ fontWeight: 900, flex: 1, minWidth: 0 }}>{getText(currentCourse.title) || currentCourse.slug}</Typography>
-                    {/* Tornar al curs, ben visible (abans només hi havia l'enllaç de "Continua estudiant") */}
-                    <Button
-                      variant="contained"
-                      onClick={() => navigate(`/courses/${currentCourse.slug}`)}
-                      endIcon={<ArrowForwardIcon fontSize="small" />}
-                      sx={{ fontWeight: 800, borderRadius: 999, px: 2.5 }}
-                    >
-                      {t('course.go_to_course')}
+                  // Sense el selector: tornar al curs com a les pàgines de test i de problema (el nom
+                  // del curs, que també diu de quin curs és el tauler) i el títol de la pàgina
+                  <Box sx={{ mb: { xs: 2, md: 3 } }}>
+                    <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+                      {getText(currentCourse.title) || currentCourse.slug}
                     </Button>
-                  </Stack>
+                    <Typography component="h1" variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>{t('dashboard.title')}</Typography>
+                  </Box>
                 )}
 
                 {currentCourse ? (
@@ -809,20 +776,19 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                                 )}
                                 {serverStats.testTotal > 0 && (
                                   <StatRow
+                                    icon={<QuizOutlinedIcon sx={statIconSx} />}
+                                    label={t('dashboard.tests_answered')}
+                                    value={`${serverStats.testsAnswered}/${serverStats.testTotal} (${Math.round((serverStats.testsAnswered / serverStats.testTotal) * 100)}%)`}
+                                  />
+                                )}
+                                {serverStats.testTotal > 0 && (
+                                  <StatRow
                                     icon={<FactCheckOutlinedIcon sx={statIconSx} />}
                                     label={t('dashboard.tests_correct')}
                                     value={serverStats.testsAnswered > 0
                                       ? `${serverStats.testsCorrect}/${serverStats.testsAnswered} (${Math.round((serverStats.testsCorrect / serverStats.testsAnswered) * 100)}%)`
                                       : '—'}
-                                    hint={t('dashboard.tests_correct_hint', { answered: serverStats.testsAnswered, total: serverStats.testTotal })}
                                   />
-                                )}
-                                <StatRow icon={<TaskAltIcon sx={statIconSx} />} label={t('dashboard.topics_completed')} value={`${serverStats.topicsCompleted}/${serverStats.topicsTotal}`} hint={t('dashboard.topics_completed_hint')} />
-                                {aboveAverage && (
-                                  <StatRow icon={<TrendingUpIcon sx={statIconSx} />} label={t('dashboard.above_average_label')} value={`${aboveAverage.above}/${aboveAverage.total}`} hint={`${t('dashboard.above_average', aboveAverage)}. ${t('dashboard.above_average_hint')}`} />
-                                )}
-                                {myPosition != null && (
-                                  <StatRow icon={<EmojiEventsIcon sx={statIconSx} />} label={t('dashboard.ranking_position')} value={`#${myPosition}`} />
                                 )}
                                 {serverStats.hints && (
                                   <StatRow icon={<AutoAwesomeIcon sx={statIconSx} />} label={t('dashboard.ai_hints_left')} value={`${serverStats.hints.hints_remaining}/${serverStats.hints.max_per_day}`} />
