@@ -76,8 +76,10 @@ export default {
     topics_completed: "Temes acabats",
     topics_completed_hint: "Temes amb tots els problemes resolts",
     ranking_position: "Posició al rànquing",
-    chart_previous: "Temes anteriors",
-    chart_next: "Temes següents"
+    chart_older_topics: "+{{count}} temes anteriors",
+    above_average: "Per sobre de la mitjana en {{above}} de {{total}} temes",
+    above_average_label: "Per sobre de la mitjana",
+    above_average_hint: "Temes on el teu resultat supera la mitjana de la classe"
   },
   home: {
     enrolled_title: "Els meus cursos",

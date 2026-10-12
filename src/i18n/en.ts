@@ -76,8 +76,10 @@ export default {
     topics_completed: "Topics completed",
     topics_completed_hint: "Topics with every problem solved",
     ranking_position: "Ranking position",
-    chart_previous: "Previous topics",
-    chart_next: "Next topics"
+    chart_older_topics: "+{{count}} earlier topics",
+    above_average: "Above average in {{above}} of {{total}} topics",
+    above_average_label: "Above average",
+    above_average_hint: "Topics where your result beats the class average"
   },
   home: {
     enrolled_title: "My courses",

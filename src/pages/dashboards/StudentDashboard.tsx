@@ -1,8 +1,8 @@
 import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {useQueryClient} from '@tanstack/react-query';
+import {useQuery, useQueryClient} from '@tanstack/react-query';
 import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, LinearProgress, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
-import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, TaskAlt as TaskAltIcon, EmojiEvents as EmojiEventsIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
+import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, MenuBook as MenuBookIcon, LaptopMac as LaptopMacIcon, InfoOutlined as InfoOutlinedIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, TaskAlt as TaskAltIcon, TrendingUp as TrendingUpIcon, EmojiEvents as EmojiEventsIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
 import {useTranslation} from 'react-i18next';
@@ -504,6 +504,33 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     return () => window.removeEventListener(POINTS_EVENT, apply);
   }, [currentSlug, selectedStudentId, selectedStudent?.name]);
 
+  // Rendiment propi vs. mitjana de la classe per tema (només als cursos on és alumne)
+  const isStudentOfCurrent = visibleCourses.find((c) => c.slug === currentSlug)?.myRole === 'student';
+  const statisticsQuery = useQuery({
+    queryKey: ['course-statistics', currentSlug],
+    queryFn: () => courseService.getCourseStatistics(currentSlug!),
+    enabled: !!currentSlug && isStudentOfCurrent,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+  // Temes on supera la mitjana: per tema, la mitjana dels seus resultats (programació i tests)
+  // contra la de la classe. Només temes on la classe ja ha fet alguna cosa.
+  const aboveAverage = useMemo(() => {
+    const data = statisticsQuery.data;
+    if (!data) return null;
+    const byTopic = new Map<string, { mine: number[]; avg: number[] }>();
+    for (const row of [...(data.coding_data ?? []), ...(data.test_data ?? [])]) {
+      const entry = byTopic.get(row.topic) ?? { mine: [], avg: [] };
+      entry.mine.push(Number(row.user_performance) || 0);
+      entry.avg.push(Number(row.class_average) || 0);
+      byTopic.set(row.topic, entry);
+    }
+    const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    const topics = [...byTopic.values()].filter((e) => mean(e.avg) > 0);
+    if (topics.length === 0) return null;
+    return { above: topics.filter((e) => mean(e.mine) > mean(e.avg)).length, total: topics.length };
+  }, [statisticsQuery.data]);
+
   // Les mateixes xifres que el servidor (progrés propi per tema i pistes d'IA del curs), no les
   // del navegador: `null` si el backend no les envia.
   const serverStats = useMemo(() => {
@@ -696,9 +723,18 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
                 {!SHOW_COURSE_SWITCHER && currentCourse && (
                   // Sense el selector, el nom del curs diu de quin curs són les estadístiques
-                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: { xs: 2, md: 3 }, mt: { xs: 0, md: 1 } }}>
+                  <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: { xs: 2, md: 3 }, mt: { xs: 0, md: 1 }, flexWrap: 'wrap', rowGap: 1 }}>
                     <ProtectedAvatar src={courseAvatarUrl(currentCourse)} alt={getText(currentCourse.title) || currentCourse.slug} sx={{ width: 36, height: 36 }} />
-                    <Typography component="h1" variant="h5" sx={{ fontWeight: 900 }}>{getText(currentCourse.title) || currentCourse.slug}</Typography>
+                    <Typography component="h1" variant="h5" sx={{ fontWeight: 900, flex: 1, minWidth: 0 }}>{getText(currentCourse.title) || currentCourse.slug}</Typography>
+                    {/* Tornar al curs, ben visible (abans només hi havia l'enllaç de "Continua estudiant") */}
+                    <Button
+                      variant="contained"
+                      onClick={() => navigate(`/courses/${currentCourse.slug}`)}
+                      endIcon={<ArrowForwardIcon fontSize="small" />}
+                      sx={{ fontWeight: 800, borderRadius: 999, px: 2.5 }}
+                    >
+                      {t('course.go_to_course')}
+                    </Button>
                   </Stack>
                 )}
 
@@ -782,6 +818,9 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                                   />
                                 )}
                                 <StatRow icon={<TaskAltIcon sx={statIconSx} />} label={t('dashboard.topics_completed')} value={`${serverStats.topicsCompleted}/${serverStats.topicsTotal}`} hint={t('dashboard.topics_completed_hint')} />
+                                {aboveAverage && (
+                                  <StatRow icon={<TrendingUpIcon sx={statIconSx} />} label={t('dashboard.above_average_label')} value={`${aboveAverage.above}/${aboveAverage.total}`} hint={`${t('dashboard.above_average', aboveAverage)}. ${t('dashboard.above_average_hint')}`} />
+                                )}
                                 {myPosition != null && (
                                   <StatRow icon={<EmojiEventsIcon sx={statIconSx} />} label={t('dashboard.ranking_position')} value={`#${myPosition}`} />
                                 )}
@@ -859,13 +898,13 @@ const isMdUp = useMediaQuery('(max-height:900px)');
 
 const statIconSx = { color: '#00685d', fontSize: { xs: 22, md: 26 } };
 
-function StatRow({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: React.ReactNode; hint?: string }) {
+function StatRow({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value?: React.ReactNode; hint?: string }) {
   return (
     <Tooltip title={hint || ''} arrow placement="top" disableHoverListener={!hint}>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
         {icon}
         <Typography variant="body2" sx={{ flex: 1, textAlign: 'left', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{label}</Typography>
-        <Typography variant="body2" sx={{ color: '#00685d', fontWeight: 800, fontSize: { xs: '0.8rem', md: '0.95rem' } }}>{value}</Typography>
+        {value != null && <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 800, fontSize: { xs: '0.8rem', md: '0.95rem' }, whiteSpace: 'nowrap' }}>{value}</Typography>}
       </Box>
     </Tooltip>
   );
