@@ -6,6 +6,7 @@ import {ArrowRight} from 'lucide-react';
 import { type MouseEvent } from 'react';
 import {useTranslation} from 'react-i18next';
 import { courseImages } from '../data/courses';
+import { ProgressBar } from './ui/ProgressBar';
 
 interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
 
@@ -14,9 +15,10 @@ function getLocalizedText(text: string | { ca: string; es: string; en: string },
   return text[lang as keyof typeof text] || text.en || text.ca || text.es || '';
 }
 
-interface CourseCardProps {course: Course;index: number;}
+// `progress`: % completat del curs (cursos on l'usuari és alumne). Sense, el peu diu "Anar al curs".
+interface CourseCardProps {course: Course;index: number;progress?: number | null;}
 
-export function CourseCard({ course, index }: CourseCardProps) {
+export function CourseCard({ course, index, progress }: CourseCardProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
@@ -73,12 +75,19 @@ export function CourseCard({ course, index }: CourseCardProps) {
             </Box>
 
             <Box>
+              {progress != null ? (
+                <Box sx={{ pt: { xs: 1.5, md: 2.5 }, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Typography sx={{ fontSize: { xs: '0.7rem', md: '0.85rem' }, fontWeight: 900, color: 'text.primary', mb: 1 }}>{t('course.percent_completed', { percent: progress })}</Typography>
+                  <ProgressBar value={progress} />
+                </Box>
+              ) : (
               <Box sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: 'divider'}}>
-                <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.enroll')}</Typography>
+                <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.go_to_course')}</Typography>
                 <Box component={motion.div} animate={{ x: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
                   <ArrowRight size={18} color={theme.palette.primary.main} strokeWidth={2.5} />
                 </Box>
               </Box>
+              )}
             </Box>
           </CardContent>
         </Card>

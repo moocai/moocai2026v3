@@ -8,7 +8,7 @@ import { Header } from '../components/Header';
 import Hero from '../components/Hero';
 import { Footer } from '../components/Footer';
 import { CourseCard } from '../components/CourseCard';
-import { useAllCourses, ALL_COURSES_KEY } from '../hooks/useCourses';
+import { useAllCourses, usePublicCourses, ALL_COURSES_KEY, PUBLIC_COURSES_KEY } from '../hooks/useCourses';
 import { Course } from '../types';
 
 const flipVariants = {
@@ -60,7 +60,22 @@ export default function Home() {
 
   // La llista de cursos es llegeix de la cache de React Query (mateixa queryKey
   // que el prefetch del MainLayout i que CourseLessons) → una sola petició.
-  const { data: coursesList = [], isLoading: loading } = useAllCourses(isLoggedIn);
+  const { data: myCourses = [], isLoading: myLoading } = useAllCourses(isLoggedIn);
+  const { data: publicCourses = [], isLoading: publicLoading } = usePublicCourses(isLoggedIn);
+  const loading = myLoading || (isLoggedIn && publicLoading);
+
+  // Els meus cursos: on l'usuari és membre (alumne o professor). El personal veu tots els
+  // cursos a `GET /courses/`, però només són "seus" els que tenen rol.
+  const enrolledCourses = myCourses.filter((c) => c.myRole !== null);
+  // Destacats: els cursos als quals té accés (públics, o tots si és personal) però on no està inscrit
+  const enrolledIds = new Set(enrolledCourses.map((c) => c.id));
+  const featuredCourses = [...myCourses, ...publicCourses].filter((c, i, all) =>
+    !enrolledIds.has(c.id) && all.findIndex((o) => o.id === c.id) === i);
+  const coursePercent = (course: Course) => {
+    const p = course.myProgress;
+    if (!p) return null;
+    return p.problems > 0 ? Math.round((p.completed / p.problems) * 100) : 0;
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('currentStudent');
@@ -83,6 +98,7 @@ export default function Home() {
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
+        queryClient.invalidateQueries({ queryKey: PUBLIC_COURSES_KEY });
       }
     };
     document.addEventListener('visibilitychange', onVisible);
@@ -90,6 +106,7 @@ export default function Home() {
     const handleAuthChange = () => {
       setIsLoggedIn(Boolean(localStorage.getItem('currentStudent')));
       queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
+      queryClient.invalidateQueries({ queryKey: PUBLIC_COURSES_KEY });
     };
 
     window.addEventListener('authChange', handleAuthChange);
@@ -111,57 +128,69 @@ export default function Home() {
     {icon: '🎓', title: t('home.features.cert_title'), desc: t('home.features.cert_desc')}
   ];
 
+  const sectionTitleSx = { fontSize: { xs: '1.7rem', md: '3.5rem' }, fontWeight: 900, background: 'linear-gradient(to bottom, ' + theme.palette.text.primary, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block', mb: 3 };
+
+  const renderCourseGrid = (courses: Course[], withProgress: boolean) => (
+    <Box sx={{ perspective: '1000px' }}>
+      <Grid container spacing={3}>
+        {courses.map((course, index) => (
+          <Grid size={{ xs: 12, sm: 6, md: 3 }} key={course.id || index}>
+            <motion.div variants={flipVariants} initial="hidden" whileInView="visible" viewport={{ once: true }} custom={index} style={{ height: '100%' }}>
+              <CourseCard course={course} index={index} progress={withProgress ? coursePercent(course) : null} />
+            </motion.div>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  );
+
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', color: 'text.primary', overflowX: 'hidden' }}>
       <Header />
       <Hero />
       
-      {/* SECCIÓ 2: CURSOS */}
+      {/* SECCIÓ 2: CURSOS (el botó "Cursos" del menú fa scroll fins aquí: primer, els meus cursos) */}
       <Box component="section" id="courses" sx={{ position: 'relative', zIndex: 2, py: { xs: 1, md: 10 } }}>
         <Container maxWidth="lg">
-          <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}>
-            <Box sx={{ textAlign: 'center', mb: 10 }}>
-              <Typography component="h2" variant="h5" sx={{ fontSize: { xs: '1.7rem', md: '3.5rem' }, fontWeight: 900, background: 'linear-gradient(to bottom, ' + theme.palette.text.primary, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', display: 'inline-block', mb: 3 }}>
-                {t('home.featured_title')}
-              </Typography>
-              <Typography component="p" variant="body1" sx={{ color: 'text.primary', maxWidth: '80rem', mx: 'auto', fontWeight: 400, fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.8rem' }, lineHeight: { xs: 1.5, md: 1.6 }, px: { xs: 2, md: 0 }, mt: { xs: 2 }, mb: { xs: -5 } }}>
-                {t('home.featured_subtitle')}
-              </Typography>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
+              <CircularProgress sx={{ color: 'primary.main' }} />
             </Box>
-          </motion.div>
-
-          <Box sx={{ perspective: '1000px' }}>
-            <Grid container spacing={3}>
-              {loading ? (
-                <Grid size={12} sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-                  <CircularProgress sx={{ color: 'primary.main' }} />
-                </Grid>
-              ) : coursesList.length > 0 ? (
-                coursesList.map((course: Course, index: number) => (
-                  <Grid size={{ xs: 12, sm: 6, md: 3 }} key={course.id || index}>
-                    <motion.div
-                      variants={flipVariants}
-                      initial="hidden"
-                      whileInView="visible"
-                      viewport={{ once: true }}
-                      custom={index}
-                      style={{ height: '100%' }}
-                    >
-                      <CourseCard course={course} index={index} />
-                    </motion.div>
-                  </Grid>
-                ))
-              ) : (
-                <Grid size={12}>
-                  <Box sx={{ textAlign: 'center', py: 10, border: '1px dashed', borderColor: 'divider', borderRadius: 8 }}>
-                    <Typography variant="body1" sx={{ color: 'text.secondary' }}>
-                      {t('home.no_courses')}
-                    </Typography>
+          ) : (
+            <>
+              {enrolledCourses.length > 0 && (
+                <Box sx={{ mb: featuredCourses.length > 0 ? { xs: 8, md: 14 } : 0 }}>
+                  <Box sx={{ textAlign: 'center', mb: { xs: 4, md: 6 } }}>
+                    <Typography component="h2" variant="h5" sx={sectionTitleSx}>{t('home.enrolled_title')}</Typography>
                   </Box>
-                </Grid>
+                  {renderCourseGrid(enrolledCourses, true)}
+                </Box>
               )}
-            </Grid>
-          </Box>
+
+              {(featuredCourses.length > 0 || enrolledCourses.length === 0) && (
+                <>
+                  <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8 }}>
+                    <Box sx={{ textAlign: 'center', mb: 10 }}>
+                      <Typography component="h2" variant="h5" sx={sectionTitleSx}>
+                        {t('home.featured_title')}
+                      </Typography>
+                      <Typography component="p" variant="body1" sx={{ color: 'text.primary', maxWidth: '80rem', mx: 'auto', fontWeight: 400, fontSize: { xs: '0.9rem', sm: '1.1rem', md: '1.8rem' }, lineHeight: { xs: 1.5, md: 1.6 }, px: { xs: 2, md: 0 }, mt: { xs: 2 }, mb: { xs: -5 } }}>
+                        {t('home.featured_subtitle')}
+                      </Typography>
+                    </Box>
+                  </motion.div>
+
+                  {featuredCourses.length > 0 ? renderCourseGrid(featuredCourses, false) : (
+                    <Box sx={{ textAlign: 'center', py: 10, border: '1px dashed', borderColor: 'divider', borderRadius: 8 }}>
+                      <Typography variant="body1" sx={{ color: 'text.secondary' }}>
+                        {isLoggedIn ? t('home.no_courses_available') : t('home.no_courses')}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+            </>
+          )}
         </Container>
       </Box>
 

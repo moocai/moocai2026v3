@@ -64,9 +64,11 @@ export default {
     tests_correct: "Tests correctes"
   },
   home: {
+    enrolled_title: "Els meus cursos",
     featured_title: "Cursos Destacats",
     featured_subtitle: "Comença el teu viatge amb els nostres cursos millor valorats. Projectes pràctics inclosos.",
     no_courses: "Inicia Sessió per veure els cursos disponibles",
+    no_courses_available: "Encara no tens accés a cap curs.",
     why_choose_title: "Per què triar MOOC 2026?",
     features: {
       code_title: "Codi de Grau Empresarial",
@@ -107,7 +109,7 @@ export default {
     access: "Accedir"
   },
 
-  course: {by: "by", enroll: "Veure temari del curs"},
+  course: {by: "by", enroll: "Veure temari del curs", go_to_course: "Anar al curs", percent_completed: "{{percent}}% completat"},
   common: {error_loading: "Error en carregar les dades"},
 
   profile: {

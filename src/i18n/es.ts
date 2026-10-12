@@ -64,9 +64,11 @@ export default {
     tests_correct: "Tests correctos"
   },
   home: {
+    enrolled_title: "Mis cursos",
     featured_title: "Cursos Destacados",
     featured_subtitle: "Comienza tu viaje con nuestros cursos mejor valorados. Proyectos prácticos incluidos.",
     no_courses: "Inicia Sessión para ver los cursos disponibles",
+    no_courses_available: "Todavía no tienes acceso a ningún curso.",
     why_choose_title: "¿Por qué elegir MOOC 2026?",
     features: {
       code_title: "Código de Grado Empresarial",
@@ -111,7 +113,9 @@ export default {
   },
   course: {
     by: "by",
-    enroll: "Ver temario del curso"
+    enroll: "Ver temario del curso",
+    go_to_course: "Ir al curso",
+    percent_completed: "{{percent}}% completado"
   },
   common: {
     error_loading: "Error al cargar los datos"

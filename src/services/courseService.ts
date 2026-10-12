@@ -29,6 +29,8 @@ function toCourses(data: unknown): Course[] {
     professors: Array.isArray(c.professors) ? c.professors : [],
     // Rol de l'usuari al curs ('student' | 'professor' | null). `undefined` si l'API no l'envia.
     myRole: c.my_role,
+    // Progrés de l'alumne al curs (només a `GET /courses/`); `undefined` amb el backend antic
+    myProgress: c.my_progress,
   }));
 }
 
