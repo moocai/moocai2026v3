@@ -23,6 +23,7 @@ import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCours
 import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
 import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
+import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
@@ -232,6 +233,7 @@ function isRejectedResult(r: any): boolean {
 
 export default function LessonPage() {
   const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
+  useRecordCourseActivity(courseId);
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
