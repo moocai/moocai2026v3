@@ -44,6 +44,11 @@ export function Header() {
   const points = usePoints();
   const navigate = useNavigate();
   const location = useLocation();
+  // "Tauler" només dins d'un curs (i al mateix tauler): obre el tauler d'aquell curs
+  const courseInPath = /^\/courses\/([^/]+)/.exec(location.pathname)?.[1];
+  const dashboardTarget = courseInPath
+    ? `/dashboards/student?course=${encodeURIComponent(decodeURIComponent(courseInPath))}`
+    : location.pathname === '/dashboards/student' ? `${location.pathname}${location.search}` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -144,8 +149,8 @@ export function Header() {
               {t('footer.courses')}
             </Button>
 
-            {isLoggedIn && (
-              <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>
+            {isLoggedIn && dashboardTarget && (
+              <Button onClick={() => navigate(dashboardTarget)} sx={commonButtonStyle}>
                 {t('dashboard.title')}
               </Button>
             )}
@@ -194,8 +199,8 @@ export function Header() {
                 <Button onClick={scrollToCourses} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
                   {t('footer.courses').toUpperCase()}
                 </Button>
-                {isLoggedIn && (
-                  <Button onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                {isLoggedIn && dashboardTarget && (
+                  <Button onClick={() => { navigate(dashboardTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
                     {t('dashboard.title')}
                   </Button>
                 )}
