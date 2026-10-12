@@ -76,8 +76,10 @@ export default {
     topics_completed: "Temas terminados",
     topics_completed_hint: "Temas con todos los problemas resueltos",
     ranking_position: "Posición en el ranking",
-    chart_previous: "Temas anteriores",
-    chart_next: "Temas siguientes"
+    chart_older_topics: "+{{count}} temas anteriores",
+    above_average: "Por encima de la media en {{above}} de {{total}} temas",
+    above_average_label: "Por encima de la media",
+    above_average_hint: "Temas en los que tu resultado supera la media de la clase"
   },
   home: {
     enrolled_title: "Mis cursos",
