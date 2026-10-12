@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import { Badge, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Popover, Stack, Typography, alpha } from '@mui/material';
@@ -29,9 +29,18 @@ export function NotificationBell() {
   // El més antic primer: s'han de llegir en l'ordre en què es van publicar
   const blocking = [...unread].reverse().find((n) => n.is_important);
 
-  const open = (path: string) => {
+  // Curs des d'on s'obre la pàgina d'avisos (dins d'un curs, o el que ja portava la pàgina
+  // d'avisos): la pàgina hi posa l'enllaç de tornada "< curs", filtri el que filtri.
+  const { pathname, search } = useLocation();
+  const fromCourse = /^\/courses\/([^/]+)/.exec(pathname)?.[1]
+    ?? (pathname === '/notifications' ? new URLSearchParams(search).get('from') : null);
+
+  const open = (params: Record<string, string>, hash = '') => {
     setAnchor(null);
-    navigate(path);
+    const query = new URLSearchParams(params);
+    if (fromCourse) query.set('from', decodeURIComponent(fromCourse));
+    const qs = query.toString();
+    navigate(`/notifications${qs ? `?${qs}` : ''}${hash}`);
   };
 
   return (
@@ -77,7 +86,7 @@ export function NotificationBell() {
                 key={n.id}
                 component="button"
                 type="button"
-                onClick={() => open(`/notifications?course=${encodeURIComponent(n.course.slug)}#notification-${n.id}`)}
+                onClick={() => open({ course: n.course.slug }, `#notification-${n.id}`)}
                 sx={(theme) => ({
                   display: 'block', width: '100%', textAlign: 'left', border: 0, cursor: 'pointer', font: 'inherit', color: 'inherit',
                   px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider',
@@ -101,7 +110,7 @@ export function NotificationBell() {
           )}
         </Box>
         <Divider />
-        <Button onClick={() => open('/notifications')} sx={{ textTransform: 'none', fontWeight: 700, py: 1.25, borderRadius: 0 }}>
+        <Button onClick={() => open({})} sx={{ textTransform: 'none', fontWeight: 700, py: 1.25, borderRadius: 0 }}>
           {t('notification_center.see_all')}
         </Button>
       </Popover>

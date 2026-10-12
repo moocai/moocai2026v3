@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { Box, Button, Chip, CircularProgress, Container, Stack, Typography } from '@mui/material';
 import { useThemeMode } from '../hooks/useTheme';
+import { useAllCourses } from '../hooks/useCourses';
+import { resolveSlug } from '../hooks/useCourse';
 import { useMarkNotificationsRead, useNotificationFeed } from '../hooks/useNotificationFeed';
 import { MarkdownContent } from '../components/MarkdownContent';
 import { formatNotificationDate } from '../utils/notificationText';
@@ -21,6 +23,8 @@ export default function NotificationsPage() {
   const { hash } = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const courseFilter = searchParams.get('course');
+  // `?from=<curs>`: s'hi ha entrat des d'un curs (la campana ho afegeix), i s'hi pot tornar
+  const fromCourse = searchParams.get('from');
   const isLoggedIn = !!localStorage.getItem('token');
   const { notifications, isLoading, isError } = useNotificationFeed(isLoggedIn);
   const markRead = useMarkNotificationsRead();
@@ -36,7 +40,11 @@ export default function NotificationsPage() {
   }, [notifications]);
 
   const visible = courseFilter ? notifications.filter((n) => n.course.slug === courseFilter) : notifications;
-  const filterName = courses.find((c) => c.slug === courseFilter)?.name;
+  const ownCourses = useAllCourses(isLoggedIn && !!fromCourse).data;
+  const fromName = fromCourse
+    ? ownCourses?.find((c) => c.slug === resolveSlug(fromCourse))?.title
+      ?? courses.find((c) => c.slug === resolveSlug(fromCourse))?.name
+    : undefined;
 
   // Veure'ls és llegir-los (com a algorien): es marquen els que es veuen sense llegir
   useEffect(() => {
@@ -73,10 +81,10 @@ export default function NotificationsPage() {
       color: 'text.primary', py: { xs: 2, md: 4 },
     }}>
       <Container maxWidth="md" sx={{ px: { xs: 2, md: 4 } }}>
-        {/* Tornar al curs, com el tauler i les pàgines de test i de problema */}
-        {courseFilter && (
-          <Button component={RouterLink} to={`/courses/${encodeURIComponent(courseFilter)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
-            {filterName || courseFilter}
+        {/* Tornar al curs des d'on s'ha entrat (encara que es vegin els avisos de tots), com el tauler */}
+        {fromCourse && (
+          <Button component={RouterLink} to={`/courses/${encodeURIComponent(fromCourse)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+            {fromName || fromCourse}
           </Button>
         )}
         <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 3, gap: 2, flexWrap: 'wrap' }}>
