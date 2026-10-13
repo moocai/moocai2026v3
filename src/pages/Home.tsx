@@ -61,8 +61,9 @@ export default function Home() {
   // La llista de cursos es llegeix de la cache de React Query (mateixa queryKey
   // que el prefetch del MainLayout i que CourseLessons) → una sola petició.
   const { data: myCourses = [], isLoading: myLoading } = useAllCourses(isLoggedIn);
-  const { data: publicCourses = [], isLoading: publicLoading } = usePublicCourses(isLoggedIn);
-  const loading = myLoading || (isLoggedIn && publicLoading);
+  // Els públics també sense sessió (l'API no la demana): són els destacats que veu un visitant
+  const { data: publicCourses = [], isLoading: publicLoading } = usePublicCourses();
+  const loading = myLoading || publicLoading;
 
   // Els meus cursos: on l'usuari és membre (alumne o professor). El personal veu tots els
   // cursos a `GET /courses/`, però només són "seus" els que tenen rol.

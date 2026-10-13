@@ -5,31 +5,27 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha} from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
-import { Trophy } from 'lucide-react';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
+import { NotificationBell } from './NotificationBell';
+import { StarScore } from './StarScore';
 // Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
 import { usePoints } from '../utils/pointsSync';
 const logo = '/img/logo.webp';
 
-/** Pastilla de punts, pensada per anar al costat de l'àvia. */
+/** Pastilla d'estrelles (la puntuació), pensada per anar al costat de l'àvia. */
 function PointsBadge({ points }: { points: number }) {
-  const { t } = useTranslation();
   return (
     <Box
-      title={`${t('lesson.points_label')}: ${points}`}
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.5,
         px: 1, height: 32, borderRadius: 999, flexShrink: 0,
         bgcolor: alpha('#8400ff', 0.15), border: '1px solid', borderColor: alpha('#8400ff', 0.4),
       }}
     >
-      <Trophy size={16} color="#8400ff" />
-      <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }}>
-        {points}
-      </Typography>
+      <StarScore value={points} sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }} />
     </Box>
   );
 }
@@ -49,6 +45,8 @@ export function Header() {
   const dashboardTarget = courseInPath
     ? `/dashboards/student?course=${encodeURIComponent(decodeURIComponent(courseInPath))}`
     : location.pathname === '/dashboards/student' ? `${location.pathname}${location.search}` : null;
+  // "Enquestes", com a algorien, només dins d'un curs: són de cada curs
+  const surveysTarget = courseInPath ? `/courses/${courseInPath}/surveys` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -155,6 +153,12 @@ export function Header() {
               </Button>
             )}
 
+            {isLoggedIn && surveysTarget && (
+              <Button onClick={() => navigate(surveysTarget)} sx={commonButtonStyle}>
+                {t('surveys.title')}
+              </Button>
+            )}
+
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
             )}
@@ -162,6 +166,7 @@ export function Header() {
             <ThemeToggleButton />
             {!studentName && <LanguageSwitcher />}
             {studentName && <PointsBadge points={points} />}
+            {isLoggedIn && <NotificationBell />}
             {/* Aquí s'integra el menú d'avatar de l'usuari amb la imatge del header */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
@@ -179,6 +184,7 @@ export function Header() {
           {/* MOBILE CONTROLS */}
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
+            {isLoggedIn && <NotificationBell />}
             {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
@@ -195,13 +201,18 @@ export function Header() {
             <Stack spacing={4} sx={{ width: '85%', alignItems: 'center' }}>
 
               {/* 1. Cursos + Dashboard + nom usuari */}
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%', flexWrap: 'wrap' }}>
                 <Button onClick={scrollToCourses} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
                   {t('footer.courses').toUpperCase()}
                 </Button>
                 {isLoggedIn && dashboardTarget && (
                   <Button onClick={() => { navigate(dashboardTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
                     {t('dashboard.title')}
+                  </Button>
+                )}
+                {isLoggedIn && surveysTarget && (
+                  <Button onClick={() => { navigate(surveysTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                    {t('surveys.title')}
                   </Button>
                 )}
                 {isLoggedIn && (

@@ -15,6 +15,7 @@ import { useAllCourses, usePublicCourses, useCourseDetail, ALL_COURSES_KEY, PUBL
 import {useThemeMode} from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import ProtectedAvatar from '../../components/ProtectedAvatar';
+import { StarScore } from '../../components/StarScore';
 import { courseImages } from '../../data/courses';
 import { preloadImage, userAvatarUrl, myAvatarUrl, pruneAvatarCacheOnce } from '../../utils/avatarCache';
 import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../utils/pointsSync';
@@ -767,9 +768,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                                       {s.name}
                                     </Typography>
                                   </Stack>
-                                  <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' }, flexShrink: 0 }}>
-                                    {s.points} pts
-                                  </Typography>
+                                  <StarScore value={s.points} size={14} sx={{ fontWeight: 700, fontSize: { xs: '0.8rem', md: '0.875rem' }, flexShrink: 0 }} />
                                 </Stack>
                               ))
                             ) : (

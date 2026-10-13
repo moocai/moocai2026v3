@@ -1,8 +1,10 @@
-import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import { Box, alpha, useTheme, type SxProps, type Theme } from '@mui/material';
+import type { Element } from 'hast';
+import { RunnableCodeBlock } from './RunnableCodeBlock';
 
 // L'HTML escrit pel professorat es mostra, però passat per una llista blanca (com fa el
 // servidor d'algorien amb nh3): sense <script>, atributs on*, URLs javascript:, <iframe>,
@@ -30,11 +32,37 @@ const SANITIZE_SCHEMA = {
 const urlTransform = (url: string, key: string, node: { tagName?: string }) =>
   key === 'src' && node.tagName === 'img' && /^data:image\//i.test(url.trim()) ? url : defaultUrlTransform(url);
 
+/** Codi d'un bloc ```python (el text del seu <code>), o `null` si el bloc és d'un altre llenguatge. */
+function pythonBlockCode(pre: Element | undefined): string | null {
+  const code = pre?.children.find((c): c is Element => c.type === 'element' && c.tagName === 'code');
+  const classes = code?.properties?.className;
+  if (!code || !Array.isArray(classes) || !classes.includes('language-python')) return null;
+  const text = code.children.map((c) => (c.type === 'text' ? c.value : '')).join('');
+  return text.replace(/\n$/, '');
+}
+
+// Fora del component: amb un objecte nou a cada render, React tornaria a muntar cada bloc
+// executable (i en perdria el codi editat i la sortida)
+const COMPONENTS: Components = {
+  a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />,
+};
+const RUNNABLE_COMPONENTS: Components = {
+  ...COMPONENTS,
+  pre: ({ node, ...props }) => {
+    const code = pythonBlockCode(node);
+    return code !== null ? <RunnableCodeBlock code={code} /> : <pre {...props} />;
+  },
+};
+
 /**
  * Text en Markdown escrit pel professorat (p. ex. l'enunciat d'un problema), amb
  * GitHub Flavored Markdown (taules, llistes de tasques...) i HTML sanejat.
  */
-export function MarkdownContent({ children, fontSize = '0.95rem', sx }: { children: string; fontSize?: string; sx?: SxProps<Theme> }) {
+export function MarkdownContent({ children, fontSize = '0.95rem', sx, runnablePython = false }: {
+  children: string; fontSize?: string; sx?: SxProps<Theme>;
+  /** Els blocs ```python es poden editar i executar (teoria), amb la sortida a sota */
+  runnablePython?: boolean;
+}) {
   const theme = useTheme();
   return (
     <Box
@@ -71,7 +99,7 @@ export function MarkdownContent({ children, fontSize = '0.95rem', sx }: { childr
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeSanitize, SANITIZE_SCHEMA]]}
         urlTransform={urlTransform}
-        components={{ a: ({ node: _node, ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" /> }}
+        components={runnablePython ? RUNNABLE_COMPONENTS : COMPONENTS}
       >
         {children}
       </ReactMarkdown>
