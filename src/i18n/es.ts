@@ -197,6 +197,18 @@ export default {
     got_it: "Entendido",
     load_error: "No se han podido cargar los avisos."
   },
+  drive: {
+    title: "Drive",
+    subtitle: "Archivos generales del curso. Los archivos de cada tema están en la pestaña Archivos del curso.",
+    empty: "Esta carpeta está vacía.",
+    load_error: "No se ha podido cargar esta carpeta.",
+    not_found: "Esta carpeta no existe o no está disponible.",
+    hidden: "Oculto",
+    download_error: "No se ha podido descargar el archivo.",
+    login_required: "Inicia sesión para descargar los archivos.",
+    folders: "Carpetas",
+    files: "Archivos"
+  },
   surveys: {
     title: "Encuestas",
     empty: "Ahora mismo no hay ninguna encuesta abierta.",

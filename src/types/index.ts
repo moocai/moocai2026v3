@@ -148,3 +148,26 @@ export interface ContactoChat {
   mensajes: MensajeChat[];
   ultimoMensaje: string;
 }
+/** Una carpeta del Drive del curs (`GET /courses/{c}/drive/`). */
+export interface DriveFile {
+  id: number;
+  name: string;
+  size: number;
+  kind: string;
+  hidden: boolean;
+  uploaded_at: string;
+}
+
+export interface DriveFolderEntry {
+  id: number;
+  name: string;
+  hidden: boolean;
+}
+
+export interface DriveListing {
+  folder: { id: number; name: string };
+  /** Del Drive (primer) a la carpeta actual (últim) */
+  breadcrumbs: { id: number; name: string }[];
+  folders: DriveFolderEntry[];
+  files: DriveFile[];
+}

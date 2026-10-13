@@ -187,6 +187,18 @@ export default {
     got_it: "Entesos",
     load_error: "No s'han pogut carregar els avisos."
   },
+  drive: {
+    title: "Drive",
+    subtitle: "Fitxers generals del curs. Els fitxers de cada tema són a la pestanya Fitxers del curs.",
+    empty: "Aquesta carpeta és buida.",
+    load_error: "No s'ha pogut carregar aquesta carpeta.",
+    not_found: "Aquesta carpeta no existeix o no està disponible.",
+    hidden: "Amagat",
+    download_error: "No s'ha pogut descarregar el fitxer.",
+    login_required: "Inicia sessió per descarregar els fitxers.",
+    folders: "Carpetes",
+    files: "Fitxers"
+  },
   surveys: {
     title: "Enquestes",
     empty: "Ara mateix no hi ha cap enquesta oberta.",

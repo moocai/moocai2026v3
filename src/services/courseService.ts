@@ -1,4 +1,4 @@
-import { Course } from '../types';
+import { Course, DriveListing } from '../types';
 import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
 import { apiClient } from './httpClient';
@@ -122,6 +122,16 @@ export const courseService = {
     if (data.theory_md) {
       data.theory_md = getLocalizedText(data.theory_md, lang as any);
     }
+    return data;
+  },
+
+  /**
+   * `GET /courses/{c}/drive/` (o `drive/folders/{id}/`): una carpeta del Drive del curs,
+   * els fitxers generals que no són de cap tema. Professorat: també els amagats.
+   */
+  async getDriveFolder(courseSlug: string, folderId?: number | string): Promise<DriveListing> {
+    const path = folderId === undefined ? 'drive/' : `drive/folders/${folderId}/`;
+    const { data } = await apiClient.get(`/courses/${courseSlug}/${path}`);
     return data;
   },
 

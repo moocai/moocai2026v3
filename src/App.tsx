@@ -10,6 +10,7 @@ import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import SurveysPage from './pages/courses/SurveysPage';
 import SurveyPage from './pages/courses/SurveyPage';
+import DrivePage from './pages/courses/DrivePage';
 import RendimentDashboard from './features/student/RendimentDashboard';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
@@ -44,6 +45,8 @@ function App() {
           <Route path="/courses/:courseId/stats" element={<RendimentDashboard />} />
           <Route path="/courses/:courseId/surveys" element={<SurveysPage />} />
           <Route path="/courses/:courseId/surveys/:surveySlug" element={<SurveyPage />} />
+          <Route path="/courses/:courseId/drive" element={<DrivePage />} />
+          <Route path="/courses/:courseId/drive/:folderId" element={<DrivePage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />

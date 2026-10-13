@@ -51,6 +51,8 @@ export function Header() {
     : location.pathname === '/dashboards/student' ? `${location.pathname}${location.search}` : null;
   // "Enquestes", com a algorien, només dins d'un curs: són de cada curs
   const surveysTarget = courseInPath ? `/courses/${courseInPath}/surveys` : null;
+  // "Drive": fitxers generals del curs (els de cada tema són a la pestanya Fitxers del curs)
+  const driveTarget = courseInPath ? `/courses/${courseInPath}/drive` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -163,6 +165,12 @@ export function Header() {
               </Button>
             )}
 
+            {isLoggedIn && driveTarget && (
+              <Button onClick={() => navigate(driveTarget)} sx={commonButtonStyle}>
+                {t('drive.title')}
+              </Button>
+            )}
+
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
             )}
@@ -217,6 +225,11 @@ export function Header() {
                 {isLoggedIn && surveysTarget && (
                   <Button onClick={() => { navigate(surveysTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
                     {t('surveys.title')}
+                  </Button>
+                )}
+                {isLoggedIn && driveTarget && (
+                  <Button onClick={() => { navigate(driveTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                    {t('drive.title')}
                   </Button>
                 )}
                 {isLoggedIn && (

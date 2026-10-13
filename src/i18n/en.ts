@@ -189,6 +189,18 @@ export default {
     got_it: "Got it",
     load_error: "Couldn't load the notifications."
   },
+  drive: {
+    title: "Drive",
+    subtitle: "Course-wide files. Each topic's own files are in the Files tab of the course.",
+    empty: "This folder is empty.",
+    load_error: "Couldn't load this folder.",
+    not_found: "This folder doesn't exist or isn't available.",
+    hidden: "Hidden",
+    download_error: "Couldn't download the file.",
+    login_required: "Log in to download the files.",
+    folders: "Folders",
+    files: "Files"
+  },
   surveys: {
     title: "Surveys",
     empty: "There are no open surveys right now.",
