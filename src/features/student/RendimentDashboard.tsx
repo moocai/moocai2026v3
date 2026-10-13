@@ -240,8 +240,9 @@ export default function RendimentDashboard() {
   }
 
   return (
+    // El layout no fa scroll (cada pàgina el gestiona): sense height + overflowY no es podia baixar
     <Box sx={{
-      position: 'relative', minHeight: '100%',
+      position: 'relative', height: '100%', overflowY: 'auto',
       bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#0a0e17' : 'background.default',
       color: 'text.primary', py: { xs: 2, md: 4 },
     }}>
