@@ -3,6 +3,7 @@ import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
 import { apiClient } from './httpClient';
 import { applyServerSolutions } from './topicTestAnswers';
+import { onSessionChange } from './sessionCache';
 
 /* ------------------------------------------------------------------ */
 /* Servei                                                             */
@@ -317,3 +318,6 @@ export const courseService = {
     }
   },
 };
+
+// Els detalls dels cursos depenen de qui els demana (temes bloquejats, respostes pròpies…)
+onSessionChange(() => courseService.clearCache());
