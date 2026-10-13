@@ -240,7 +240,7 @@ export default function RendimentDashboard() {
   }
 
   return (
-    // El layout no fa scroll (cada pàgina el gestiona): sense height + overflowY no es podia baixar
+    // Scroll propi, com les altres pàgines (el layout només en fa si una pàgina el desborda)
     <Box sx={{
       position: 'relative', height: '100%', overflowY: 'auto',
       bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#0a0e17' : 'background.default',
