@@ -6,6 +6,8 @@ import { useTranslation } from 'react-i18next';
 import { ConsolePanel, type ConsoleLine } from './ConsolePanel';
 import { usePythonRun } from '../hooks/usePythonRun';
 import { getMonacoEditorTheme, loadMonaco } from '../utils/monaco';
+import { useThemeMode } from '../hooks/useTheme';
+import { useCodeSurface } from '../theme/codeSurface';
 
 const FONT_SIZE = 14;
 const LINE_HEIGHT = 20;
@@ -18,6 +20,9 @@ const EDITOR_PADDING = 8;
  */
 export function RunnableCodeBlock({ code }: { code: string }) {
   const { t } = useTranslation();
+  // Com el codi dels companys: segueix el mode de la web (el tema de Monaco és global a la pàgina)
+  const { mode } = useThemeMode();
+  const c = useCodeSurface();
   const [value, setValue] = useState(code);
   const [output, setOutput] = useState<ConsoleLine[] | null>(null);
   const [monacoReady, setMonacoReady] = useState(false);
@@ -38,37 +43,37 @@ export function RunnableCodeBlock({ code }: { code: string }) {
   const edited = value !== code;
 
   const staticCode = (
-    <Box component="pre" sx={{ m: 0, px: 1.5, py: `${EDITOR_PADDING}px`, overflowX: 'auto', fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, color: '#d4d4d4', whiteSpace: 'pre' }}>
+    <Box component="pre" sx={{ m: 0, px: 1.5, py: `${EDITOR_PADDING}px`, overflowX: 'auto', fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, color: c.stdout, whiteSpace: 'pre' }}>
       {value}
     </Box>
   );
 
   return (
-    <Box sx={{ my: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden', bgcolor: '#1e1e1e' }}>
+    <Box sx={{ my: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden', bgcolor: c.bg }}>
       {/* Executar a l'esquerra, al costat del codi (com les cel·les de Jupyter): a la dreta quedava
           massa lluny en pantalles grans */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, bgcolor: '#111', borderBottom: '1px solid #333', minHeight: 36 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, bgcolor: c.bar, borderBottom: `1px solid ${c.border}`, minHeight: 36 }}>
         <Button
           size="small"
           onClick={() => (isRunning ? stop() : void run(value))}
           startIcon={isRunning ? <Square size={12} fill="currentColor" /> : <Play size={13} fill="currentColor" />}
           sx={{
             textTransform: 'none', fontWeight: 700, fontSize: '0.8rem', minWidth: 0, px: 1.25, py: 0.25, borderRadius: 1,
-            color: isRunning ? '#f87171' : '#fff', bgcolor: isRunning ? 'transparent' : '#8400ff',
-            border: '1px solid', borderColor: isRunning ? '#f87171' : '#8400ff',
-            '&:hover': { bgcolor: isRunning ? '#2a1414' : '#6d00d4' },
+            color: isRunning ? c.error : '#fff', bgcolor: isRunning ? 'transparent' : '#8400ff',
+            border: '1px solid', borderColor: isRunning ? c.error : '#8400ff',
+            '&:hover': { bgcolor: isRunning ? c.hover : '#6d00d4' },
           }}
         >
           {isRunning ? stopLabel : runLabel}
         </Button>
         {edited && (
           <Tooltip title={resetLabel} arrow>
-            <IconButton size="small" onClick={() => setValue(code)} aria-label={resetLabel} sx={{ color: '#e5e7eb', '&:hover': { bgcolor: '#222' } }}>
+            <IconButton size="small" onClick={() => setValue(code)} aria-label={resetLabel} sx={{ color: c.icon, '&:hover': { bgcolor: c.hover } }}>
               <RotateCcw size={14} />
             </IconButton>
           </Tooltip>
         )}
-        <Box component="span" sx={{ ml: 'auto', color: '#c4b5fd', fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Fira Code', 'Consolas', monospace" }}>Python</Box>
+        <Box component="span" sx={{ ml: 'auto', color: c.accentText, fontSize: '0.75rem', fontWeight: 700, fontFamily: "'Fira Code', 'Consolas', monospace" }}>Python</Box>
       </Box>
 
       <Box sx={{ height }}>
@@ -76,8 +81,7 @@ export function RunnableCodeBlock({ code }: { code: string }) {
           <Editor
             value={value}
             language="python"
-            // Sempre fosc, com el codi dels companys
-            theme={getMonacoEditorTheme('dark')}
+            theme={getMonacoEditorTheme(mode)}
             onChange={(v) => setValue(v ?? '')}
             onMount={(editor) => {
               // L'alçada segueix el codi: sense barra de desplaçament dins de la teoria
@@ -114,7 +118,7 @@ export function RunnableCodeBlock({ code }: { code: string }) {
 
       {/* La sortida apareix a sota en executar-lo, com a algorien */}
       {output !== null && (
-        <Box sx={{ display: 'flex', maxHeight: 300, bgcolor: '#0a0a0a' }}>
+        <Box sx={{ display: 'flex', maxHeight: 300, bgcolor: mode === 'light' ? c.bg : '#0a0a0a' }}>
           <ConsolePanel
             output={output}
             inputActive={inputActive}
