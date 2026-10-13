@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
-import { useThemeMode } from '../hooks/useTheme';
+import { useCodeSurface } from '../theme/codeSurface';
 
 /**
  * Línia de la consola: un text de l'aplicació (string, amb el prefix "> ") o
@@ -22,11 +22,10 @@ interface ConsolePanelProps {
   inputPlaceholder?: string;
 }
 
-const KIND_COLORS = { stdout: '#e5e7eb', stderr: '#f87171', info: '#9ca3af' } as const;
-const ECHO_COLOR = '#67e8f9';
 
 export function ConsolePanel({ output, emptyMessage, inputActive = false, onInputSubmit, inputLabel, inputPlaceholder }: ConsolePanelProps) {
-  const { mode } = useThemeMode();
+  const c = useCodeSurface();
+  const kindColors = { stdout: c.stdout, stderr: c.error, info: c.info };
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -55,7 +54,7 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
         e.preventDefault();
         onInputSubmit?.(e.currentTarget.value);
       }}
-      sx={{ flex: 1, minWidth: 80, border: 'none', outline: 'none', p: 0, m: 0, bgcolor: 'transparent', color: ECHO_COLOR, caretColor: ECHO_COLOR, font: 'inherit', '&::placeholder': { color: '#6b7280', fontStyle: 'italic', opacity: 1 } }}
+      sx={{ flex: 1, minWidth: 80, border: 'none', outline: 'none', p: 0, m: 0, bgcolor: 'transparent', color: c.echo, caretColor: c.echo, font: 'inherit', '&::placeholder': { color: c.placeholder, fontStyle: 'italic', opacity: 1 } }}
     />
   ) : null;
 
@@ -69,28 +68,28 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
       flexDirection: 'column',
       width: '100%',
       borderTop: '1px solid',
-      borderTopColor: mode === 'light' ? '#000' : 'divider',
+      borderTopColor: 'divider',
       borderBottom: '1px solid',
-      borderColor: mode === 'light' ? '#000' : 'divider'
+      borderColor: 'divider'
     }}>
       <Box sx={{
         height: 30,
         px: 2,
-        bgcolor: '#000',
+        bgcolor: c.bar,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`,
+        borderBottom: `1px solid ${c.border}`,
         flexShrink: 0
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography component="span" sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.console', 'Consola').toUpperCase()}</Typography>
+          <Typography component="span" sx={{ fontSize: 11, color: c.text, fontWeight: 900 }}>{t('lesson.console', 'Consola').toUpperCase()}</Typography>
         </Box>
       </Box>
       {/* Clicar a la consola posa el cursor al camp d'entrada, com en un terminal */}
       <Box ref={scrollRef} onClick={() => { if (inputActive && !window.getSelection()?.toString()) inputRef.current?.focus(); }} sx={{ p: 2, overflowY: 'auto', flex: 1, cursor: inputActive ? 'text' : 'default' }}>
         {output.length === 0 && !inputActive && (
-          <Typography sx={{ fontSize: 14, color: '#444', fontFamily: 'monospace' }}>
+          <Typography sx={{ fontSize: 14, color: c.placeholder, fontFamily: 'monospace' }}>
             {`// ${emptyMessage ?? t('lesson.waiting_execution', "Esperant l'execució del codi...")}`}
           </Typography>
         )}
@@ -101,7 +100,7 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
               sx={{
                 fontSize: 14,
                 fontFamily: 'monospace',
-                color: line.includes('✅') ? '#4ade80' : line.includes('❌') ? '#f87171' : '#aaa',
+                color: line.includes('✅') ? c.success : line.includes('❌') ? c.error : c.muted,
                 mb: 0.5
               }}
             >
@@ -117,14 +116,14 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
                 fontSize: 14,
                 fontFamily: 'monospace',
                 lineHeight: 1.45,
-                color: KIND_COLORS[line.kind],
+                color: kindColors[line.kind],
                 fontStyle: line.kind === 'info' ? 'italic' : 'normal',
                 mt: line.kind === 'info' ? 0.75 : 0,
               }}
             >
               <Box component="span" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', minWidth: 0 }}>
                 {line.text}
-                {line.echo !== undefined && <Box component="span" sx={{ color: ECHO_COLOR }}>{line.echo}</Box>}
+                {line.echo !== undefined && <Box component="span" sx={{ color: c.echo }}>{line.echo}</Box>}
                 {!line.text && line.echo === undefined && !(i === lastIndex && inputActive) ? ' ' : null}
               </Box>
               {i === lastIndex && inputField}
