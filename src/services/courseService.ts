@@ -31,6 +31,7 @@ function toCourses(data: unknown): Course[] {
     myRole: c.my_role,
     // Progrés de l'alumne al curs (només a `GET /courses/`); `undefined` amb el backend antic
     myProgress: c.my_progress,
+    allowsChallenges: c.allows_challenges,
   }));
 }
 
