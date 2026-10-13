@@ -233,6 +233,7 @@ export default {
     leaderboard: "Clasificación",
     login_to_see_board: "Inicia sesión para ver la clasificación.",
     board_error: "No se ha podido cargar la clasificación.",
+    board_members_only: "Solo los miembros del curso pueden ver esta clasificación.",
     board_public: "Pública",
     board_private: "Privada",
     board_final: "Final",

@@ -225,6 +225,7 @@ export default {
     leaderboard: "Leaderboard",
     login_to_see_board: "Log in to see the leaderboard.",
     board_error: "Couldn't load the leaderboard.",
+    board_members_only: "Only course members can see this leaderboard.",
     board_public: "Public",
     board_private: "Private",
     board_final: "Final",

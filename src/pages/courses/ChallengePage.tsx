@@ -69,7 +69,8 @@ export default function ChallengePage() {
   const boards = useQuery({
     queryKey: challengeKeys.leaderboard(slug, challengeSlug),
     queryFn: () => challengeService.leaderboard(slug, challengeSlug),
-    enabled: !!challenge && !challenge.is_exam && isLoggedIn,
+    // Sense sessió també: als cursos públics la classificació és pública
+    enabled: !!challenge && !challenge.is_exam,
     staleTime: 30 * 1000,
     retry: false,
   });
@@ -150,12 +151,12 @@ export default function ChallengePage() {
                 <Box sx={{ p: { xs: 2, md: 3.5 } }}>
                   {tab === 'overview' ? (
                     <Overview courseSlug={slug} challenge={challenge} isStaff={isStaff} />
-                  ) : !isLoggedIn ? (
-                    <Typography color="text.secondary">{t('challenges.login_to_see_board')}</Typography>
                   ) : boards.isLoading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
                   ) : boards.isError || !boards.data ? (
-                    <Typography color="error">{t('challenges.board_error')}</Typography>
+                    status(boards.error) === 403 || status(boards.error) === 401
+                      ? <Typography color="text.secondary">{isLoggedIn ? t('challenges.board_members_only') : t('challenges.login_to_see_board')}</Typography>
+                      : <Typography color="error">{t('challenges.board_error')}</Typography>
                   ) : (
                     <Leaderboard courseSlug={slug} boards={boards.data} myId={myId} closed={!challenge.current} />
                   )}

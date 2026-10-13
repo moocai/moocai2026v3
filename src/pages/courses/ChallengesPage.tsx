@@ -90,17 +90,17 @@ function ChallengeCard({ challenge, courseId, slug }: { challenge: Challenge; co
   const excerpt = markdownExcerpt(challengeDescription(challenge, i18n.language));
   const to = `/courses/${courseId}/challenges/${encodeURIComponent(challenge.slug)}`;
 
-  // La pròpia posició surt de la classificació (top 5 + l'entrada pròpia): només per a qui ha iniciat sessió
+  // La pròpia posició (o qui lidera) surt de la classificació (top 5 + l'entrada pròpia)
   const board = useQuery({
     queryKey: challengeKeys.leaderboard(slug, challenge.slug),
     queryFn: () => challengeService.leaderboard(slug, challenge.slug),
-    enabled: !!myId && !challenge.is_exam && !challenge.locked,
+    enabled: !challenge.is_exam && !challenge.locked,
     staleTime: 60 * 1000,
     retry: false,
   });
   const boards = board.data;
   const leader = boards?.final?.[0] ?? boards?.public?.[0];
-  const mine = (boards?.final ?? boards?.public)?.find((e) => e.user_id === myId);
+  const mine = myId ? (boards?.final ?? boards?.public)?.find((e) => e.user_id === myId) : undefined;
 
   return (
     <Box

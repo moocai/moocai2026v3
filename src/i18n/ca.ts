@@ -223,6 +223,7 @@ export default {
     leaderboard: "Classificació",
     login_to_see_board: "Inicia sessió per veure la classificació.",
     board_error: "No s'ha pogut carregar la classificació.",
+    board_members_only: "Només els membres del curs poden veure aquesta classificació.",
     board_public: "Pública",
     board_private: "Privada",
     board_final: "Final",

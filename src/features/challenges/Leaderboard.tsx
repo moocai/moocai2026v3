@@ -23,8 +23,9 @@ interface Props {
 }
 
 /**
- * Classificació d'un repte: podi per als tres primers i, a sota, la resta de posicions.
- * L'alumnat només rep el top 5 i la seva posició: si queda més avall, se separa amb "⋯".
+ * Classificació d'un repte. La final (només un cop tancat) té un podi per als tres primers i,
+ * a sota, la resta; la pública i la privada són una llista. L'alumnat només rep el top 5 i la
+ * seva posició: si queda més avall, se separa amb "⋯".
  */
 export function Leaderboard({ courseSlug, boards, myId, closed }: Props) {
   const { t, i18n } = useTranslation();
@@ -33,7 +34,7 @@ export function Leaderboard({ courseSlug, boards, myId, closed }: Props) {
   const current = boards[board] ? board : available[0] ?? 'public';
   const entries = boards[current] ?? [];
 
-  const podium = entries.filter((e) => e.pos <= 3).slice(0, 3);
+  const podium = current === 'final' ? entries.filter((e) => e.pos <= 3).slice(0, 3) : [];
   const rest = entries.filter((e) => !podium.includes(e));
 
   return (
@@ -74,7 +75,7 @@ export function Leaderboard({ courseSlug, boards, myId, closed }: Props) {
         <>
           <Podium courseSlug={courseSlug} entries={podium} myId={myId} language={i18n.language} />
           {rest.length > 0 && (
-            <Box component="ol" sx={{ listStyle: 'none', m: 0, mt: 2, p: 0, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
+            <Box component="ol" sx={{ listStyle: 'none', m: 0, mt: podium.length ? 2 : 0, p: 0, border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' }}>
               {rest.map((entry, i) => {
                 const prev = i === 0 ? podium[podium.length - 1] : rest[i - 1];
                 const gap = prev ? entry.pos > prev.pos + 1 : entry.pos > 1;
@@ -113,7 +114,7 @@ function Row({ courseSlug, entry, isMe, first, language }: { courseSlug: string;
         boxShadow: isMe ? `inset 3px 0 0 ${theme.palette.primary.main}` : 'none',
       }}
     >
-      <Typography sx={{ width: 32, fontWeight: 900, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>#{entry.pos}</Typography>
+      <Typography sx={{ width: 32, fontWeight: 900, color: entry.pos <= 3 ? MEDALS[entry.pos - 1] : 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>#{entry.pos}</Typography>
       <ProtectedAvatar src={userAvatarUrl(entry.user_id, courseSlug)} alt={entry.username} sx={{ width: 30, height: 30, fontSize: '0.85rem' }} />
       <Typography sx={{ flex: 1, minWidth: 0, fontWeight: isMe ? 900 : 600, color: isMe ? 'primary.main' : 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {entry.username}{isMe && ` (${t('challenges.you')})`}
