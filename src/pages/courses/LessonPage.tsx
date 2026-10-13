@@ -21,6 +21,8 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
+import { useCodeSurface } from '../../theme/codeSurface';
+import { CODING_HEADER_HEIGHT } from '../../layouts/headerHeight';
 import { courseService } from '../../services/courseService';
 import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
@@ -58,6 +60,7 @@ const REACT_FILE = 'React.tsx';
 const LESSON_URI_PREFIX = 'file:///lesson';
 
 function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: Partial<Record<EditorLang, EditorFileInfo>>; onChange: (v: EditorLang) => void }) {
+  const c = useCodeSurface();
   const langs = Object.keys(files) as EditorLang[];
   // Un sol fitxer (p. ex. un curs de Python): només informa del llenguatge, no és clicable
   if (langs.length === 1) {
@@ -66,7 +69,7 @@ function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: 
         sx={{
           userSelect: 'none', px: 1, py: 0.3, borderRadius: 0.8, fontSize: 10.5, fontWeight: 700,
           lineHeight: 1.4, whiteSpace: 'nowrap', fontFamily: "'Fira Code', 'Consolas', monospace",
-          color: '#c4b5fd', border: '1px solid #3f3f46', bgcolor: 'transparent',
+          color: c.accentText, border: `1px solid ${c.separator}`, bgcolor: 'transparent',
         }}
       >
         {files[langs[0]]!.label}
@@ -93,12 +96,12 @@ function EditorFileTabs({ value, files, onChange }: { value: EditorLang; files: 
               fontWeight: 800,
               lineHeight: 1.4,
               whiteSpace: 'nowrap',
-              color: active ? '#fff' : '#9ca3af',
-              bgcolor: active ? '#8400ff' : 'rgba(255,255,255,0.06)',
+              color: active ? '#fff' : c.info,
+              bgcolor: active ? '#8400ff' : c.chipBg,
               border: '1px solid',
-              borderColor: active ? '#8400ff' : '#444',
+              borderColor: active ? '#8400ff' : c.chipBorder,
               transition: 'all 0.15s',
-              '&:hover': { color: '#fff', borderColor: '#8400ff' },
+              '&:hover': { color: active ? '#fff' : c.text, borderColor: '#8400ff' },
             }}
           >
             {file.label}
@@ -115,6 +118,7 @@ const MONACO_SEVERITY_WARNING = 4;
 
 function EditorDiagnosticsBadge({ markers }: { markers: any[] }) {
   const { t } = useTranslation();
+  const c = useCodeSurface();
   const errors = markers.filter((m) => m.severity === MONACO_SEVERITY_ERROR).length;
   const warnings = markers.filter((m) => m.severity === MONACO_SEVERITY_WARNING).length;
   if (!errors && !warnings) return null;
@@ -122,14 +126,14 @@ function EditorDiagnosticsBadge({ markers }: { markers: any[] }) {
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {errors > 0 && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={t('lesson.diagnostics_errors', 'Errors: {{count}}', { count: errors })}>
-          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#f87171' }} />
-          <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: '#f87171' }}>{errors}</Typography>
+          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: c.error }} />
+          <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: c.error }}>{errors}</Typography>
         </Box>
       )}
       {warnings > 0 && (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.4 }} title={t('lesson.diagnostics_warnings', 'Avisos: {{count}}', { count: warnings })}>
-          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: '#fbbf24' }} />
-          <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: '#fbbf24' }}>{warnings}</Typography>
+          <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: c.warning }} />
+          <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, color: c.warning }}>{warnings}</Typography>
         </Box>
       )}
     </Box>
@@ -237,6 +241,7 @@ export default function LessonPage() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
+  const c = useCodeSurface();
   const navigate = useNavigate();
   const contentRef = useRef<HTMLDivElement>(null);
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
@@ -929,13 +934,14 @@ export default function LessonPage() {
   // MOBILE LAYOUT
   if (isMobile) {
     return (
-      <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
+      // pt: sota la capçalera (fixa, per sobre de la pàgina), no amagat al darrere
+      <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
         {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
-        <Box sx={{height: 48, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0, mt: 5}}>
+        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0}}>
           <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
         </Box>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
-          <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', flexShrink: 0 }}>
+          <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
               {topicClosed && (
@@ -947,14 +953,14 @@ export default function LessonPage() {
             </Box>
             {status === 'fail' && !backHidden && (
               <Box sx={{ textAlign: 'center', mt: 2 }}>
-                <Button onClick={() => { setShowResultModal(false); setBackHidden(true); }} sx={{ color: 'white', fontSize: 15, minWidth: 0, p: 0.5, '&:hover': { color: '#fff' } }}>{t('lesson.back')}</Button>
+                <Button onClick={() => { setShowResultModal(false); setBackHidden(true); }} sx={{ color: 'text.primary', fontSize: 15, minWidth: 0, p: 0.5 }}>{t('lesson.back')}</Button>
               </Box>
             )}
           </Box>
           {/* SOLUCIÓ DEL PROFESSOR (MÒBIL) */}
           {activeTab === 1 && solutionUnlocked && monaco && (
-            <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: '#1e1e1e', p: 1.5 }}>
-              <Typography sx={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', mb: 1, color: '#c084fc' }}>
+            <Box sx={{ flex: 1, overflowY: 'auto', bgcolor: c.bg, p: 1.5 }}>
+              <Typography sx={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', mb: 1, color: c.accentText }}>
                 {t('lesson.teacher_solution_title', 'professor')}
               </Typography>
               {referenceSolution ? (
@@ -966,17 +972,17 @@ export default function LessonPage() {
                   stopLabel={stopLabel}
                 />
               ) : (
-                <Typography sx={{ fontSize: 11, color: '#aaa' }}>
+                <Typography sx={{ fontSize: 11, color: c.muted }}>
                   {t('lesson.no_solution_available', 'No hi ha solució disponible per aquest exercici.')}
                 </Typography>
               )}
             </Box>
           )}
 
-          <Box sx={{ display: activeTab === 1 && solutionUnlocked ? 'none' : 'flex', flexDirection: 'column', flex: 1, bgcolor: '#1e1e1e', overflow: 'hidden' }}>
-            <Box sx={{ height: 36, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
+          <Box sx={{ display: activeTab === 1 && solutionUnlocked ? 'none' : 'flex', flexDirection: 'column', flex: 1, bgcolor: c.bg, overflow: 'hidden' }}>
+            <Box sx={{ height: 36, px: 2, bgcolor: c.bar, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}`, flexShrink: 0 }}>
               {/* "Editor" només fa falta per distingir-lo de la visualització (cursos de React) */}
-              {isReactCourse ? <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 500 }}>{t('lesson.app_file')}</Typography> : <Box />}
+              {isReactCourse ? <Typography sx={{ fontSize: 11, color: c.text, fontWeight: 500 }}>{t('lesson.app_file')}</Typography> : <Box />}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact />
@@ -984,7 +990,7 @@ export default function LessonPage() {
                 {isReactCourse && (
                   <Tooltip title={liveRenderTooltip} arrow>
                     <IconButton size="small" aria-label={liveRenderTooltip} onClick={() => setShowLiveRender(v => !v)} sx={{ p: 0.5 }}>
-                      {showLiveRender ? <EyeOff size={14} color="#fff" /> : <Eye size={14} color="#fff" />}
+                      {showLiveRender ? <EyeOff size={14} color={c.icon} /> : <Eye size={14} color={c.icon} />}
                     </IconButton>
                   </Tooltip>
                 )}
@@ -1015,8 +1021,8 @@ export default function LessonPage() {
           {/* VISUALITZACIÓ EN TEMPS REAL (MÒBIL) */}
           {isReactCourse && showLiveRender && !(activeTab === 1 && solutionUnlocked) && (
             <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-              <Box sx={{ height: 30, px: 2, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
-                <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.live_render', 'Visualització')}</Typography>
+              <Box sx={{ height: 30, px: 2, bgcolor: c.bar, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}`, flexShrink: 0 }}>
+                <Typography sx={{ fontSize: 11, color: c.text, fontWeight: 900 }}>{t('lesson.live_render', 'Visualització')}</Typography>
               </Box>
               <Box sx={{ flex: 1, height: 0, display: 'flex', minHeight: 0 }}>
                 <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
@@ -1025,7 +1031,7 @@ export default function LessonPage() {
           )}
         </Box>
 
-        <ResizeHandle orientation="horizontal" thickness={8} ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
+        <ResizeHandle color={c.resizeHandle} orientation="horizontal" thickness={8} ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
         <Box sx={{ height: consoleHeight, flexShrink: 0, display: 'flex' }}>
           <ConsolePanel 
             output={consoleOutput}
@@ -1039,17 +1045,17 @@ export default function LessonPage() {
         {/* Espai de la barra de botons fixa de sota */}
         <Box sx={{ height: 70, flexShrink: 0 }} />
 
-        <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
-          <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1, p: 1 }}>
+        <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
+          <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
             <ChevronLeft size={20}/>
           </IconButton>
           <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
             <Tooltip title={resetTooltip} arrow>
-              <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: '1px solid #444', borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: '#333' } }}><RotateCcw size={15} color="red"/></IconButton>
+              <IconButton onClick={handleResetCode} aria-label={resetTooltip} sx={{ border: `1px solid ${c.chipBorder}`, borderRadius: 1, width: 28, height: 28, '&:hover': { bgcolor: c.hover } }}><RotateCcw size={15} color="red"/></IconButton>
             </Tooltip>
             {selectedLanguage === 'python' && (
               <Tooltip title={testTooltip} arrow>
-                <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="currentColor" /> : <Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: '#666', color: 'inherit', whiteSpace: 'nowrap' }}>{isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}</Button>
+                <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="currentColor" /> : <Play size={12} />} sx={{ fontWeight: 700, borderRadius: 1, fontSize: 11, borderColor: c.outline, color: 'inherit', whiteSpace: 'nowrap' }}>{isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}</Button>
               </Tooltip>
             )}
             <Tooltip title={submitTooltip} arrow>
@@ -1059,7 +1065,7 @@ export default function LessonPage() {
               </Box>
             </Tooltip>
           </Stack>
-          <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', borderRadius: 1.5, p: 1 }}>
+          <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1 }}>
             <ChevronRight size={20}/>
           </IconButton>
         </Box>
@@ -1069,20 +1075,20 @@ export default function LessonPage() {
 
   // DESKTOP LAYOUT - Editor + Visualització en temps real neta al costat + Consola abaix
   return (
-    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
+    <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
       {progressPercent > 0 && <Box sx={{ height: 4, flexShrink: 0, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
 
-      <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0, mt: 10 }}>
+      <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* COLUMNA 1: Enunciat / AI / Solucions */}
-        <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
+        <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
             <Tab label={t('lesson.tab_teacher_solution', 'Solució')} icon={!solutionUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!peersUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_ai_help', 'IA')} />
           </Tabs>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
             <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={tabFontSize} />
           </Box>
 
@@ -1169,8 +1175,8 @@ export default function LessonPage() {
           </Box>
 
           {/* Botons de navegació inferior esquerra */}
-          <Box sx={{ height: 60, px: 4, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: mode === 'light' ? '#000' : 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-            <Button onClick={handlePrevious} disabled={isFirstCoding} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: mode === 'light' ? '#000' : 'divider', color: 'text.primary' }}>
+          <Box sx={{ height: 60, px: 4, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2 }}>
+            <Button onClick={handlePrevious} disabled={isFirstCoding} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: 'divider', color: 'text.primary' }}>
               {t('lesson.previous', 'Anterior')}
             </Button>
             <Button onClick={handleNext} variant="contained" size="small" endIcon={<ChevronRight size={16} />} sx={{ fontWeight: 700, fontSize: 13, bgcolor: 'primary.main', color: '#fff' }}>
@@ -1179,29 +1185,29 @@ export default function LessonPage() {
           </Box>
         </Box>
 
-        <Box onMouseDown={handleDragStart('col1')} sx={{width: 4,flexShrink: 0,cursor: 'col-resize',bgcolor: mode === 'light' ? 'black' : '#8400ff','&:hover': { bgcolor: '#8400ff' },transition: 'background-color 0.15s',}}/>
+        <Box onMouseDown={handleDragStart('col1')} sx={{width: 4,flexShrink: 0,cursor: 'col-resize',bgcolor: mode === 'light' ? c.resizeHandle : '#8400ff','&:hover': { bgcolor: '#8400ff' },transition: 'background-color 0.15s',}}/>
 
         
         <Box ref={editorColumnRef} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* COLUMNA 2: EDITOR + VISUALITZACIÓ EN DIRECTE*/}
           <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}> {/* SECCIÓ SUPERIOR: SPLIT DE CODI I VISUALITZACIÓ EN DIRECTE */}
            {/* Capçalera: cobreix l'editor i la visualització */}
-            <Box sx={{ height: 60, px: compactHeader ? 1 : 2, gap: 1, bgcolor: '#000', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${mode === 'light' ? '#000' : '#333'}`, flexShrink: 0 }}>
+            <Box sx={{ height: 60, px: compactHeader ? 1 : 2, gap: 1, bgcolor: c.bar, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: `1px solid ${c.border}`, flexShrink: 0 }}>
               {/* Esquerra: llenguatge i estat, i a continuació Executar i Enviar */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: compactHeader ? 1 : 1.5, minWidth: 0 }}>
-                {isReactCourse && !compactHeader && <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
+                {isReactCourse && !compactHeader && <Typography sx={{ fontSize: 11, color: c.text, fontWeight: 900 }}>{t('lesson.app_file', 'Codi')}</Typography>}
                 <EditorFileTabs value={selectedLanguage} files={editorFiles} onChange={handleLanguageChange} />
                 <SolutionStatusChip status={solutionStatus} submissions={submissionCount} lastSubmittedAt={mySolution?.last_submitted_at} compact={compactHeader} />
                 <EditorDiagnosticsBadge markers={diagnostics} />
-                <Box sx={{ width: '1px', height: 22, bgcolor: '#3f3f46', mx: compactHeader ? 0.25 : 0.75, flexShrink: 0 }} />
+                <Box sx={{ width: '1px', height: 22, bgcolor: c.separator, mx: compactHeader ? 0.25 : 0.75, flexShrink: 0 }} />
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexShrink: 0 }}>
                   {selectedLanguage === 'python' && (
                     <Tooltip title={`${testTooltip} (Shift+Enter)`} arrow>
                       {compactHeader ? (
-                        <IconButton onClick={handleLocalRun} aria-label={testTooltip} sx={{ border: '1px solid', borderColor: isRunning ? '#f87171' : '#666', borderRadius: 1, width: 32, height: 32, color: '#fff', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
-                          {isRunning ? <Square size={12} fill="#fff"/> : <Play size={14} fill="#fff"/>}
+                        <IconButton onClick={handleLocalRun} aria-label={testTooltip} sx={{ border: '1px solid', borderColor: isRunning ? c.error : c.outline, borderRadius: 1, width: 32, height: 32, color: c.text, '&:hover': { bgcolor: c.hover, borderColor: c.outlineHover } }}>
+                          {isRunning ? <Square size={12} fill="currentColor"/> : <Play size={14} fill="currentColor"/>}
                         </IconButton>
                       ) : (
-                        <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="#fff"/> : <Play size={12} fill="#fff"/>} sx={{ borderColor: isRunning ? '#f87171' : '#666', color: '#fff', height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#222', borderColor: '#888' } }}>
+                        <Button onClick={handleLocalRun} variant="outlined" startIcon={isRunning ? <Square size={11} fill="currentColor"/> : <Play size={12} fill="currentColor"/>} sx={{ borderColor: isRunning ? c.error : c.outline, color: c.text, height: 32, fontSize: 11, fontWeight: 700, px: 2, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: c.hover, borderColor: c.outlineHover } }}>
                           {isRunning ? t('lesson.stop_button', 'Atura') : t('lesson.run_button', 'Executar')}
                         </Button>
                       )}
@@ -1211,11 +1217,11 @@ export default function LessonPage() {
                     {/* El span permet mostrar el tooltip encara que el botó estigui desactivat */}
                     <Box component="span" sx={{ display: 'inline-flex' }}>
                       {compactHeader ? (
-                        <IconButton onClick={handleRunTests} disabled={!canSubmit} aria-label={submitTooltip} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', width: 40, height: 32, borderRadius: 1, '&:hover': { bgcolor: '#e0e0e0' } }}>
+                        <IconButton onClick={handleRunTests} disabled={!canSubmit} aria-label={submitTooltip} sx={{ '&.Mui-disabled': { bgcolor: c.disabledBg, color: c.disabledText }, bgcolor: c.primaryBg, color: c.primaryText, width: 40, height: 32, borderRadius: 1, '&:hover': { bgcolor: c.primaryHover } }}>
                           <CloudUpload size={17}/>
                         </IconButton>
                       ) : (
-                        <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: '#333', color: '#777' }, bgcolor: '#fff', color: '#000', height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: '#e0e0e0' } }}>
+                        <Button onClick={handleRunTests} disabled={!canSubmit} variant="contained" startIcon={<CloudUpload size={15}/>} sx={{ '&.Mui-disabled': { bgcolor: c.disabledBg, color: c.disabledText }, bgcolor: c.primaryBg, color: c.primaryText, height: 32, fontSize: 11, fontWeight: 900, px: 2.5, borderRadius: 1, whiteSpace: 'nowrap', '&:hover': { bgcolor: c.primaryHover } }}>
                           {t('lesson.run', 'Enviar')}
                         </Button>
                       )}
@@ -1247,7 +1253,7 @@ export default function LessonPage() {
 
             <Box sx={{ flex: 1, display: 'flex', flexDirection: 'row', minHeight: 0 }}>
               {/* L'Editor de Codi */}
-              <Box ref={contentRef} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0, borderRight: isReactCourse ? '1px solid #8400ff' : 'none'}}>
+              <Box ref={contentRef} sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: c.bg, minHeight: 0, borderRight: isReactCourse ? '1px solid #8400ff' : 'none'}}>
                 {monaco ? (
                   <Box key={fadeKey} sx={{ height: '100%' }}>
                     <Editor
@@ -1269,7 +1275,7 @@ export default function LessonPage() {
 
               {/* LIVE RENDER: només als cursos de React (Python fa servir tota l'amplada per a l'editor) */}
               {isReactCourse && (
-                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: '#1e1e1e', minHeight: 0 }}>
+                <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', bgcolor: c.bg, minHeight: 0 }}>
                   <Box sx={{ flex: 1, minHeight: 0, display: 'flex' }}>
                     <ReactLivePreview monaco={monaco} code={codeByLang.react} dark={mode !== 'light'} />
                   </Box>
@@ -1279,7 +1285,7 @@ export default function LessonPage() {
           </Box>
 
           {/* CONSOLA */}
-          <ResizeHandle orientation="horizontal" ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
+          <ResizeHandle color={c.resizeHandle} orientation="horizontal" ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
           <Box sx={{ height: consoleHeight, flexShrink: 0, display: 'flex' }}>
             <ConsolePanel 
               output={consoleOutput}

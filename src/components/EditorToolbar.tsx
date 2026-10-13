@@ -3,6 +3,7 @@ import { Box, CircularProgress, IconButton, ListItemIcon, ListItemText, Menu, Me
 import { Bot, GraduationCap, History, Keyboard, MoreHorizontal, ZoomIn, ZoomOut } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { TFunction } from 'i18next';
+import { useCodeSurface } from '../theme/codeSurface';
 
 /** Una versió del codi que es pot carregar a l'editor (esborrany local, còpia del servidor...). */
 export interface CodeVersion {
@@ -25,11 +26,12 @@ function relativeTime(iso: string | null | undefined, t: TFunction, lang: string
 }
 
 function ToolButton({ title, onClick, disabled, children }: { title: string; onClick: (e: React.MouseEvent<HTMLElement>) => void; disabled?: boolean; children: ReactNode }) {
+  const c = useCodeSurface();
   return (
     <Tooltip title={title} arrow>
       {/* El span manté el tooltip encara que el botó estigui desactivat */}
       <Box component="span" sx={{ display: 'inline-flex' }}>
-        <IconButton size="small" onClick={onClick} disabled={disabled} aria-label={title} sx={{ color: '#d1d5db', borderRadius: 1, px: 0.75, '&:hover': { bgcolor: '#222', color: '#fff' }, '&.Mui-disabled': { color: '#555' } }}>
+        <IconButton size="small" onClick={onClick} disabled={disabled} aria-label={title} sx={{ color: c.icon, borderRadius: 1, px: 0.75, '&:hover': { bgcolor: c.hover, color: c.text }, '&.Mui-disabled': { color: c.disabledText } }}>
           {children}
         </IconButton>
       </Box>
@@ -57,6 +59,7 @@ export function EditorToolbar({ compact, showAiHint = true, onAiHint, aiBusy, hi
   onZoomOut: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const c = useCodeSurface();
   const [versionsAnchor, setVersionsAnchor] = useState<HTMLElement | null>(null);
   const [moreAnchor, setMoreAnchor] = useState<HTMLElement | null>(null);
   const [versions, setVersions] = useState<CodeVersion[] | null>(null);
@@ -132,7 +135,7 @@ export function EditorToolbar({ compact, showAiHint = true, onAiHint, aiBusy, hi
       <ToolButton title={t('lesson.python_tutor', 'Obre a Python Tutor')} onClick={onPythonTutor}><GraduationCap size={17} /></ToolButton>
       <ToolButton title={t('lesson.shortcuts_title', 'Dreceres de teclat')} onClick={onShortcuts}><Keyboard size={17} /></ToolButton>
       <ToolButton title={t('lesson.version_title', 'Carrega una versió')} onClick={(e) => openVersions(e.currentTarget)}><History size={17} /></ToolButton>
-      <Box sx={{ width: '1px', height: 18, bgcolor: '#333', mx: 0.5 }} />
+      <Box sx={{ width: '1px', height: 18, bgcolor: c.separator, mx: 0.5 }} />
       <ToolButton title={t('lesson.zoom_out', 'Redueix la lletra')} onClick={onZoomOut}><ZoomOut size={17} /></ToolButton>
       <ToolButton title={t('lesson.zoom_in', 'Amplia la lletra')} onClick={onZoomIn}><ZoomIn size={17} /></ToolButton>
       {versionsMenu}

@@ -470,9 +470,10 @@ export default function CourseLessons() {
     </Box>
   );
 
+  // En l'ordre del curs (el de l'API, com a algorien): abans els temes amb la teoria completada
+  // anaven al final i la llista quedava desordenada
   const topicItems: TopicNavItem[] = allLessons
-    .map((l) => ({ id: l.id, title: getText(l.title), done: isTheoryDone(l.id), percent: getLessonProgress(l), current: typeof l.current === 'boolean' ? l.current : undefined }))
-    .sort((a, b) => Number(a.done === true) - Number(b.done === true));
+    .map((l) => ({ id: l.id, title: getText(l.title), done: isTheoryDone(l.id), percent: getLessonProgress(l), current: typeof l.current === 'boolean' ? l.current : undefined }));
   const activeTopicId: string | undefined = allLessons.find((l) => l.id === selectedTopicId)?.id ?? allLessons[0]?.id;
 
   const renderTheoryTab = () => {

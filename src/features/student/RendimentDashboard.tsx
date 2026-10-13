@@ -240,8 +240,9 @@ export default function RendimentDashboard() {
   }
 
   return (
+    // Scroll propi, com les altres pàgines (el layout només en fa si una pàgina el desborda)
     <Box sx={{
-      position: 'relative', minHeight: '100%',
+      position: 'relative', height: '100%', overflowY: 'auto',
       bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#0a0e17' : 'background.default',
       color: 'text.primary', py: { xs: 2, md: 4 },
     }}>
