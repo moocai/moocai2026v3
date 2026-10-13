@@ -11,6 +11,7 @@ import { UserAvatarMenu } from './UserAvatarMenu';
 import { useThemeMode } from '../hooks/useTheme';
 import { NotificationBell } from './NotificationBell';
 import { StarScore } from './StarScore';
+import { headerHeightFor, isCodingRoute } from '../layouts/headerHeight';
 // Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
 import { usePoints } from '../utils/pointsSync';
 const logo = '/img/logo.webp';
@@ -40,6 +41,9 @@ export function Header() {
   const points = usePoints();
   const navigate = useNavigate();
   const location = useLocation();
+  // Problema de codi: capçalera més baixa perquè l'alumne tingui més espai per al codi
+  const compact = isCodingRoute(location.pathname);
+  const headerHeight = headerHeightFor(location.pathname);
   // "Tauler" només dins d'un curs (i al mateix tauler): obre el tauler d'aquell curs
   const courseInPath = /^\/courses\/([^/]+)/.exec(location.pathname)?.[1];
   const dashboardTarget = courseInPath
@@ -122,27 +126,27 @@ export function Header() {
     color: 'text.primary',
     fontWeight: 800,
     textTransform: 'none',
-    fontSize: '1rem',
-    height: 40,
+    fontSize: compact ? '0.9rem' : '1rem',
+    height: compact ? 32 : 40,
     '&:hover': { color: 'primary.main', bgcolor: 'transparent' }
   };
 
   return (
     <>
-      <AppBar position="sticky" sx={{width: '100%', bgcolor: mode === 'fancy' ? '#000000' : mode === 'dark' ? '#1f2937' : 'white', zIndex: 1400, boxShadow: mode === 'fancy' ? 'none' : '0 1px 40px #8400ff'}}>
-        <Toolbar sx={{ px: { xs: 2, md: 8 }, height: '80px', display: 'flex', justifyContent: 'space-between' }}>
+      <AppBar position="sticky" sx={{width: '100%', bgcolor: mode === 'fancy' ? '#000000' : mode === 'dark' ? '#1f2937' : 'white', zIndex: 1400, boxShadow: mode === 'fancy' ? 'none' : compact ? '0 1px 16px #8400ff' : '0 1px 40px #8400ff'}}>
+        <Toolbar sx={{ px: { xs: 2, md: compact ? 3 : 8 }, height: headerHeight, minHeight: { xs: headerHeight, sm: headerHeight }, display: 'flex', justifyContent: 'space-between' }}>
           
           {/* LOGO */}
         <Box component={RouterLink} to="/" state={{ fromNav: true }} sx={{ display: 'flex', flexDirection: { xs: 'row', md: 'row' }, alignItems: 'center', gap: { xs: 0.5, md: 1.5 }, textDecoration: 'none' }}>
-          <Box component="img" src={logo} alt="Rocket" width={438} height={190} sx={{ height: { xs: 22, md: 50 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s' }} />
+          <Box component="img" src={logo} alt="Rocket" width={438} height={190} sx={{ height: { xs: compact ? 17 : 22, md: compact ? 28 : 50 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s' }} />
             <Stack direction="row" sx={{ alignItems: 'baseline' }}>
-              <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'text.primary'}}>MOOC</Typography>
-              <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'primary.main', ml:0.5}}>2026</Typography>
+              <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'text.primary', ...(compact && { fontSize: '1.15rem' })}}>MOOC</Typography>
+              <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'primary.main', ml:0.5, ...(compact && { fontSize: '1.15rem' })}}>2026</Typography>
             </Stack>
           </Box>
 
           {/* DESKTOP NAV */}
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3, mr: -5}}>
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: compact ? 2 : 3, mr: compact ? 0 : -5}}>
             <Button onClick={scrollToCourses} sx={commonButtonStyle}>
               {t('footer.courses')}
             </Button>
@@ -197,7 +201,7 @@ export function Header() {
       {/* MOBILE MENU OVERLAY */}
       <AnimatePresence>
         {mobileOpen && (
-          <Box component={motion.div} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}  sx={{position: 'fixed', top: '80px',left: 0,right: 0,bottom: 0,width: '100vw',height: 'calc(100vh - 80px)',bgcolor: 'background.default', zIndex: 1300, display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', pt: 4, pb: 6}}>
+          <Box component={motion.div} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}  sx={{position: 'fixed', top: headerHeight,left: 0,right: 0,bottom: 0,width: '100vw',height: `calc(100vh - ${headerHeight}px)`,bgcolor: 'background.default', zIndex: 1300, display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', pt: 4, pb: 6}}>
             <Stack spacing={4} sx={{ width: '85%', alignItems: 'center' }}>
 
               {/* 1. Cursos + Dashboard + nom usuari */}
