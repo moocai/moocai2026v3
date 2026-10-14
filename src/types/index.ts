@@ -19,6 +19,8 @@ export interface Course {
   myRole?: string | null;
   /** Progrés propi com a alumne (`my_progress`): només a la llista de cursos propis; `null` si no n'hi ha. */
   myProgress?: { problems: number; completed: number } | null;
+  /** El curs té reptes de ML (`allows_challenges`). `undefined` si l'API no l'envia. */
+  allowsChallenges?: boolean;
 }
 
 export interface Lesson {

@@ -31,6 +31,8 @@ type I18nField = { ca: string; es: string; en: string };
 // };
 
 // Les 4 pestanyes principals (mateix ordre que els índexs de mainTab)
+const CODING_TAB = 1;
+const TESTS_TAB = 2;
 const TAB_ITEMS = [
   { icon: BookOpen, labelKey: 'lesson.tab_theory', fallback: 'Teoria' },
   { icon: Code, labelKey: 'lesson.tab_exercises', fallback: 'Programació' },
@@ -94,12 +96,17 @@ export default function CourseLessons() {
     // navigate(`/courses/${targetCourseId}`);
   // };
 
-  const [mainTab, setMainTab] = useState<number>(() => {
+  const [storedTab, setMainTab] = useState<number>(() => {
     const saved = localStorage.getItem(`mooc_tab_${courseId}`);
     return saved !== null ? JSON.parse(saved) : 0;
   });
+  // Programació i Tests només si el curs els té activats (`allows_coding` / `allows_tests`);
+  // si l'API no ho diu (backend antic), es mostren. La pestanya desada d'una que no hi és → Teoria.
+  const visibleTabs = TAB_ITEMS.map((_, i) => i).filter((i) =>
+    (i !== CODING_TAB || course?.allows_coding !== false) && (i !== TESTS_TAB || course?.allows_tests !== false));
+  const mainTab = visibleTabs.includes(storedTab) ? storedTab : 0;
 
-  useEffect(() => {if (courseId) {localStorage.setItem(`mooc_tab_${courseId}`, JSON.stringify(mainTab));}}, [mainTab, courseId]);
+  useEffect(() => {if (courseId) {localStorage.setItem(`mooc_tab_${courseId}`, JSON.stringify(storedTab));}}, [storedTab, courseId]);
 
   const getProgressKey = useCallback(() => {
     const saved = localStorage.getItem('currentStudent');
@@ -360,14 +367,16 @@ export default function CourseLessons() {
 
   const isTheoryDone = (lessonId: string) => progress[`${courseId}_theory_${lessonId}`] === true;
   const allLessons: any[] = course.content || [];
-  const isFirstTab = mainTab === 0; const isLastTab = mainTab === TAB_ITEMS.length - 1;
+  const tabPos = visibleTabs.indexOf(mainTab);
+  const isFirstTab = tabPos <= 0; const isLastTab = tabPos === visibleTabs.length - 1;
 
   const handleTabArrow = (dir: -1 | 1) => {
-    const target = Math.min(Math.max(mainTab + dir, 0), TAB_ITEMS.length - 1);
+    const targetPos = Math.min(Math.max(tabPos + dir, 0), visibleTabs.length - 1);
+    const target = visibleTabs[targetPos];
     if (target === mainTab) return;
     setMainTab(target);
     const scroller = tabsListRef.current?.querySelector('.MuiTabs-scroller') as HTMLElement | null;
-    const tab = tabsListRef.current?.querySelectorAll('[role="tab"]')[target] as HTMLElement | undefined;
+    const tab = tabsListRef.current?.querySelectorAll('[role="tab"]')[targetPos] as HTMLElement | undefined;
     if (scroller && tab) {
       const delta = tab.getBoundingClientRect().left - scroller.getBoundingClientRect().left - (scroller.clientWidth - tab.offsetWidth) / 2;
       if (delta) scroller.scrollBy({ left: delta, behavior: 'smooth' });
@@ -401,7 +410,10 @@ export default function CourseLessons() {
             '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
             '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: { xs: 4, md: 3}},
           }}>
-          {TAB_ITEMS.map(({ labelKey, fallback }) => (<Tab key={labelKey} label={t(labelKey, fallback)} />))}
+          {visibleTabs.map((index) => {
+            const { labelKey, fallback } = TAB_ITEMS[index];
+            return <Tab key={labelKey} value={index} label={t(labelKey, fallback)} />;
+          })}
         </Tabs>
       </Box>
       {navArrow(1)}
@@ -700,7 +712,8 @@ export default function CourseLessons() {
 
       {/* Menú vertical flotant: apareix quan les pestanyes de dalt surten de la pantalla */}
       <Box sx={{ position: 'absolute', right: { xs: 7.5, md: 27, lg: 35 }, top: '50%', zIndex: 20, display: 'flex', flexDirection: 'column', gap: 3, p: 1, borderRadius: 999, bgcolor: alpha(theme.palette.background.paper, 0.85), backdropFilter: 'blur(8px)', border: '1px solid', borderColor: 'divider', boxShadow: 3, transition: 'opacity 0.25s, transform 0.25s', opacity: showRail ? 1 : 0, transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)', pointerEvents: showRail ? 'auto' : 'none' }}>
-        {TAB_ITEMS.map(({ icon: Icon, labelKey, fallback }, index) => {
+        {visibleTabs.map((index) => {
+          const { icon: Icon, labelKey, fallback } = TAB_ITEMS[index];
           const active = mainTab === index;
           return (
             <Tooltip key={labelKey} title={t(labelKey, fallback)} placement="left">

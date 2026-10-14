@@ -1,12 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
-import { Box, Container, Typography, Stack, CircularProgress, Button, Tooltip } from '@mui/material';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { Box, Typography, Stack, CircularProgress, Tooltip } from '@mui/material';
 import { ArrowDownward, ArrowUpward, InfoOutlined } from '@mui/icons-material';
-import { ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { useThemeMode } from '../../hooks/useTheme';
 import { courseService } from '../../services/courseService';
-import { resolveSlug } from '../../hooks/useCourse';
 import { useSeriesColors } from './chartColors';
 
 interface TopicRow {
@@ -44,10 +41,10 @@ function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boole
   const diffColor = !hasActivity || diff === 0 ? 'text.secondary' : diff > 0 ? ABOVE_COLOR : BELOW_COLOR;
 
   return (
-    <Stack direction="row" spacing={2} sx={{ py: 1, alignItems: 'center' }}>
+    <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ py: 1, alignItems: 'center' }}>
       <Typography
         variant="body2"
-        sx={{ width: { xs: 110, md: 180 }, textAlign: 'left', color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}
+        sx={{ width: { xs: 80, sm: 110, md: 180 }, textAlign: 'left', color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}
         title={row.topic}
       >
         {row.topic}
@@ -77,13 +74,13 @@ function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boole
       </Tooltip>
 
       <Tooltip title={t('dashboard.stats_value_tooltip', { you: row.personal })} arrow placement="top">
-        <Typography variant="body2" sx={{ width: 46, textAlign: 'right', fontWeight: 700, color: 'text.primary', flexShrink: 0 }}>
+        <Typography variant="body2" sx={{ width: { xs: 38, sm: 46 }, textAlign: 'right', fontWeight: 700, color: 'text.primary', flexShrink: 0 }}>
           {row.personal}%
         </Typography>
       </Tooltip>
 
       <Tooltip title={diffTip} arrow placement="top">
-        <Stack direction="row" spacing={0.25} sx={{ width: 56, color: diffColor, alignItems: 'center', flexShrink: 0 }}>
+        <Stack direction="row" spacing={0.25} sx={{ width: { xs: 48, sm: 56 }, color: diffColor, alignItems: 'center', flexShrink: 0 }}>
           {hasActivity && diff > 0 && <ArrowUpward sx={{ fontSize: 14 }} />}
           {hasActivity && diff < 0 && <ArrowDownward sx={{ fontSize: 14 }} />}
           <Typography variant="body2" sx={{ fontWeight: 700 }}>
@@ -135,16 +132,16 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
         </Stack>
       </Box>
 
-      <Box sx={{ px: 2.5, py: 1.5 }}>
+      <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.5 }}>
         {data.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 2 }}>{t('dashboard.no_data')}</Typography>
         ) : (
           <>
             {/* Capçalera de la columna de la diferència, amb l'explicació */}
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+            <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ alignItems: 'center' }}>
               <Box sx={{ flex: 1 }} />
               <Tooltip title={t('dashboard.stats_vs_average_help')} arrow placement="top">
-                <Typography variant="caption" color="text.secondary" sx={{ width: 56, flexShrink: 0, cursor: 'help', textDecoration: 'underline dotted' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ width: { xs: 48, sm: 56 }, flexShrink: 0, cursor: 'help', textDecoration: 'underline dotted' }}>
                   {t('dashboard.stats_vs_average')}
                 </Typography>
               </Tooltip>
@@ -152,17 +149,21 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
             {data.map((row, i) => (
               <BarRow key={row.topic} row={row} active={active} accent={accent} delayMs={i * 55} />
             ))}
-            <Stack direction="row" spacing={2} sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider', alignItems: 'center' }}>
-              <Box sx={{ width: { xs: 110, md: 180 }, flexShrink: 0 }} />
+            <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider', alignItems: 'center' }}>
+              <Box sx={{ width: { xs: 80, sm: 110, md: 180 }, flexShrink: 0 }} />
               <Box sx={{ flex: 1, position: 'relative', height: 14 }}>
-                {[0, 20, 40, 60, 80, 100].map((g) => (
-                  <Typography key={g} sx={{ position: 'absolute', left: `${g}%`, transform: 'translateX(-50%)', fontSize: 10, color: 'text.secondary', lineHeight: 1 }}>
+                {/* Al mòbil la barra és estreta: només 0, 50 i 100 % (si no, les etiquetes se sobreposen) */}
+                {[0, 20, 40, 50, 60, 80, 100].map((g) => (
+                  <Typography key={g} sx={{
+                    position: 'absolute', left: `${g}%`, transform: 'translateX(-50%)', fontSize: 10, color: 'text.secondary', lineHeight: 1,
+                    display: g === 50 ? { xs: 'block', sm: 'none' } : g === 0 || g === 100 ? 'block' : { xs: 'none', sm: 'block' },
+                  }}>
                     {g}%
                   </Typography>
                 ))}
               </Box>
-              <Box sx={{ width: 46, flexShrink: 0 }} />
-              <Box sx={{ width: 56, flexShrink: 0 }} />
+              <Box sx={{ width: { xs: 38, sm: 46 }, flexShrink: 0 }} />
+              <Box sx={{ width: { xs: 48, sm: 56 }, flexShrink: 0 }} />
             </Stack>
           </>
         )}
@@ -171,100 +172,73 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
   );
 }
 
-/* ─── Component principal ─── */
-export default function RendimentDashboard() {
-  const { courseId } = useParams<{ courseId: string }>();
+/* ─── Gràfics de rendiment per tema (al tauler) ─── */
+type StatsData = { coding: TopicRow[]; tests: TopicRow[] };
+
+export const courseStatsKey = (slug: string) => ['course-stats', slug] as const;
+
+// 2 peticions, siguin quants siguin els temes:
+//  - `GET …/statistics/`: rendiment propi per tema i la mitjana REAL de la classe;
+//  - `GET …/topics/`: problemes per tema i progrés propi (per saber si hi ha activitat).
+async function fetchCourseStats(slug: string): Promise<StatsData> {
+  const [stats, topics] = await Promise.all([
+    courseService.getCourseStatistics(slug),
+    courseService.getCourseTopics(slug).catch(() => [] as any[]),
+  ]);
+  const topicByName = new Map<string, any>(topics.map((topic: any) => [topic.name, topic]));
+  const toRows = (rows: any[], kind: 'coding' | 'test'): TopicRow[] => (rows || []).map((r: any) => {
+    const topic = topicByName.get(r.topic);
+    const progress = topic?.my_progress;
+    const personal = Math.round(Number(r.user_performance) || 0);
+    return {
+      topic: r.topic || '—',
+      personal,
+      avg: Math.round(Number(r.class_average) || 0),
+      total: topic?.problem_counts?.[kind] ?? 0,
+      // Sense el progrés del servidor (backend antic), el rendiment propi indica si n'hi ha
+      done: progress ? (kind === 'coding' ? progress.coding_accepted : progress.tests_answered) : (personal > 0 ? 1 : 0),
+    };
+  });
+  return { coding: toRows(stats?.coding_data, 'coding'), tests: toRows(stats?.test_data, 'test') };
+}
+
+/**
+ * Rendiment per tema (programació i tests), el propi i la mitjana de la classe. Abans era la
+ * pàgina "Més estadístiques"; ara és una secció del tauler del curs.
+ */
+export function CourseStatsCharts({ courseSlug }: { courseSlug: string }) {
   const { t } = useTranslation();
-  const { mode } = useThemeMode();
   const colors = useSeriesColors();
+  const queryClient = useQueryClient();
+  const stats = useQuery({
+    queryKey: courseStatsKey(courseSlug),
+    queryFn: () => fetchCourseStats(courseSlug),
+    enabled: !!courseSlug,
+    staleTime: 60 * 1000,
+  });
 
-  const [loading, setLoading] = useState(true);
-  const [codeTopics, setCodeTopics] = useState<TopicRow[]>([]);
-  const [testTopics, setTestTopics] = useState<TopicRow[]>([]);
-
-  // 2 peticions, siguin quants siguin els temes:
-  //  - `GET …/statistics/`: rendiment propi per tema i la mitjana REAL de la classe;
-  //  - `GET …/topics/`: problemes per tema i progrés propi (per saber si hi ha activitat).
-  const fetchData = useCallback(async () => {
-    if (!courseId) return;
-    setLoading(true);
-    try {
-      const slug = resolveSlug(courseId);
-      const [stats, topics] = await Promise.all([
-        courseService.getCourseStatistics(slug),
-        courseService.getCourseTopics(slug).catch(() => [] as any[]),
-      ]);
-      const topicByName = new Map<string, any>(topics.map((topic: any) => [topic.name, topic]));
-      const toRows = (rows: any[], kind: 'coding' | 'test'): TopicRow[] => (rows || []).map((r: any) => {
-        const topic = topicByName.get(r.topic);
-        const progress = topic?.my_progress;
-        const personal = Math.round(Number(r.user_performance) || 0);
-        return {
-          topic: r.topic || '—',
-          personal,
-          avg: Math.round(Number(r.class_average) || 0),
-          total: topic?.problem_counts?.[kind] ?? 0,
-          // Sense el progrés del servidor (backend antic), el rendiment propi indica si n'hi ha
-          done: progress ? (kind === 'coding' ? progress.coding_accepted : progress.tests_answered) : (personal > 0 ? 1 : 0),
-        };
-      });
-      setCodeTopics(toRows(stats?.coding_data, 'coding'));
-      setTestTopics(toRows(stats?.test_data, 'test'));
-    } catch (err) {
-      console.error('Error carregant dades de rendiment:', err);
-      setCodeTopics([]);
-      setTestTopics([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [courseId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
-
+  // En resoldre un problema o un test, les xifres canvien
   useEffect(() => {
-    const onProgress = () => fetchData();
+    const onProgress = () => { void queryClient.invalidateQueries({ queryKey: courseStatsKey(courseSlug) }); };
     document.addEventListener('lessonProgressUpdated', onProgress);
     window.addEventListener('lessonProgressUpdated', onProgress);
     return () => {
       document.removeEventListener('lessonProgressUpdated', onProgress);
       window.removeEventListener('lessonProgressUpdated', onProgress);
     };
-  }, [fetchData]);
-
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  }, [courseSlug, queryClient]);
 
   return (
-    // Scroll propi, com les altres pàgines (el layout només en fa si una pàgina el desborda)
-    <Box sx={{
-      position: 'relative', height: '100%', overflowY: 'auto',
-      bgcolor: mode === 'fancy' ? 'transparent' : mode === 'dark' ? '#0a0e17' : 'background.default',
-      color: 'text.primary', py: { xs: 2, md: 4 },
-    }}>
-      <Container maxWidth={false} disableGutters sx={{ px: { xs: 2, md: 8 } }}>
-        {/* Tornar al tauler, com el "tornar al curs" de les pàgines de test i de problema */}
-        <Button
-          component={RouterLink}
-          to={`/dashboards/student?course=${encodeURIComponent(courseId ? resolveSlug(courseId) : '')}`}
-          startIcon={<ChevronLeft size={18} />}
-          sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}
-        >
-          {t('dashboard.title')}
-        </Button>
-        <Typography component="h1" variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' }, mb: 3 }}>
-          {t('dashboard.more_statistics')}
-        </Typography>
-
-        <Box sx={{ display: 'grid', gap: { xs: 3, md: 5 }, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, alignItems: 'start' }}>
-          <ChartCard title={t('dashboard.stats_coding_title')} help={t('dashboard.stats_coding_help')} data={codeTopics} accent={colors.coding} delayStart={0} />
-          <ChartCard title={t('dashboard.stats_test_title')} help={t('dashboard.stats_test_help')} data={testTopics} accent={colors.tests} delayStart={150} />
+    <Box component="section">
+      <Typography component="h2" variant="h6" sx={{ fontWeight: 900, mb: 2 }}>{t('dashboard.performance_title')}</Typography>
+      {stats.isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+      ) : (
+        <Box sx={{ display: 'grid', gap: { xs: 3, md: 4 }, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, alignItems: 'start' }}>
+          <ChartCard title={t('dashboard.stats_coding_title')} help={t('dashboard.stats_coding_help')} data={stats.data?.coding ?? []} accent={colors.coding} delayStart={0} />
+          <ChartCard title={t('dashboard.stats_test_title')} help={t('dashboard.stats_test_help')} data={stats.data?.tests ?? []} accent={colors.tests} delayStart={150} />
         </Box>
-      </Container>
+      )}
     </Box>
   );
 }
