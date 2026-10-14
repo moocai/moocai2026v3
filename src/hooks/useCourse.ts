@@ -56,6 +56,20 @@ export function useCourse(courseId: string | undefined) {
 }
 
 /**
+ * Un examen vist com un curs d'un sol tema (vegeu `courseService.getExamCourse`): el fa servir
+ * LessonPage quan el problema s'obre des d'un examen. Fresc al cap de poc: l'examen es pot tancar.
+ */
+export function useExamCourse(courseId: string | undefined, examSlug: string | undefined) {
+  return useQuery<Course>({
+    queryKey: ['exam-course', courseId, examSlug],
+    queryFn: () => courseService.getExamCourse(resolveSlug(courseId!), examSlug!),
+    enabled: !!courseId && !!examSlug,
+    staleTime: 30 * 1000,
+    retry: false,
+  });
+}
+
+/**
  * Consulta del detall d'un problema (enunciat, codi inicial...). La comparteixen
  * LessonPage (que la llegeix) i la llista de problemes (que l'avança en passar-hi
  * per sobre), de manera que en obrir el problema les dades ja hi són.

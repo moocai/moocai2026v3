@@ -19,11 +19,12 @@ import { usePythonRun } from '../../hooks/usePythonRun';
 import { useTranslation } from 'react-i18next';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCourse';
+import { problemDetailQuery, resolveSlug, useCourse, useExamCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import { useCodeSurface } from '../../theme/codeSurface';
 import { CODING_HEADER_HEIGHT } from '../../layouts/headerHeight';
 import { courseService } from '../../services/courseService';
+import { examKeys } from '../../services/examService';
 import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { apiErrorMessages } from '../../services/httpClient';
@@ -236,7 +237,8 @@ function isRejectedResult(r: any): boolean {
 }
 
 export default function LessonPage() {
-  const { courseId, lessonId } = useParams<{ courseId: string; lessonId: string }>();
+  // `examSlug`: el problema s'ha obert des d'un examen (`/courses/:c/exams/:examSlug/:lessonId`)
+  const { courseId, lessonId, examSlug } = useParams<{ courseId: string; lessonId: string; examSlug?: string }>();
   useRecordCourseActivity(courseId);
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -247,7 +249,12 @@ export default function LessonPage() {
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const isMdUp = useMediaQuery('(min-height:900px)');
   const { addNotification } = useNotifications();
-  const { data: course, isLoading: loading } = useCourse(courseId);
+  // Dins d'un examen, el "curs" només té l'examen: anterior/següent no en surten
+  const courseQuery = useCourse(examSlug ? undefined : courseId);
+  const examCourseQuery = useExamCourse(courseId, examSlug);
+  const { data: course, isLoading: loading } = examSlug ? examCourseQuery : courseQuery;
+  // On tornen "enrere" i el final de l'examen: la pàgina de l'examen
+  const examPath = examSlug ? `/courses/${courseId}/exams/${encodeURIComponent(examSlug)}` : null;
   const [currentUser] = useState<Student | null>(() => {const saved = localStorage.getItem('currentStudent'); return saved ? JSON.parse(saved) : null;  });
   const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
   // Resultat de l'últim enviament d'aquesta visita (fins que el detail del servidor es refresca)
@@ -468,6 +475,7 @@ export default function LessonPage() {
   // Ruta d'un test amb el seu tema (?topic=): així TopicTestPage només carrega aquell tema
   const testPath = (slug: string) => {
     const topicSlug = course?.content?.find((tp: any) => (tp.subTopics || []).some((st: any) => st.problemSlug === slug))?.id;
+    if (examSlug) return `/courses/${courseId}/test/${slug}?exam=${encodeURIComponent(examSlug)}`;
     return `/courses/${courseId}/test/${slug}${topicSlug ? `?topic=${encodeURIComponent(topicSlug)}` : ''}`;
   };
 
@@ -484,7 +492,7 @@ export default function LessonPage() {
     if (!slug) return null;
     return problem.type === 'test'
       ? testPath(slug)
-      : `/courses/${courseId}/${slug}`;
+      : examPath ? `${examPath}/${slug}` : `/courses/${courseId}/${slug}`;
   };
 
   // "Anterior" retrocedeix a l'activitat de CODI anterior, saltant els tests
@@ -499,14 +507,14 @@ export default function LessonPage() {
         return;
       }
     }
-    navigate(`/courses/${course.id}`);
+    navigate(examPath ?? `/courses/${course.id}`);
   };
 
   // Torna a la pàgina del curs (CourseLessons) deixant l'activitat
   const handleBackToCourse = () => {
     if (!courseId) return;
     persistViewState();
-    navigate(`/courses/${courseId}`);
+    navigate(examPath ?? `/courses/${courseId}`);
   };
 
   // "Següent temari" avança a la següent activitat de CODI, saltant els tests
@@ -519,6 +527,7 @@ export default function LessonPage() {
       if (nextPath) {navigate(nextPath); return;}
     }
 
+    if (examPath) { navigate(examPath); return; }
     const topics = course.content || []; let currentTopicId = '';
     for (const topic of topics) {const subs = topic.subTopics || []; if (subs.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)) { currentTopicId = topic.id; break; }}
     navigate(`/courses/${course.id}${currentTopicId ? `?lessonId=${currentTopicId}` : ''}`);
@@ -756,8 +765,13 @@ export default function LessonPage() {
       // Detall i llista del curs al dia: estat propi i, si s'ha resolt, la solució de referència
       void queryClient.invalidateQueries({ queryKey: ['problem', courseId, currentTopicSlug, lessonId] });
       void queryClient.invalidateQueries({ queryKey: ['own-submission', courseId, currentTopicSlug, lessonId] });
+      if (examSlug) {
+        // La nota de l'examen i l'estat dels seus problemes (llista d'exàmens i pàgina de l'examen)
+        void queryClient.invalidateQueries({ queryKey: examKeys.list(resolveSlug(courseId!)) });
+        void queryClient.invalidateQueries({ queryKey: ['topic-problems', resolveSlug(courseId!), examSlug] });
+      }
       if (result?.status) {
-        queryClient.setQueryData(['course', courseId], (old: any) => old && ({
+        queryClient.setQueryData(examSlug ? ['exam-course', courseId, examSlug] : ['course', courseId], (old: any) => old && ({
           ...old,
           content: (old.content || []).map((tp: any) => ({
             ...tp,
@@ -913,7 +927,13 @@ export default function LessonPage() {
   useEffect(() => {if (activeTab === 2 && peersUnlocked) {loadPeerSolutions();}}, [activeTab, peersUnlocked, courseId, lessonId]);
 
   if (loading) return <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999 }}><CircularProgress color="secondary" /></Box>;
-  if (!course) return null;
+  if (!course) return examPath && examCourseQuery.isError ? (
+    // L'examen ja no es pot obrir (s'ha tancat, o demana el Safe Exam Browser)
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', flexDirection: 'column', gap: 2, px: 3, textAlign: 'center' }}>
+      <Typography>{t('exams.not_found')}</Typography>
+      <Button variant="outlined" onClick={() => navigate(examPath)} sx={{ textTransform: 'none', fontWeight: 700 }}>{t('exams.back_to_exam')}</Button>
+    </Box>
+  ) : null;
   if (!currentProblem) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999, flexDirection: 'column', gap: 2 }}>
       <CircularProgress color="secondary" />
@@ -938,7 +958,7 @@ export default function LessonPage() {
       <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
         {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
         <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0}}>
-          <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
+          <BackToCourseButton label={examSlug ? t('exams.back_to_exam') : t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
         </Box>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
           <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
@@ -1089,7 +1109,7 @@ export default function LessonPage() {
           </Tabs>
 
           <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={tabFontSize} />
+            <BackToCourseButton label={examSlug ? t('exams.back_to_exam') : t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={tabFontSize} />
           </Box>
 
           <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, pb: isMdUp ? 14 : 10 }}>

@@ -59,6 +59,10 @@ export function Header() {
   const courseAllowsChallenges = !!courseInPath
     && courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath))?.allowsChallenges === true;
   const challengesTarget = courseAllowsChallenges ? `/courses/${courseInPath}/challenges` : null;
+  // "Exàmens": només si l'alumnat del curs en té algun
+  const courseHasExams = !!courseInPath
+    && courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath))?.hasExams === true;
+  const examsTarget = courseHasExams ? `/courses/${courseInPath}/exams` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -183,6 +187,12 @@ export function Header() {
               </Button>
             )}
 
+            {isLoggedIn && examsTarget && (
+              <Button onClick={() => navigate(examsTarget)} sx={commonButtonStyle}>
+                {t('exams.title')}
+              </Button>
+            )}
+
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
             )}
@@ -247,6 +257,11 @@ export function Header() {
                 {isLoggedIn && challengesTarget && (
                   <Button onClick={() => { navigate(challengesTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
                     {t('challenges.title')}
+                  </Button>
+                )}
+                {isLoggedIn && examsTarget && (
+                  <Button onClick={() => { navigate(examsTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                    {t('exams.title')}
                   </Button>
                 )}
                 {isLoggedIn && (

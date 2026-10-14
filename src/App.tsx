@@ -13,6 +13,8 @@ import SurveyPage from './pages/courses/SurveyPage';
 import DrivePage from './pages/courses/DrivePage';
 import ChallengesPage from './pages/courses/ChallengesPage';
 import ChallengePage from './pages/courses/ChallengePage';
+import ExamsPage from './pages/courses/ExamsPage';
+import ExamPage from './pages/courses/ExamPage';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
 import TeacherIndex from './pages/teacher/TeacherIndex';
@@ -56,6 +58,9 @@ function App() {
           <Route path="/courses/:courseId/drive/:folderId" element={<DrivePage />} />
           <Route path="/courses/:courseId/challenges" element={<ChallengesPage />} />
           <Route path="/courses/:courseId/challenges/:challengeSlug" element={<ChallengePage />} />
+          <Route path="/courses/:courseId/exams" element={<ExamsPage />} />
+          <Route path="/courses/:courseId/exams/:examSlug" element={<ExamPage />} />
+          <Route path="/courses/:courseId/exams/:examSlug/:lessonId" element={<LessonPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />

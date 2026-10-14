@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-rea
 import { useTranslation } from 'react-i18next';
 import { resolveSlug } from '../../hooks/useCourse';
 import { courseService, mapProblem } from '../../services/courseService';
+import { examKeys } from '../../services/examService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
@@ -15,7 +16,9 @@ export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
   useRecordCourseActivity(courseId);
   const [searchParams] = useSearchParams();
-  const topicParam = searchParams.get('topic');
+  // Dins d'un examen (?exam=): el tema és l'examen i "enrere" hi torna
+  const examParam = searchParams.get('exam');
+  const topicParam = searchParams.get('topic') ?? examParam;
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -152,6 +155,11 @@ export default function TopicTestPage() {
     setResult({ correct, choices: review, fresh: true });
     saveAnswers({ [answerKey(courseId, currentTestSlug)]: { answers, correct, choices: review } });
     if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0, 1000, res);
+    if (examParam) {
+      // La nota de l'examen i l'estat dels seus problemes (llista d'exàmens i pàgina de l'examen)
+      void queryClient.invalidateQueries({ queryKey: examKeys.list(courseSlug) });
+      void queryClient.invalidateQueries({ queryKey: ['topic-problems', courseSlug, topicSlug] });
+    }
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {
@@ -179,7 +187,8 @@ export default function TopicTestPage() {
     // La URL segueix el test actual (per recarregar o compartir) sense tornar a carregar la pàgina
     const slug = topicTests[idx]?.problemSlug;
     if (slug && courseId && topicSlug) {
-      window.history.replaceState(window.history.state, '', `/courses/${courseId}/test/${slug}?topic=${encodeURIComponent(topicSlug)}`);
+      const query = examParam ? `exam=${encodeURIComponent(examParam)}` : `topic=${encodeURIComponent(topicSlug)}`;
+      window.history.replaceState(window.history.state, '', `/courses/${courseId}/test/${slug}?${query}`);
     }
   };
 
@@ -275,9 +284,15 @@ export default function TopicTestPage() {
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
         {/* Botó de tornar enrere */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
-            {getText(courseTitle) || t('lesson.back', 'Tornar')}
-          </Button>
+          {examParam ? (
+            <Button component={RouterLink} to={`/courses/${courseId}/exams/${encodeURIComponent(examParam)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              {t('exams.back_to_exam')}
+            </Button>
+          ) : (
+            <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              {getText(courseTitle) || t('lesson.back', 'Tornar')}
+            </Button>
+          )}
         </Box>
 
         {/* Títol principal */}

@@ -33,6 +33,7 @@ function toCourses(data: unknown): Course[] {
     // Progrés de l'alumne al curs (només a `GET /courses/`); `undefined` amb el backend antic
     myProgress: c.my_progress,
     allowsChallenges: c.allows_challenges,
+    hasExams: c.has_exams,
   }));
 }
 
@@ -307,6 +308,26 @@ export const courseService = {
       console.error("Error al carregar el detall del curs:", err);
       throw err;
     }
+  },
+
+  /**
+   * Un examen com si fos un curs d'un sol tema: el detall del curs amb `content` = [l'examen].
+   * Així la pàgina d'un problema obert des d'un examen només hi veu (i hi navega) els seus
+   * problemes. L'alumnat no té els exàmens a la llista de temes del curs.
+   */
+  async getExamCourse(slug: string, examSlug: string): Promise<any> {
+    const [courseData, topic, problems] = await Promise.all([
+      this.getCourseBySlug(slug),
+      this.getTopicBySlug(slug, examSlug),
+      this.getTopicProblems(slug, examSlug),
+    ]);
+    applyServerSolutions(slug, problems);
+    return {
+      ...courseData,
+      id: courseData.slug,
+      title: courseData.name,
+      content: [toContentTopic(topic, problems)],
+    };
   },
 
   clearCache(slug?: string) {

@@ -91,8 +91,9 @@ export default function ChallengePage() {
       color: 'text.primary', py: { xs: 2, md: 4 },
     }}>
       <Container maxWidth="lg" sx={{ px: { xs: 2, md: 4 } }}>
-        <Button component={RouterLink} to={`/courses/${courseId}/challenges`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
-          {t('challenges.title')}
+        {/* Els exàmens de repte s'obren des de la llista d'exàmens: "enrere" hi torna */}
+        <Button component={RouterLink} to={`/courses/${courseId}/${challenge?.is_exam ? 'exams' : 'challenges'}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
+          {challenge?.is_exam ? t('exams.title') : t('challenges.title')}
         </Button>
 
         {detail.isLoading ? (

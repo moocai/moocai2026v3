@@ -21,6 +21,8 @@ export interface Course {
   myProgress?: { problems: number; completed: number } | null;
   /** El curs té reptes de ML (`allows_challenges`). `undefined` si l'API no l'envia. */
   allowsChallenges?: boolean;
+  /** L'alumnat del curs té almenys un examen (obert o tancat) (`has_exams`). `undefined` si l'API no l'envia. */
+  hasExams?: boolean;
 }
 
 export interface Lesson {
