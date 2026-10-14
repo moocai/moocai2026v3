@@ -64,7 +64,7 @@ export default {
     tests_answered: "Tests answered",
     your_stats: "Your stats",
     ai_hints_left: "AI hints today",
-    more_statistics: "More statistics",
+    performance_title: "Your performance by topic",
     topic_progress: "Progress by topic",
     chart_code: "Coding",
     chart_tests: "Tests",

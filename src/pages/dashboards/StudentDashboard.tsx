@@ -22,6 +22,7 @@ import { syncOwnPointsFromList, getBackendPoints, POINTS_EVENT } from '../../uti
 import { userKey } from '../../services/topicTestAnswers';
 import { recentCourse, lastActiveCourse } from '../../utils/lastCourse';
 import { TopicProgressChart, type TopicProgressItem } from '../../features/student/TopicProgressChart';
+import { CourseStatsCharts } from '../../features/student/CourseStatsCharts';
 import { useSeriesColors } from '../../features/student/chartColors';
 import { resolveSlug } from '../../hooks/useCourse';
 
@@ -41,6 +42,9 @@ const NO_COURSES: Course[] = [];
 // vegada. Es fa amb un interruptor i no comentant-lo perquè el codi que només fa servir ell
 // (estat, menú, reiniciar el curs...) seguiria compilant-se i no donaria errors de no usat.
 const SHOW_COURSE_SWITCHER = false;
+// "Següent" (el pròxim problema i test per fer) amagat: al seu lloc hi ha el rendiment per tema
+// (l'antiga pàgina "Més estadístiques"). Interruptor pel mateix motiu que el de dalt.
+const SHOW_NEXT_UP = false;
 
 /** Les tres llistes de cursos que es poden veure als tabs. */
 export type CourseScope = 'public' | 'private' | 'assigned';
@@ -581,10 +585,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       tests: { total: topic.problemCounts.test, done: topic.myProgress?.tests_answered ?? 0 },
     }));
 
-  const handleStatsClick = () => {
-    navigate(`/courses/${currentCourse?.slug}/stats`);
-  };
-
   const openTopic = (tab: number, topicId: string) => {
     if (!currentCourse?.slug) return;
     try {
@@ -813,19 +813,19 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                               <Typography variant="caption" color="text.secondary">{t('dashboard.no_data')}</Typography>
                             )}
                           </Stack>
-                          <Typography
-                            variant="caption"
-                            onClick={handleStatsClick}
-                            sx={{ color: 'primary.main', fontWeight: 700, fontSize: { xs: '0.75rem', md: '0.85rem' }, letterSpacing: '0.1em', mt: 'auto', pt: 1, cursor: 'pointer', '&:hover': { textDecoration: 'underline' } }}
-                          >
-                            {t('dashboard.more_statistics')}
-                          </Typography>
                         </DashboardCard>
                       </Grid>
                     </Grid>
 
+                    {/* Rendiment per tema, el propi i el de la classe (abans, "Més estadístiques") */}
+                    {currentCourse.slug && (
+                      <Box sx={{ order: { xs: 2, md: 0 } }}>
+                        <CourseStatsCharts courseSlug={currentCourse.slug} />
+                      </Box>
+                    )}
+
                     {/* Què toca ara: el següent problema de programació i el següent test per fer */}
-                    {nextUp && (
+                    {SHOW_NEXT_UP && nextUp && (
                       <Box sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, p: { xs: 2, md: 3 }, bgcolor: 'background.paper', order: { xs: 2, md: 0 } }}>
                         <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5 }}>{t('dashboard.next_up')}</Typography>
                         {nextUp.coding || nextUp.test ? (
