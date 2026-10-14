@@ -105,7 +105,8 @@ export function applyServerSolutions(courseId: string, problems: ApiProblem[]) {
     const key = answerKey(courseId, p.slug);
     if (p.type === 'test') {
       if (!Array.isArray(mine.choices) || readSavedAnswer(key, p.choices)) continue;
-      answers[key] = { answers: mine.choices.map(String), correct: !!mine.correct, choices: p.choices || [] };
+      // `correct` és null als exàmens: mai diuen si la resposta és correcta
+      answers[key] = { answers: mine.choices.map(String), correct: typeof mine.correct === 'boolean' ? mine.correct : null, choices: p.choices || [] };
     } else if (mine.status === 'accepted' && progress[key] !== true) {
       progress[key] = true;
       progressChanged = true;

@@ -301,6 +301,7 @@ export default {
     test_section: "Questions",
     no_problems: "This exam has no problems.",
     problem_points: "{{max}} pts",
+    answer_submitted: "Answer submitted",
     back_to_exam: "Back to the exam"
   },
   surveys: {

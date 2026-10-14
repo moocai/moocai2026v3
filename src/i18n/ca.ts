@@ -299,6 +299,7 @@ export default {
     test_section: "Preguntes",
     no_problems: "Aquest examen no té problemes.",
     problem_points: "{{max}} punts",
+    answer_submitted: "Resposta enviada",
     back_to_exam: "Torna a l'examen"
   },
   surveys: {

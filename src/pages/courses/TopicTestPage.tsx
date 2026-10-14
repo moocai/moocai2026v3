@@ -131,7 +131,8 @@ export default function TopicTestPage() {
   // Envia la resposta al servidor, que la corregeix i retorna totes les opcions amb la correcció
   const submitAnswers = async (answers: string[]) => {
     if (!courseId || !currentTestSlug || !topicSlug) return;
-    let correct: boolean;
+    // `null` als exàmens: el servidor no diu si la resposta és correcta
+    let correct: boolean | null;
     let review: any[];
     setSubmitting(true);
     setSubmitError(null);
@@ -140,7 +141,7 @@ export default function TopicTestPage() {
       res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
         answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
       });
-      correct = !!res?.correct;
+      correct = typeof res?.correct === 'boolean' ? res.correct : null;
       review = Array.isArray(res?.choices) ? res.choices : [];
     } catch (error: any) {
       const status = error?.response?.status;
@@ -154,7 +155,7 @@ export default function TopicTestPage() {
 
     setResult({ correct, choices: review, fresh: true });
     saveAnswers({ [answerKey(courseId, currentTestSlug)]: { answers, correct, choices: review } });
-    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0, 1000, res);
+    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct === true ? 4 : 0, 1000, res);
     if (examParam) {
       // La nota de l'examen i l'estat dels seus problemes (llista d'exàmens i pàgina de l'examen)
       void queryClient.invalidateQueries({ queryKey: examKeys.list(courseSlug) });
@@ -230,6 +231,8 @@ export default function TopicTestPage() {
 
   // ---- Feedback just després d'enviar ----
   const answered = !!result;
+  // Exàmens: només es diu que s'ha enviat, mai si és correcta (ni quines opcions ho són)
+  const revealed = answered && typeof result.correct === 'boolean';
 
   // Si el backend retorna result.choices el fem servir; si no, caiem a les opcions locals
   const reviewChoices: any[] = Array.isArray(result?.choices) ? result.choices : [];
@@ -237,7 +240,7 @@ export default function TopicTestPage() {
   const correctIds = new Set<string>(correctChoices.map((c: any) => String(c.id)));
 
   const choiceState = (value: string): 'correct' | 'wrong' | null => {
-    if (!answered) return null;
+    if (!revealed) return null;
     if (correctIds.has(value)) return 'correct';
     if (selectedAnswers.includes(value)) return 'wrong';
     return null;
@@ -271,7 +274,7 @@ export default function TopicTestPage() {
 
   // Explicació del professor (si n'hi ha), un cop respost
   const choiceExplanation = (value: string) => {
-    if (!answered) return null;
+    if (!revealed) return null;
     const review = reviewChoices.find((c: any) => String(c.id) === value);
     const explanation = review?.explanation_html || review?.explanationHtml || '';
     if (!explanation) return null;
@@ -327,11 +330,14 @@ export default function TopicTestPage() {
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {topicTests.map((st: any, idx: number) => {
                     const saved = savedAnswers[`${courseId}_${st.problemSlug}`];
-                    const status = saved?.correct === true ? true : saved?.correct === false ? 'attempted' : null;
+                    const status = saved?.correct === true ? true : saved?.correct === false ? 'attempted'
+                      : saved ? 'submitted' : null;
                     const isCurrent = idx === currentIdx;
-                    const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
+                    const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main
+                      : status === 'submitted' ? '#8400ff' : null;
                     const statusLabel = status === true ? t('topic_test.status_correct', 'encertada')
                       : status === 'attempted' ? t('topic_test.status_wrong', 'fallada')
+                      : status === 'submitted' ? t('exams.answer_submitted')
                       : t('topic_test.status_pending', 'pendent');
                     return (
                       <ButtonBase
@@ -359,7 +365,10 @@ export default function TopicTestPage() {
             <Box ref={resultRef} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                 {/* Resultat global del test: icona al costat del títol, sense línies extra */}
-                {answered && result.correct !== null && (
+                {answered && !revealed && (
+                  <Typography component="span" sx={{ fontWeight: 800, color: '#8400ff', fontSize: '0.9rem' }}>{t('exams.answer_submitted')}</Typography>
+                )}
+                {revealed && (
                   <Box component="span" role="img"
                     aria-label={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}
                     title={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}
