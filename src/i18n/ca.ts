@@ -302,6 +302,24 @@ export default {
     answer_submitted: "Resposta enviada",
     back_to_exam: "Torna a l'examen"
   },
+  materials: {
+    title: "Materials",
+    close: "Tanca els materials",
+    topic: "Tema",
+    theory: "Teoria",
+    files: "Fitxers",
+    problems: "Problemes",
+    no_topics: "Aquest curs no té temes.",
+    no_theory: "Aquest tema no té teoria.",
+    no_files: "Aquest tema no té fitxers.",
+    no_problems: "Aquest tema no té altres problemes.",
+    open_new_tab: "Obre en una pestanya nova",
+    download: "Descarrega",
+    kind_coding: "Codi",
+    kind_test: "Test",
+    problem_error: "No s'ha pogut carregar aquest problema.",
+    open_problem: "Ves a aquest problema"
+  },
   surveys: {
     title: "Enquestes",
     empty: "Ara mateix no hi ha cap enquesta oberta.",

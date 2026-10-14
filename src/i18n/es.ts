@@ -312,6 +312,24 @@ export default {
     answer_submitted: "Respuesta enviada",
     back_to_exam: "Volver al examen"
   },
+  materials: {
+    title: "Materiales",
+    close: "Cerrar los materiales",
+    topic: "Tema",
+    theory: "Teoría",
+    files: "Archivos",
+    problems: "Problemas",
+    no_topics: "Este curso no tiene temas.",
+    no_theory: "Este tema no tiene teoría.",
+    no_files: "Este tema no tiene archivos.",
+    no_problems: "Este tema no tiene otros problemas.",
+    open_new_tab: "Abrir en una pestaña nueva",
+    download: "Descargar",
+    kind_coding: "Código",
+    kind_test: "Test",
+    problem_error: "No se ha podido cargar este problema.",
+    open_problem: "Ir a este problema"
+  },
   surveys: {
     title: "Encuestas",
     empty: "Ahora mismo no hay ninguna encuesta abierta.",

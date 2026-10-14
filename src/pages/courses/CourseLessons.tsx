@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import { useParams, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, useMediaQuery, Tooltip, IconButton, Stack} from '@mui/material';
 // Selector de curs (desactivat): Menu, MenuItem, ListItemText, Divider
 import { MarkdownContent } from '../../components/MarkdownContent';
@@ -13,7 +13,7 @@ import { useThemeMode } from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { courseService } from '../../services/courseService';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { problemDetailQuery, resolveSlug } from '../../hooks/useCourse';
+import { problemDetailQuery, resolveSlug, topicDetailQuery as topicDetailOptions } from '../../hooks/useCourse';
 import { preloadMonaco } from '../../utils/monaco';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 // import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
@@ -150,7 +150,16 @@ export default function CourseLessons() {
     return () => el.removeEventListener('scroll', save);
   }, [courseId, course]);
 
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {try {const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null;} catch {return null;}});
+  // Tema obert: el de l'adreça (`?lessonId=<tema>`, p. ex. des del camí d'un problema) o l'últim triat
+  const [searchParams] = useSearchParams();
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {
+    const fromUrl = searchParams.get('lessonId');
+    if (fromUrl) {
+      try { localStorage.setItem(`mooc_selected_topic_${courseId}`, JSON.stringify(fromUrl)); } catch { /* sense emmagatzematge */ }
+      return fromUrl;
+    }
+    try {const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null;} catch {return null;}
+  });
   const contentRef = useRef<HTMLDivElement>(null);
   const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -310,14 +319,9 @@ export default function CourseLessons() {
   const detailTopicId: string | undefined = (mainTab === 0 || mainTab === 3) && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
-  const topicDetailQuery = useQuery<{ theory: string; files: TopicFile[] }>({
-    queryKey: ['topic-detail', course?.id, detailTopicId, lang],
-    queryFn: () => courseService.getTopicBySlug(course!.id, detailTopicId!).then((d) => ({
-      theory: d?.theory_md || '',
-      files: Array.isArray(d?.files) ? d.files : [],
-    })),
+  const topicDetailQuery = useQuery({
+    ...topicDetailOptions(course?.id ?? '', detailTopicId ?? '', lang),
     enabled: !!course?.id && !!detailTopicId,
-    staleTime: 30 * 60 * 1000,
   });
 
   const downloadFile = async (file: TopicFile) => {

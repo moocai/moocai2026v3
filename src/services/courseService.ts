@@ -327,6 +327,8 @@ export const courseService = {
       id: courseData.slug,
       title: courseData.name,
       content: [toContentTopic(topic, problems)],
+      // Si l'alumnat pot consultar la teoria del curs durant aquest examen
+      examAllowsTheory: topic.allows_theory === true,
     };
   },
 

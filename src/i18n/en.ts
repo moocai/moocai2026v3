@@ -304,6 +304,24 @@ export default {
     answer_submitted: "Answer submitted",
     back_to_exam: "Back to the exam"
   },
+  materials: {
+    title: "Materials",
+    close: "Close materials",
+    topic: "Topic",
+    theory: "Theory",
+    files: "Files",
+    problems: "Problems",
+    no_topics: "This course has no topics.",
+    no_theory: "This topic has no theory.",
+    no_files: "This topic has no files.",
+    no_problems: "This topic has no other problems.",
+    open_new_tab: "Open in a new tab",
+    download: "Download",
+    kind_coding: "Code",
+    kind_test: "Test",
+    problem_error: "Couldn't load this problem.",
+    open_problem: "Go to this problem"
+  },
   surveys: {
     title: "Surveys",
     empty: "There are no open surveys right now.",

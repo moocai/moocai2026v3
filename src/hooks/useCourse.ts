@@ -70,6 +70,19 @@ export function useExamCourse(courseId: string | undefined, examSlug: string | u
 }
 
 /**
+ * Teoria (Markdown en l'idioma actiu) i fitxers d'un tema. La comparteixen la pàgina del curs
+ * (pestanyes Teoria i Fitxers) i el panell Materials de la pàgina d'un problema.
+ */
+export const topicDetailQuery = (courseSlug: string, topicSlug: string, lang: string) => ({
+  queryKey: ['topic-detail', courseSlug, topicSlug, lang] as const,
+  queryFn: () => courseService.getTopicBySlug(courseSlug, topicSlug).then((d: any) => ({
+    theory: (d?.theory_md || '') as string,
+    files: (Array.isArray(d?.files) ? d.files : []) as { id: number; name: string; hidden?: boolean }[],
+  })),
+  staleTime: 30 * 60 * 1000,
+});
+
+/**
  * Consulta del detall d'un problema (enunciat, codi inicial...). La comparteixen
  * LessonPage (que la llegeix) i la llista de problemes (que l'avança en passar-hi
  * per sobre), de manera que en obrir el problema les dades ja hi són.

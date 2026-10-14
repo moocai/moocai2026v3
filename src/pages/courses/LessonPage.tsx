@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-react';
+import { BookOpen, ChevronLeft, ChevronRight, Play, Square, RotateCcw, Lock, CloudUpload, Eye, EyeOff, CheckCircle2, AlertTriangle, XCircle, Loader2, X } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip } from '@mui/material';
+import { Box, Typography, Button, IconButton, Stack, alpha, CircularProgress, useTheme, useMediaQuery, Tabs, Tab, Tooltip, Drawer } from '@mui/material';
 import Editor from '@monaco-editor/react';
 import { api } from '../../services/api';
 import { getMonacoEditorOptions, getMonacoEditorTheme, loadMonaco, loadMonacoTypescript } from '../../utils/monaco';
@@ -29,6 +29,8 @@ import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { apiErrorMessages } from '../../services/httpClient';
 import { AiHelpPanel } from '../courses/AiHelpPanel';
+import { ProblemBreadcrumb, type Crumb } from '../../features/lesson/ProblemBreadcrumb';
+import { MaterialsPanel } from '../../features/lesson/MaterialsPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
 
 interface Student { id: string; name: string; }
@@ -138,23 +140,6 @@ function EditorDiagnosticsBadge({ markers }: { markers: any[] }) {
         </Box>
       )}
     </Box>
-  );
-}
-
-// === Botó de retorn al curs (CourseLessons) ===
-function BackToCourseButton({ label, onClick, fontSize = 11 }: { label: string; onClick: () => void; fontSize?: number }) {
-  return (
-    <Button
-      onClick={onClick}
-      startIcon={<ChevronLeft size={fontSize + 5} />}
-      sx={{
-        fontWeight: 700, textTransform: 'none', borderRadius: 1.5,
-        fontSize, color: 'text.secondary', minWidth: 0, px: 1,
-        '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
-      }}
-    >
-      {label}
-    </Button>
   );
 }
 
@@ -435,6 +420,19 @@ export default function LessonPage() {
   // sumen punts (el servidor només els dona mentre el tema és actiu)
   const currentTopic = course?.content?.find((tp: any) => tp.id === currentTopicSlug) as any;
   const topicClosed = currentTopic?.current === false;
+  // On és el problema, amb cada nivell a un clic: Curs › Tema › Problema (o Exàmens › Examen › Problema)
+  const crumbs: Crumb[] = examPath ? [
+    { label: t('exams.title'), to: `/courses/${courseId}/exams` },
+    { label: getText(currentTopic?.title), to: examPath },
+    { label: getText(currentProblem?.subtitle) },
+  ] : [
+    { label: getText((course as any)?.title) || t('lesson.back_to_course', 'Torna al curs'), to: `/courses/${courseId}` },
+    ...(currentTopic ? [{ label: getText(currentTopic.title), to: `/courses/${courseId}?lessonId=${encodeURIComponent(currentTopic.id)}` }] : []),
+    { label: getText(currentProblem?.subtitle) },
+  ];
+  // Materials del curs (teoria, fitxers, altres problemes): als exàmens, només si ho permeten
+  const materialsAllowed = !examSlug || (course as any)?.examAllowsTheory === true;
+  const [materialsOpen, setMaterialsOpen] = useState(false);
   const solutionStatus: string | null = submittedStatus?.status ?? mySolution?.status ?? null;
   const solved = solutionStatus === 'accepted';
   const referenceSolution: string | null = currentProblem?.systemSolution ?? null;
@@ -510,12 +508,6 @@ export default function LessonPage() {
     navigate(examPath ?? `/courses/${course.id}`);
   };
 
-  // Torna a la pàgina del curs (CourseLessons) deixant l'activitat
-  const handleBackToCourse = () => {
-    if (!courseId) return;
-    persistViewState();
-    navigate(examPath ?? `/courses/${courseId}`);
-  };
 
   // "Següent temari" avança a la següent activitat de CODI, saltant els tests
   const handleNext = () => {
@@ -957,9 +949,22 @@ export default function LessonPage() {
       // pt: sota la capçalera (fixa, per sobre de la pàgina), no amagat al darrere
       <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
         {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
-        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0}}>
-          <BackToCourseButton label={examSlug ? t('exams.back_to_exam') : t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
+        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, gap: 1, justifyContent: 'space-between', flexShrink: 0}}>
+          <ProblemBreadcrumb items={crumbs} fontSize={12} onNavigate={persistViewState} />
+          {materialsAllowed && (
+            <Button size="small" variant="outlined" startIcon={<BookOpen size={14} />} onClick={() => setMaterialsOpen(true)} sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 700, fontSize: 12 }}>
+              {t('materials.title')}
+            </Button>
+          )}
         </Box>
+        {/* Materials (mòbil): a pantalla completa, per sobre del problema */}
+        <Drawer anchor="right" open={materialsOpen} onClose={() => setMaterialsOpen(false)} sx={{ zIndex: 1500 }} slotProps={{ paper: { sx: { width: '100%', maxWidth: 520 } } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography sx={{ fontWeight: 900 }}>{t('materials.title')}</Typography>
+            <IconButton onClick={() => setMaterialsOpen(false)} aria-label={t('materials.close')}><X size={20} /></IconButton>
+          </Box>
+          {materialsOpen && <MaterialsPanel courseId={courseId!} topicSlug={examSlug ? undefined : currentTopicSlug} problemSlug={lessonId} />}
+        </Drawer>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
           <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
@@ -1101,15 +1106,17 @@ export default function LessonPage() {
       <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* COLUMNA 1: Enunciat / AI / Solucions */}
         <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons={false} sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'safe center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 0.75 * tabScale, ml: 0.75 * tabScale, '&:first-of-type': { ml: 0 }, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
             <Tab label={t('lesson.tab_teacher_solution', 'Solució')} icon={!solutionUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!peersUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_ai_help', 'IA')} />
+            {/* Només la icona: amb cinc pestanyes, el text no hi cabria */}
+            {materialsAllowed && <Tab icon={<BookOpen size={tabIconSize + 4} />} aria-label={t('materials.title')} title={t('materials.title')} />}
           </Tabs>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.5, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-            <BackToCourseButton label={examSlug ? t('exams.back_to_exam') : t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={tabFontSize} />
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.75, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', minWidth: 0 }}>
+            <ProblemBreadcrumb items={crumbs} fontSize={tabFontSize} onNavigate={persistViewState} />
           </Box>
 
           <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, pb: isMdUp ? 14 : 10 }}>
@@ -1177,6 +1184,10 @@ export default function LessonPage() {
                   )}
                 </Box>
               ) : (<LockedTabMessage text={t('lesson.locked_other_solutions', "Completa l'exercici correctament per veure les solucions d'altres estudiants.")} />)
+            )}
+
+            {activeTab === 4 && materialsAllowed && (
+              <MaterialsPanel courseId={courseId!} topicSlug={examSlug ? undefined : currentTopicSlug} problemSlug={lessonId} />
             )}
 
             {activeTab === 3 && (
