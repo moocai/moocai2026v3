@@ -105,7 +105,10 @@ function pyodideFiles(): Plugin {
     name: 'pyodide-files',
     async buildStart() {
       const failed = await ensurePyodidePackages();
-      if (!failed.length) return;
+      if (!failed.length) {
+        this.info(`[pyodide] Paquets disponibles en importar-los: ${PYODIDE_PACKAGES.join(', ')}`);
+        return;
+      }
       const detail = `[pyodide] No s'han pogut baixar de ${PYODIDE_CDN}: ${failed.join(', ')}`;
       // Una versió publicada sense numpy fallaria en silenci a les mans de l'alumnat: el build
       // s'atura (si de debò no hi ha xarxa, MOOC_SKIP_PYTHON_PACKAGES=1 el deixa continuar).
@@ -118,7 +121,9 @@ function pyodideFiles(): Plugin {
         const name = path.basename((req.url || '').split('?')[0]);
         const file = PYODIDE_FILES.includes(name) ? path.join(PYODIDE_SRC, name)
           : HOSTED_FILES.has(name) ? path.join(PYODIDE_PACKAGES_CACHE, name) : null;
-        if (!file || !fs.existsSync(file)) return next();
+        if (!file) return next();
+        // Paquet no baixat: un 404 net (si no, el servidor respondria amb la pàgina de l'app)
+        if (!fs.existsSync(file)) { res.statusCode = 404; res.end(); return; }
         res.setHeader('Content-Type', PYODIDE_TYPES[path.extname(name)] || 'application/octet-stream');
         fs.createReadStream(file).pipe(res);
       });

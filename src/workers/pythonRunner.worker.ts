@@ -243,6 +243,8 @@ async function init(indexURL: string, sizes: Record<string, number>): Promise<Py
   pyodide.runPython(RUNNER_SOURCE);
   runFn = pyodide.globals.get('__mooc_run');
   findImportsFn = pyodide.pyimport('pyodide.code').find_imports;
+  // Per comprovar a la consola del navegador quins paquets es poden importar
+  console.info(`[python] Pyodide ${pyodide.version} a punt. Paquets en importar-los: ${[...new Set(HOSTED.values())].join(', ') || '—'}`);
   return pyodide;
 }
 
