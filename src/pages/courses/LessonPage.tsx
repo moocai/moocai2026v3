@@ -420,13 +420,15 @@ export default function LessonPage() {
   // sumen punts (el servidor només els dona mentre el tema és actiu)
   const currentTopic = course?.content?.find((tp: any) => tp.id === currentTopicSlug) as any;
   const topicClosed = currentTopic?.current === false;
-  // On és el problema, amb cada nivell a un clic: Curs › Tema › Problema (o Exàmens › Examen › Problema)
+  // On és el problema, amb cada nivell a un clic: Curs › Tema › Problema (o Curs › Exàmens › Examen › Problema)
+  const courseCrumb: Crumb = { label: getText((course as any)?.title) || t('lesson.back_to_course', 'Torna al curs'), to: `/courses/${courseId}` };
   const crumbs: Crumb[] = examPath ? [
+    courseCrumb,
     { label: t('exams.title'), to: `/courses/${courseId}/exams` },
     { label: getText(currentTopic?.title), to: examPath },
     { label: getText(currentProblem?.subtitle) },
   ] : [
-    { label: getText((course as any)?.title) || t('lesson.back_to_course', 'Torna al curs'), to: `/courses/${courseId}` },
+    courseCrumb,
     ...(currentTopic ? [{ label: getText(currentTopic.title), to: `/courses/${courseId}?lessonId=${encodeURIComponent(currentTopic.id)}` }] : []),
     { label: getText(currentProblem?.subtitle) },
   ];
