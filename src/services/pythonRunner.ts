@@ -2,7 +2,7 @@
 // Fa servir Pyodide (CPython real) dins d'un Web Worker: la sortida i els errors són
 // els mateixos que els de Python, i un programa que no acaba es pot aturar.
 // input() es respon des de la consola: vegeu `answerPythonInput` i `public/python-input-sw.js`.
-import type { RunnerRequest, RunnerResponse } from '../workers/pythonRunner.worker';
+import type { RunnerMessages, RunnerRequest, RunnerResponse } from '../workers/pythonRunner.worker';
 
 export type PythonStream = 'stdout' | 'stderr';
 export type PythonRunStatus = 'ok' | 'error' | 'stopped' | 'timeout' | 'load-error';
@@ -22,6 +22,10 @@ export interface PythonRunOptions {
   onLoadProgress?: (loaded: number, total: number) => void;
   /** Text que es mostra si input() no es pot fer servir en aquest navegador. */
   inputUnavailableMessage?: string;
+  /** Textos per als paquets (numpy...): mòdul no disponible, error en baixar-lo. */
+  messages?: Partial<RunnerMessages>;
+  /** El programa importa paquets que s'han de baixar (`null` quan ja estan carregats). */
+  onPackagesLoading?: (packages: string[] | null) => void;
   /** Temps màxim d'execució (sense comptar la càrrega ni l'espera d'input()). */
   timeoutMs?: number;
 }
@@ -118,6 +122,13 @@ function handleMessage(msg: RunnerResponse, resolve: () => void, reject: (err: E
     clearTimeout(run.timer);
     run.waitingInput = msg.requestId;
     run.options.onInputRequest?.(msg.prompt);
+  } else if (msg.type === 'packages-loading') {
+    // La baixada no compta per al temps límit
+    clearTimeout(run.timer);
+    run.options.onPackagesLoading?.(msg.packages);
+  } else if (msg.type === 'packages-loaded') {
+    run.options.onPackagesLoading?.(null);
+    startTimer(run);
   } else if (msg.type === 'done') {
     run.finish({ status: msg.ok ? 'ok' : 'error' });
   }
@@ -189,6 +200,11 @@ export function runPython(code: string, options: PythonRunOptions = {}): Promise
       code,
       inputURL: inputAvailable ? INPUT_URL : null,
       inputUnavailable: options.inputUnavailableMessage ?? 'input() is not available in this browser.',
+      messages: {
+        moduleUnavailable: "The module '{modules}' is not available here. Extra modules you can import: {available}.\n",
+        packageLoadError: "Couldn't load {modules}. Check your connection and try again.\n",
+        ...options.messages,
+      },
     });
     startTimer(run);
   })();

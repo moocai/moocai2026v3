@@ -14,6 +14,8 @@ interface RunState {
   open: Stream | null;
   truncated: boolean;
   loading: boolean;
+  /** Posició de la línia "Carregant numpy…" mentre es baixa un paquet. */
+  packagesLine: number | null;
 }
 
 /**
@@ -38,7 +40,7 @@ export function usePythonRun(setLines: (lines: ConsoleLine[]) => void, resetKey?
 
   const run = useCallback(async (code: string) => {
     const generation = ++generationRef.current;
-    const st: RunState = { lines: [], open: null, truncated: false, loading: false };
+    const st: RunState = { lines: [], open: null, truncated: false, loading: false, packagesLine: null };
     stateRef.current = st;
     const current = () => generationRef.current === generation;
     const show = () => { if (current()) setLines([...st.lines]); };
@@ -71,6 +73,22 @@ export function usePythonRun(setLines: (lines: ConsoleLine[]) => void, resetKey?
 
     const result = await runPython(code, {
       inputUnavailableMessage: t('lesson.input_unavailable', "input() no funciona en aquest navegador (p. ex. en mode privat). Torna a carregar la pàgina i, si continua, prova un altre navegador.") + '\n',
+      messages: {
+        moduleUnavailable: t('lesson.module_unavailable', "El mòdul '{{modules}}' no està disponible aquí. Mòduls addicionals que pots importar: {{available}}.", { modules: '{modules}', available: '{available}' }) + '\n',
+        packageLoadError: t('lesson.package_load_error', "No s'ha pogut carregar {{modules}}. Comprova la connexió i torna-ho a provar.", { modules: '{modules}' }) + '\n',
+      },
+      onPackagesLoading: (packages) => {
+        // Una línia mentre es baixa (només la primera vegada que s'importa)
+        if (packages) {
+          clearLoading();
+          st.lines.push({ kind: 'info', text: t('lesson.package_loading', 'Carregant {{modules}}… (només la primera vegada)', { modules: packages.join(', ') }) });
+          st.packagesLine = st.lines.length - 1;
+        } else if (st.packagesLine !== null) {
+          st.lines.splice(st.packagesLine, 1);
+          st.packagesLine = null;
+        }
+        show();
+      },
       onLoadProgress: (loaded, total) => {
         if (!st.loading) return;
         st.lines[0] = loadingLine(total ? Math.floor((loaded / total) * 100) : 0);
