@@ -139,7 +139,7 @@ export default function StudentDashboard() {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   // `?course=<slug>`: el tauler d'un curs concret (l'enllaç "Tauler" del menú des d'un curs)
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const courseParam = searchParams.get('course');
   const { addNotification } = useNotifications();
   const { mode } = useThemeMode();
@@ -419,6 +419,13 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     const idx = visibleCourses.findIndex((c) => c.slug === courseParam);
     if (idx >= 0) setCourseTabIndex(idx);
   }, [restored, courseParam, visibleCourses]);
+
+  // I a l'inrevés: l'adreça diu sempre de quin curs és el tauler (també si s'hi ha arribat sense
+  // `?course=` i s'ha triat el curs recordat), perquè el menú hi mostri Enquestes, Drive...
+  useEffect(() => {
+    if (!restored || !currentSlug || currentSlug === courseParam) return;
+    setSearchParams((params) => { params.set('course', currentSlug); return params; }, { replace: true });
+  }, [restored, currentSlug, courseParam, setSearchParams]);
 
   const selectedStudentId = selectedStudent?.id;
 
