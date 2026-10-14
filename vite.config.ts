@@ -1,11 +1,22 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import fs from 'fs'
+import https from 'https'
+import net from 'net'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// === Proxy de l'API en desenvolupament (/api → algorien.com) ===
+// Node prova les adreces del servidor (IPv6 i IPv4) amb només 250 ms per intent ("happy
+// eyeballs"): amb una xarxa una mica lenta totes caduquen i la petició falla amb
+// `AggregateError [ETIMEDOUT]` encara que el servidor estigui bé. Es dona més marge a cada
+// intent i les connexions es reutilitzen (keep-alive) en lloc d'obrir-ne una de nova
+// (TCP + TLS) per a cada petició, de manera que es connecta molt menys sovint.
+net.setDefaultAutoSelectFamilyAttemptTimeout?.(2000);
+const apiProxyAgent = new https.Agent({ keepAlive: true, maxSockets: 16 });
 
 // === Pyodide (Python real al navegador, per al botó "Executar") ===
 // Els fitxers de Pyodide es serveixen des de la mateixa aplicació (sense CDN) a
@@ -79,6 +90,7 @@ export default defineConfig({
       '/api': {
         target: 'https://algorien.com',
         changeOrigin: true,
+        agent: apiProxyAgent,
       }
     }
   },
