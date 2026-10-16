@@ -10,7 +10,15 @@ import type { PyodideInterface } from 'pyodide';
 
 export type RunnerRequest =
   | { type: 'init'; indexURL: string; sizes: Record<string, number> }
-  | { type: 'run'; id: number; code: string; inputURL: string | null; inputUnavailable: string };
+  | { type: 'run'; id: number; code: string; inputURL: string | null; inputUnavailable: string; messages: RunnerMessages };
+
+/** Textos (ja traduïts) que el worker escriu a la consola. `{modules}` es substitueix. */
+export interface RunnerMessages {
+  /** Mòduls de la distribució de Pyodide que aquí no es poden importar. També `{available}`. */
+  moduleUnavailable: string;
+  /** No s'ha pogut baixar un paquet (sense connexió...). */
+  packageLoadError: string;
+}
 
 export type RunnerResponse =
   | { type: 'progress'; loaded: number; total: number }
@@ -18,6 +26,9 @@ export type RunnerResponse =
   | { type: 'init-error'; message: string }
   | { type: 'output'; id: number; chunks: Array<{ stream: 'stdout' | 'stderr'; text: string }> }
   | { type: 'input-request'; id: number; requestId: string; prompt: string }
+  // Es baixen paquets que el programa importa (numpy...): la pàgina ho indica i atura el temps límit
+  | { type: 'packages-loading'; id: number; packages: string[] }
+  | { type: 'packages-loaded'; id: number }
   | { type: 'done'; id: number; ok: boolean };
 
 const ctx = self as unknown as {
@@ -173,6 +184,51 @@ function trackDownloads(indexURL: string, sizes: Record<string, number>) {
 
 let pyodidePromise: Promise<PyodideInterface> | null = null;
 let runFn: ((src: string) => boolean) | null = null;
+let findImportsFn: ((src: string) => { toJs(): string[]; destroy(): void }) | null = null;
+
+// === Paquets (numpy...) ===
+// Només es baixen si el programa els importa, i un cop carregats ja hi són per a les
+// execucions següents. Els de la distribució de Pyodide que aquesta app no serveix no es
+// poden importar: es diu clarament en lloc de l'error de Pyodide (que proposa micropip).
+const HOSTED = new Map(Object.entries(__PYTHON_PACKAGES__.hosted));
+const UNAVAILABLE = new Set(__PYTHON_PACKAGES__.unavailable);
+
+/** Mòduls de primer nivell que importa `code` (buit si el codi no es pot analitzar). */
+function topLevelImports(code: string): string[] {
+  try {
+    const result = findImportsFn!(code);
+    const names = result.toJs();
+    result.destroy();
+    return [...new Set(names.map((name) => name.split('.')[0]))];
+  } catch {
+    // Error de sintaxi: l'execució el mostrarà amb el traceback de sempre
+    return [];
+  }
+}
+
+/** Prepara els paquets que el programa importa. `false` si no es pot executar. */
+async function preparePackages(pyodide: PyodideInterface, code: string, id: number, messages: RunnerMessages): Promise<boolean> {
+  const imports = topLevelImports(code);
+  const unavailable = imports.filter((name) => UNAVAILABLE.has(name));
+  if (unavailable.length) {
+    const available = [...HOSTED.keys()].sort().join(', ');
+    write('stderr', messages.moduleUnavailable.replace('{modules}', unavailable.join(', ')).replace('{available}', available));
+    return false;
+  }
+  const packages = [...new Set(imports.filter((name) => HOSTED.has(name)).map((name) => HOSTED.get(name)!))]
+    .filter((name) => !(name in pyodide.loadedPackages));
+  if (!packages.length) return true;
+  ctx.postMessage({ type: 'packages-loading', id, packages });
+  let failed = false;
+  // Pyodide comprova el sha256 de cada fitxer amb el de pyodide-lock.json
+  await pyodide.loadPackage(packages, { messageCallback: () => {}, errorCallback: () => { failed = true; } });
+  ctx.postMessage({ type: 'packages-loaded', id });
+  if (failed || packages.some((name) => !(name in pyodide.loadedPackages))) {
+    write('stderr', messages.packageLoadError.replace('{modules}', packages.join(', ')));
+    return false;
+  }
+  return true;
+}
 
 async function init(indexURL: string, sizes: Record<string, number>): Promise<PyodideInterface> {
   trackDownloads(indexURL, sizes);
@@ -186,6 +242,9 @@ async function init(indexURL: string, sizes: Record<string, number>): Promise<Py
   pyodide.registerJsModule('__mooc_js', { read_input: readInput });
   pyodide.runPython(RUNNER_SOURCE);
   runFn = pyodide.globals.get('__mooc_run');
+  findImportsFn = pyodide.pyimport('pyodide.code').find_imports;
+  // Per comprovar a la consola del navegador quins paquets es poden importar
+  console.info(`[python] Pyodide ${pyodide.version} a punt. Paquets en importar-los: ${[...new Set(HOSTED.values())].join(', ') || '—'}`);
   return pyodide;
 }
 
@@ -204,7 +263,7 @@ ctx.onmessage = async (event) => {
   }
 
   if (msg.type === 'run') {
-    await pyodidePromise;
+    const pyodide = (await pyodidePromise)!;
     currentRunId = msg.id;
     inputURL = msg.inputURL;
     inputUnavailable = msg.inputUnavailable;
@@ -212,7 +271,7 @@ ctx.onmessage = async (event) => {
     lastFlush = Date.now();
     let ok = false;
     try {
-      ok = !!runFn!(msg.code);
+      if (await preparePackages(pyodide, msg.code, msg.id, msg.messages)) ok = !!runFn!(msg.code);
     } catch (err: any) {
       write('stderr', String(err?.message || err));
     }
