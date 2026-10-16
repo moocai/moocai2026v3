@@ -33,7 +33,7 @@ interface Course {
   isPublic?: boolean;
 }
 
-function resolveSlug(courseId: string): string {
+export function resolveSlug(courseId: string): string {
   if (courseId.startsWith('clone-')) {
     const local = localCourseService.getById(courseId);
     if (local?.originalSlug) return local.originalSlug;
@@ -49,14 +49,5 @@ export function useCourse(courseId: string | undefined) {
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     retry: 1,
-  });
-}
-
-export function prefetchCourse(queryClient: any, courseId: string) {
-  return queryClient.prefetchQuery({
-    queryKey: ['course', courseId],
-    queryFn: () => courseService.getFullCourseDetail(resolveSlug(courseId)),
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
   });
 }

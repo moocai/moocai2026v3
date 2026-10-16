@@ -15,6 +15,13 @@
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
+# El preview de React s'executa en un iframe aïllat (origen "null"): els seus scripts de mòdul
+# es demanen amb CORS. Són els mateixos fitxers públics que carrega l'aplicació.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+
 [[redirects]]
   from = "/api/*"
   to = "https://algorien.com/api/:splat"

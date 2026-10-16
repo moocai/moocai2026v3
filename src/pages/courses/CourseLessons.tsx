@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack} from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
+import {CheckCircle2, XCircle, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,10 @@ import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { courseService } from '../../services/courseService';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { resolveSlug } from '../../hooks/useCourse';
+import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
+import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
 type I18nField = { ca: string; es: string; en: string };
 type ScopeType = 'public' | 'private' | 'assigned';
@@ -43,19 +47,23 @@ export default function CourseLessons() {
   const isTallScreen = useMediaQuery('(min-height: 900px)');
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const { data: course, isLoading: loading } = useCourse(courseId);TAB_ITEMS
+  const { data: course, isLoading: loading } = useCourse(courseId);
 
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [subMenuAnchor, setSubMenuAnchor] = useState<null | HTMLElement>(null);
   const [activeSubMenuScope, setActiveSubMenuScope] = useState<ScopeType | null>(null);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [publicCourses, setPublicCourses] = useState<any[]>([]);
-  const [assignedCourses, setAssignedCourses] = useState<any[]>([]);
 
-  useEffect(() => {
-    courseService.getPublicCourses().then(setPublicCourses).catch(() => {});
-    courseService.getAllCourses().then(setAssignedCourses).catch(() => {});
-  }, []);
+  // Llistes de cursos per al selector: només la de l'àmbit del curs actual (per al
+  // recompte del botó) i, quan s'obre el menú, totes. Si el detall no diu si el curs
+  // és públic, es demanen les dues per deduir-ho.
+  const publicFlag: boolean | undefined = course?.is_public ?? course?.isPublic;
+  const scopeKnown = typeof publicFlag === 'boolean';
+  const switcherOpen = scopeAnchor != null;
+  const publicQuery = usePublicCourses(!!course && (switcherOpen || !scopeKnown || publicFlag === true));
+  const assignedQuery = useAllCourses(!!course && isLoggedIn() && (switcherOpen || !scopeKnown || publicFlag === false));
+  const publicCourses: any[] = publicQuery.data ?? [];
+  const assignedCourses: any[] = assignedQuery.data ?? [];
 
   const filterByScope = useCallback((list: any[], currentScope: ScopeType) => {
     if (currentScope === 'public') return list.filter(c => c.isPublic);
@@ -64,13 +72,12 @@ export default function CourseLessons() {
   }, []);
 
   const scope: ScopeType = useMemo(() => {
-    const flag = course?.is_public ?? course?.isPublic;
-    if (typeof flag === 'boolean') return flag ? 'public' : 'private';
+    if (scopeKnown) return publicFlag ? 'public' : 'private';
     const listed = [...publicCourses, ...assignedCourses].find(
       (c) => c.id === courseId || c.slug === courseId
     );
     return listed?.isPublic ? 'public' : 'private';
-  }, [course, courseId, publicCourses, assignedCourses]);
+  }, [scopeKnown, publicFlag, courseId, publicCourses, assignedCourses]);
 
   const visibleCourses = filterByScope(scope === 'public' ? publicCourses : assignedCourses, scope);
 
@@ -98,26 +105,18 @@ export default function CourseLessons() {
     JSON.parse(localStorage.getItem(getProgressKey()) || '{}')
   );
 
+  // Respostes dels tests (font de l'estat dels tests: correcte / incorrecte / pendent)
+  const [savedTestAnswers, setSavedTestAnswers] = useState(() => readAllSavedAnswers());
+
   const reSyncProgress = useCallback(() => {
     setProgress(JSON.parse(localStorage.getItem(getProgressKey()) || '{}'));
+    setSavedTestAnswers(readAllSavedAnswers());
   }, [getProgressKey]);
 
   useEffect(() => {
     window.addEventListener('lessonProgressUpdated', reSyncProgress);
     return () => window.removeEventListener('lessonProgressUpdated', reSyncProgress);
   }, [reSyncProgress]);
-
-  const [theoryMap, setTheoryMap] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!course || !course.content) return;
-    course.content.forEach((lesson: any) => {
-      courseService.getTopicBySlug(course.id, lesson.id)
-        .then(data => {const markdownValue = data?.theory_md || ''; setTheoryMap(prev => ({ ...prev, [lesson.id]: markdownValue }));})
-        .catch(() => {setTheoryMap(prev => ({ ...prev, [lesson.id]: '' }));
-        });
-    });
-  }, [course]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -244,6 +243,9 @@ export default function CourseLessons() {
   const renderStatusChip = (status: boolean | string) =>
     status === true ? (
       <CheckCircle2 size={16} color={theme.palette.success.main} />
+    ) : status === 'wrong' ? (
+      // Test respost i incorrecte (un test només té un intent: no està pendent de res)
+      <XCircle size={16} color={theme.palette.error.main} aria-label={t('lesson.test_wrong', 'Incorrecte')} />
     ) : status === 'attempted' ? (
       <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b',border: '1px solid #f59e0b', borderRadius: 5,px: 1, py: 0.2,}}>
         <AlertTriangle size={12} />
@@ -257,7 +259,7 @@ export default function CourseLessons() {
     );
 
   const renderStatusIcon = (status: boolean | string, defaultIcon: string) =>
-    status === true ? '✅' : status === 'attempted' ? '⚠️' : defaultIcon;
+    status === true ? '✅' : status === 'wrong' ? '❌' : status === 'attempted' ? '⚠️' : defaultIcon;
 
   const renderStatusWithDifficulty = (status: boolean | string, difficulty?: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -276,6 +278,38 @@ export default function CourseLessons() {
       return (<Box key={opts.key} component={RouterLink} to={opts.to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
       return (<Box key={opts.key} onClick={opts.onClick} sx={{ cursor: 'pointer' }}>{content}</Box>);
   };
+
+  // Pestanya Tests: amb sessió, porta del servidor l'estat dels tests del tema actiu (així es
+  // veu bé en qualsevol navegador). Llista del tema fresca (1 petició) + GET submissions només
+  // dels tests ja resposts que no tenim desats.
+  const queryClient = useQueryClient();
+  const syncTopicId = mainTab === 2 && course?.content?.length
+    ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
+    : undefined;
+  // Teoria: només la del tema obert a la pestanya Teoria (abans es demanava la de tots els temes)
+  const theoryTopicId: string | undefined = mainTab === 0 && course?.content?.length
+    ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
+    : undefined;
+  const theoryQuery = useQuery<string>({
+    queryKey: ['topic-theory', course?.id, theoryTopicId, lang],
+    queryFn: () => courseService.getTopicBySlug(course!.id, theoryTopicId!).then((d) => d?.theory_md || '').catch(() => ''),
+    enabled: !!course?.id && !!theoryTopicId,
+    staleTime: 30 * 60 * 1000,
+  });
+
+  // Amb el backend nou l'estructura del curs ja porta la resposta pròpia de cada test
+  // (`my_solution`, aplicada en carregar-la): no cal tornar a demanar el tema.
+  const outlineHasSolutions = !!course?.content?.some((l: any) => (l.subTopics || []).some((s: any) => s.mySolution !== undefined));
+  useEffect(() => {
+    if (!courseId || !syncTopicId || !isLoggedIn() || outlineHasSolutions) return;
+    const courseSlug = resolveSlug(courseId);
+    queryClient.fetchQuery({
+      queryKey: ['topic-problems', courseSlug, syncTopicId],
+      queryFn: () => courseService.getTopicProblems(courseSlug, syncTopicId),
+      staleTime: 0,
+    }).then((problems: any[]) => syncTopicAnswers(courseId, courseSlug, syncTopicId, problems))
+      .catch(() => {});
+  }, [courseId, syncTopicId, queryClient, outlineHasSolutions]);
 
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999 }}>
@@ -391,7 +425,7 @@ export default function CourseLessons() {
     if (allLessons.length === 0) {return (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic' }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>);}
     const activeLesson = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const isDone = isTheoryDone(activeLesson.id);
-    const markdown = theoryMap[activeLesson.id];
+    const markdown = theoryQuery.data;
 
     return renderMasterDetail(topicItems, activeTopicId, (
       <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>
@@ -426,6 +460,15 @@ export default function CourseLessons() {
     ));
   };
 
+  // Estat d'un test a partir de la resposta desada (validada amb les opcions actuals)
+  const testStatus = (sub: any): boolean | string => {
+    const saved = savedTestAnswers[answerKey(courseId!, sub.problemSlug || sub.slug)];
+    if (!saved || !Array.isArray(saved.answers) || saved.correct == null) return false;
+    const ids = new Set((sub.choices || []).map((c: any) => String(c.id)));
+    if (ids.size > 0 && !saved.answers.every((a: any) => ids.has(String(a)))) return false;
+    return saved.correct ? true : 'wrong';
+  };
+
   const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.');
     if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{emptyMessage}</Typography>;}
 
@@ -449,12 +492,13 @@ export default function CourseLessons() {
             {subItems.map((sub: any) => {
               const key = `${courseId}_${sub.problemSlug || sub.slug || active.id}`;
               const targetSlug = sub.slug || sub.problemSlug || active.id;
+              const status = type === 'test' ? testStatus(sub) : progress[key];
               return renderOverviewRow({
                 key: `${active.id}-${type}-${targetSlug}`,
-                icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], emoji)}</Typography>,
+                icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(status, emoji)}</Typography>,
                 label: getText(sub.subtitle || sub.title),
-                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/exam/${targetSlug}`,
-                right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
+                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/test/${targetSlug}?topic=${encodeURIComponent(active.id)}`,
+                right: renderStatusWithDifficulty(status || false, sub.difficulty),
               });
             })}
           </Box>

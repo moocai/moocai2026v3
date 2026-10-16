@@ -294,7 +294,6 @@ export default {
     tab_theory: "Teoría",
     tab_exercises: "Programacion",
     tab_tests: "Tests",
-    tab_exams: "Exámenes",
     tab_files: "Archivos",
     tab_prev: "Pestaña anterior",
     tab_next: "Pestaña siguiente",

@@ -1,10 +1,10 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Box } from '@mui/material';
 import Home from './pages/Home';
 import CourseLessons from './pages/courses/CourseLessons';
 import LessonPage from './pages/courses/LessonPage';
 import LessonTopic from './pages/courses/${courseId}/${lesson.id}/LessonTopic';
-import ExamPage from './pages/courses/ExamPage';
+import TopicTestPage from './pages/courses/TopicTestPage';
 import StudentDashboard from './pages/dashboards/StudentDashboard';
 import ProfilePage from './pages/ProfilePage';
 import RendimentDashboard from './features/student/RendimentDashboard';
@@ -20,6 +20,12 @@ import Hackathon from './pages/teacher/Hackathon';
 import InviteStudents from './pages/teacher/InviteStudents';
 import { useThemeMode } from './hooks/useTheme';
 
+// Enllaços antics (/exam/) continuen funcionant
+function LegacyExamRedirect() {
+  const { courseId, challengeSlug } = useParams();
+  return <Navigate to={`/courses/${courseId}/test/${challengeSlug}`} replace />;
+}
+
 function App() {
   const { mode } = useThemeMode();
   return (
@@ -30,7 +36,8 @@ function App() {
           <Route path="/courses/:courseId" element={<CourseLessons />} />
           <Route path="/courses/:courseId/:lessonId" element={<LessonPage />} />
           <Route path="/courses/:courseId/:lessonId/topic" element={<LessonTopic />} />
-          <Route path="/courses/:courseId/exam/:challengeSlug" element={<ExamPage />} />
+          <Route path="/courses/:courseId/test/:challengeSlug" element={<TopicTestPage />} />
+          <Route path="/courses/:courseId/exam/:challengeSlug" element={<LegacyExamRedirect />} />
           <Route path="/courses/:courseId/stats" element={<RendimentDashboard />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />
