@@ -1,32 +1,17 @@
-import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Box } from '@mui/material';
-import { useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { prefetchAllCourses, prefetchCourseDetail } from '../hooks/useCourses';
 
+// El layout no precarrega res: cada pàgina demana només les dades que mostra
+// (la pantalla de login, per exemple, no necessita cap llista de cursos).
 export function MainLayout() {
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    // Prefetch a la cache de React Query (mateixes queryKeys que la portada,
-    // el dashboard i CourseLessons) → una única petició per curs. Només si hi
-    // ha sessió; els errors no s'escapen (abans una promesa sense `.catch`
-    // deixava una excepció no capturada a cada visita).
-    prefetchAllCourses(queryClient)
-      .then((courses: any[]) => {
-        if (!courses) return;
-        courses.forEach((course: any) => {
-          prefetchCourseDetail(queryClient, course.slug!).catch(() => {});
-        });
-      })
-      .catch(() => {});
-  }, [queryClient]);
-
   return (
     <Box sx={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Header />
-      <Box sx={{ flex: 1, overflow: 'hidden' }}>
+      {/* Les pàgines a pantalla completa (curs, problema, tauler...) ocupen just aquesta alçada i
+          fan scroll per dins; aquí només es fa scroll si una pàgina és més alta, perquè no quedi
+          contingut tallat i inaccessible */}
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}>
         <Outlet />
       </Box>
     </Box>

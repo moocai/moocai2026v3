@@ -1,4 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import { clearPrivateLocalData } from './testAnswerStorage';
+import { resetSessionCaches } from './sessionCache';
 
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
@@ -23,6 +25,8 @@ function sentToken(config?: InternalAxiosRequestConfig): string {
 function clearSession(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('currentStudent');
+  clearPrivateLocalData();
+  resetSessionCaches();
   window.dispatchEvent(new Event('auth-state-change'));
 }
 

@@ -102,23 +102,39 @@ export function findOwnPoints(list: any[], student: PointsStudent): number | nul
   return null;
 }
 
-/** Cridat pel Dashboard cada cop que carrega el leaderboard d'un curs. */
-export function syncOwnPointsFromList(courseSlug: string, list: any[]) {
+/**
+ * Cridat pel Dashboard cada cop que carrega el leaderboard d'un curs. L'API hi inclou la
+ * fila pròpia (`me`, null si no és alumne del curs); només si no hi és es busca a la llista.
+ */
+export function syncOwnPointsFromList(courseSlug: string, list: any[], me?: any) {
   const student = getCurrentStudent();
   if (!student) return;
+  if (me !== undefined) {
+    if (me) setCoursePoints(student.id, courseSlug, pickPoints(me));
+    return;
+  }
   const own = findOwnPoints(list, student);
   if (own != null) setCoursePoints(student.id, courseSlug, own);
 }
 
 /**
- * Després d'una activitat superada: torna a demanar el leaderboard (amb reintents,
+ * Després d'enviar una activitat. Si la resposta de l'enviament porta `course_score`, és el
+ * total nou i ja està. Si no (backend antic): torna a demanar el leaderboard (amb reintents,
  * per si el backend triga a calcular) fins que els punts pugen, i els publica.
  * Només es fa servir amb els cursos propis: la API respon 403 als qui no hi estan
  * matriculats, i un 4xx no es reintenta (no es resol amb més intents).
  */
-export async function refreshCoursePoints(courseSlug: string, retries = 4, delayMs = 1000): Promise<number | null> {
+export async function refreshCoursePoints(
+  courseSlug: string, retries = 4, delayMs = 1000, submitResponse?: any,
+): Promise<number | null> {
   const student = getCurrentStudent();
   if (!student) return null;
+  // La resposta de l'enviament ja porta el total del curs (`course_score`): cap petició més.
+  const known = Number(submitResponse?.course_score);
+  if (submitResponse?.course_score != null && !Number.isNaN(known)) {
+    setCoursePoints(student.id, courseSlug, known);
+    return known;
+  }
   try {
     const mine = await courseService.getAllCourses();
     if (!mine.some((c) => c.slug === courseSlug)) return null;
@@ -132,8 +148,6 @@ export async function refreshCoursePoints(courseSlug: string, retries = 4, delay
       const res: any = await courseService.getCourseLeaderboard(courseSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
       const own = findOwnPoints(list, student);
-      console.debug('[Punts] leaderboard després d\'enviar', { intent: i, courseSlug, punts: own, abans: before });
-      if (own == null) console.debug('[Punts] No es troba l\'alumne al leaderboard', { student, courseSlug, sample: JSON.stringify(list.slice(0, 3)) });
       if (own != null) {
         last = own;
         setCoursePoints(student.id, courseSlug, own);

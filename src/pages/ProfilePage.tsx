@@ -333,7 +333,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <Box sx={{ position: 'relative', height: '100%', overflowY: { xs: 'auto', md: 'hidden' }, display: 'flex', flexDirection: 'column', bgcolor: isFancy ? 'transparent' : 'background.default', color: 'text.primary', px: { xs: 2, md: 4 }, py: { xs: 2, md: 2.5 } }}>
+    <Box sx={{ position: 'relative', height: '100%', overflowY: 'auto', display: 'flex', flexDirection: 'column', bgcolor: isFancy ? 'transparent' : 'background.default', color: 'text.primary', px: { xs: 2, md: 4 }, py: { xs: 2, md: 2.5 } }}>
       {isFancy && <ParticlesBackground opacityMultiplier={0.4} />}
       <Box sx={{ position: 'relative', width: '100%', maxWidth: 1300, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2, flex: { xs: '0 0 auto', md: '1 1 auto' }, minHeight: 0, marginTop:5}}>
         {/* Capçalera */}

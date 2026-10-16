@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { courseService } from '../services/courseService';
+import { courseService, mapProblem } from '../services/courseService';
 import { localCourseService } from '../services/localCourseService';
 
 interface SubTopic {
@@ -31,9 +31,12 @@ interface Course {
   /** El detall del curs el retorna l'API com a `is_public`; les llistes, com `isPublic`. */
   is_public?: boolean;
   isPublic?: boolean;
+  /** El curs té problemes de programació / tests (`allows_coding` / `allows_tests` del detall) */
+  allows_coding?: boolean;
+  allows_tests?: boolean;
 }
 
-function resolveSlug(courseId: string): string {
+export function resolveSlug(courseId: string): string {
   if (courseId.startsWith('clone-')) {
     const local = localCourseService.getById(courseId);
     if (local?.originalSlug) return local.originalSlug;
@@ -52,11 +55,40 @@ export function useCourse(courseId: string | undefined) {
   });
 }
 
-export function prefetchCourse(queryClient: any, courseId: string) {
-  return queryClient.prefetchQuery({
-    queryKey: ['course', courseId],
-    queryFn: () => courseService.getFullCourseDetail(resolveSlug(courseId)),
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
+/**
+ * Un examen vist com un curs d'un sol tema (vegeu `courseService.getExamCourse`): el fa servir
+ * LessonPage quan el problema s'obre des d'un examen. Fresc al cap de poc: l'examen es pot tancar.
+ */
+export function useExamCourse(courseId: string | undefined, examSlug: string | undefined) {
+  return useQuery<Course>({
+    queryKey: ['exam-course', courseId, examSlug],
+    queryFn: () => courseService.getExamCourse(resolveSlug(courseId!), examSlug!),
+    enabled: !!courseId && !!examSlug,
+    staleTime: 30 * 1000,
+    retry: false,
   });
 }
+
+/**
+ * Teoria (Markdown en l'idioma actiu) i fitxers d'un tema. La comparteixen la pàgina del curs
+ * (pestanyes Teoria i Fitxers) i el panell Materials de la pàgina d'un problema.
+ */
+export const topicDetailQuery = (courseSlug: string, topicSlug: string, lang: string) => ({
+  queryKey: ['topic-detail', courseSlug, topicSlug, lang] as const,
+  queryFn: () => courseService.getTopicBySlug(courseSlug, topicSlug).then((d: any) => ({
+    theory: (d?.theory_md || '') as string,
+    files: (Array.isArray(d?.files) ? d.files : []) as { id: number; name: string; hidden?: boolean }[],
+  })),
+  staleTime: 30 * 60 * 1000,
+});
+
+/**
+ * Consulta del detall d'un problema (enunciat, codi inicial...). La comparteixen
+ * LessonPage (que la llegeix) i la llista de problemes (que l'avança en passar-hi
+ * per sobre), de manera que en obrir el problema les dades ja hi són.
+ */
+export const problemDetailQuery = (courseId: string, topicSlug: string, problemSlug: string) => ({
+  queryKey: ['problem', courseId, topicSlug, problemSlug] as const,
+  queryFn: () => courseService.getChallenge(resolveSlug(courseId), topicSlug, problemSlug).then(mapProblem),
+  staleTime: 5 * 60 * 1000,
+});

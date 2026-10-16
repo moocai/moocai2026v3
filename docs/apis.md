@@ -56,7 +56,8 @@ Tots amb `Authorization: Token {token}` (afegit per l'interceptor d'`apiClient`)
 | GET | `/public/courses/` | Tots els cursos públics (no requereix autenticació al backend). |
 | GET | `/courses/{slug}/` | Detall d'un curs per slug. |
 | GET | `/courses/{slug}/topics/` | Temes d'un curs. |
-| GET | `/courses/{slug}/topics/{topic}/` | Detall d'un tema (teoria localitzada segons `i18n.language`). |
+| GET | `/courses/{slug}/topics/{topic}/` | Detall d'un tema (teoria localitzada segons `i18n.language` i llista de fitxers `files: [{ id, name }]`). El fan servir les pestanyes Teoria i Fitxers de `CourseLessons`. |
+| GET | `/courses/{slug}/files/{id}/download/` | Descarrega un fitxer del tema (blob). **Demana sessió**, també en cursos públics (401 sense token). `courseService.downloadFile`. |
 | GET | `/courses/{slug}/topics/{topic}/problems/` | Problemes d'un tema. |
 | GET | `/courses/{slug}/topics/{topic}/problems/{problem}/` | Detall d'un problema. |
 | POST | `/courses/{slug}/topics/{topic}/problems/{problem}/submissions/` | Envia resposta. Body JSON: coding `{ code, language? }`, test `{ answers: [id, …] }`. |
@@ -68,6 +69,22 @@ Tots amb `Authorization: Token {token}` (afegit per l'interceptor d'`apiClient`)
 - `getFullCourseDetail(slug)`: fa `GET /courses/{slug}/` + `GET /courses/{slug}/topics/` i, per cada tema, `GET .../problems/` (2 + T peticions). Cacheja el resultat en memòria.
 - Camps normalitzats a `toCourses()`: `id/slug ← slug`, `title ← name`, `isPublic ← is_public !== false`, `active ← active !== false`.
 - Camps del detall extrets a `getFullCourseDetail`: `system_solution.code`, `statement_ca || statementHtml`, `precode`, `choices`, `score`, `difficulty`.
+
+---
+
+## 2b. Avisos i enquestes
+
+Tots amb token (`apiClient`). Els avisos els publica el professorat a algorien; aquí només es llegeixen.
+
+| Mètode | Endpoint | Descripció | Servei |
+|--------|----------|------------|--------|
+| GET | `/notifications/` | Avisos de **tots** els cursos de l'usuari, del més nou al més antic: `[{ id, course: { slug, name }, text (Markdown), is_important, created_at, is_read }]`. Sense paginar. | `notificationService.getFeed` |
+| POST | `/notifications/mark-read/` | Body `{ ids?: number[] }` → `{ marked_read }`. Sense `ids`, tots els no llegits. Els d'altres cursos s'ignoren. | `notificationService.markRead` |
+| GET | `/courses/{slug}/surveys/` | Enquestes del curs en ordre (l'alumnat només rep les obertes): `[{ slug, name, description, active }]`. | `surveyService.list` |
+| GET | `/courses/{slug}/surveys/{survey}/` | Detall; **404** si està tancada. | `surveyService.get` |
+| POST | `/courses/{slug}/surveys/{survey}/answers/` | Body `{ answer }` → 201. La resposta és **anònima** (no es guarda qui l'ha enviada), així que la interfície no marca quines enquestes ha contestat l'alumne. | `surveyService.submitAnswer` |
+
+- **Campana** (`NotificationBell`): `useNotificationFeed` (React Query, `['notification-feed']`) es refresca cada minut i en tornar a la pestanya; el servidor no fa push. Els avisos importants sense llegir s'obren en un diàleg que només es tanca confirmant-los (`mark-read` amb el seu id).
 
 ---
 
@@ -136,6 +153,11 @@ Els cursos clonats reben ids `clone-<timestamp>` que `useCourse` torna a resoldr
 | 20 | GET | `/api/v1/courses/{slug}/topics/{topic}/problems/{problem}/submissions/peers/` | courseService | ✅ |
 | 21 | GET | `/api/v1/courses/{slug}/students/overview/` | courseService | ✅ |
 | 22 | GET | `/api/v1/public/stats/` | statsService | ⚠️ **previst, no existeix** |
+| 23 | GET | `/api/v1/notifications/` | notificationService | ❌ |
+| 24 | POST | `/api/v1/notifications/mark-read/` | notificationService | ❌ |
+| 25 | GET | `/api/v1/courses/{slug}/surveys/` | surveyService | ❌ |
+| 26 | GET | `/api/v1/courses/{slug}/surveys/{survey}/` | surveyService | ❌ |
+| 27 | POST | `/api/v1/courses/{slug}/surveys/{survey}/answers/` | surveyService | ❌ |
 
 **Estat dels tests:** el projecte **no té cap infraestructura de test ni cap fitxer de test**. La columna «Testejat?» reflecteix l'ús observat en manual/dev, no tests automatitzats.
 

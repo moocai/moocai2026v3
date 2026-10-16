@@ -53,7 +53,7 @@ Versions reals de `package.json`:
 
 ```
 moocai2026/
-├── index.html                        # lang="es", carrega /data.js, /src/main.tsx
+├── index.html                        # lang="es", carrega /src/main.tsx
 ├── package.json                      # scripts: dev / build (tsc -b && vite build) / preview
 ├── vite.config.ts                    # alias @→./src, proxy /api→algorien.com, port 5173, polling
 ├── tsconfig.json                     # strict + noUnusedLocals + noUnusedParameters, jsx react-jsx
@@ -62,7 +62,6 @@ moocai2026/
 ├── docs/                             # Aquest directori (project, apis, canvis, monaco, react19, ReactQuery, spring3, fix1, fix2)
 │
 ├── public/
-│   ├── data.js                       # Fixture global antic (window.EXAM_DATA), 569 B
 │   └── img/                          # logo.webp, favicon.png, Python.svg, React.svg, SB.svg, ml.svg
 │
 └── src/
@@ -145,7 +144,7 @@ moocai2026/
     │   ├── courses/
     │   │   ├── CourseLessons.tsx     # Tabs Teoria/Programació/Tests/Fitxers + rail flotant
     │   │   ├── LessonPage.tsx        # Monaco + Solució Profe + preview React + panell IA
-    │   │   ├── ExamPage.tsx          # /courses/:courseId/exam/:challengeSlug
+    │   │   ├── TopicTestPage.tsx          # /courses/:courseId/test/:challengeSlug
     │   │   ├── AiHelpPanel.tsx       # Revisió IA via client compartit (api.get); usa topicSlug real
     │   │   └── ${courseId}/${lesson.id}/LessonTopic.tsx  # ⚠️ Path literal amb ${...}
     │   ├── dashboards/
@@ -218,7 +217,7 @@ StrictMode
 | 2 | `/courses/:courseId` | `CourseLessons` | `MainLayout` |
 | 3 | `/courses/:courseId/:lessonId` | `LessonPage` | `MainLayout` |
 | 4 | `/courses/:courseId/:lessonId/topic` | `LessonTopic` | `MainLayout` |
-| 5 | `/courses/:courseId/exam/:challengeSlug` | `ExamPage` | `MainLayout` |
+| 5 | `/courses/:courseId/test/:challengeSlug` | `TopicTestPage` | `MainLayout` |
 | 6 | `/courses/:courseId/stats` | `RendimentDashboard` | `MainLayout` |
 | 7 | `/dashboards/student` | `StudentDashboard` | `MainLayout` |
 | 8 | `/profile` | `ProfilePage` | `MainLayout` |
@@ -249,15 +248,18 @@ Tabs `Teoria | Programació | Tests | Fitxers` (font única `TAB_ITEMS`) amb bar
 
 ### `LessonPage` (`/courses/:courseId/:lessonId`)
 La pàgina central. Editor **Monaco** amb:
-- **Multi-model** per llenguatge: fitxers `python.py` i `React.tsx` (`file:///lesson/<curs>/<lliço>/...`), tabs de fitxer.
+- **Multi-model** per llenguatge: fitxers `python.py` i `React.tsx` (`file:///lesson/<curs>/<lliço>/...`). Només es mostra el fitxer del llenguatge del curs (`language`/`programming_language` del curs; si no en té, Python).
+- **Executar (Python real)**: `services/pythonRunner.ts` executa el codi amb **Pyodide** (CPython en WebAssembly) dins d'un Web Worker (`workers/pythonRunner.worker.ts`): sortida i tracebacks de Python, botó **Atura** i límit de 15 s per als bucles infinits (no compta mentre s'espera un `input()`), i percentatge de càrrega la primera vegada. `input()` es respon a la mateixa consola, com en un terminal: el worker queda aturat en una petició síncrona que respon el service worker `public/python-input-sw.js` quan la pàgina li passa el text. El hook `usePythonRun` ho connecta amb la consola (també el fa servir l'`ExerciseEditor` del professorat). Els fitxers de Pyodide se serveixen des de l'app a `/pyodide/v<versió>/` (vegeu `vite.config.ts`). Enviar ja no depèn de cap validació local: corregeix el servidor.
+- **Enunciat** en Markdown (`MarkdownContent`, amb GFM) i en l'idioma de l'alumne (`statement_ca/es/en`). L'HTML dins de l'enunciat es mostra passat per una llista blanca (`rehype-sanitize`, equivalent a la del servidor d'algorien): sense scripts, atributs `on*`, URLs `javascript:`, iframes, formularis, estils ni classes.
+- Panells redimensionables: enunciat ↔ editor i editor ↔ consola (`ResizeHandle`; l'alçada de la consola es recorda). Si la columna de l'editor és estreta, els botons es mostren només amb la icona.
 - **Solució Profe**: pestanya bloquejada fins que l'alumne supera l'exercici; llavors es mostra un **`DiffEditor`** entre `teacherSolution` i el codi de l'alumne (colze a colze a desktop, unificat a mòbil).
-- **Preview React en viu** (`ReactLivePreview`): transpila el TSX amb el worker de TypeScript de Monaco (`getEmitOutput`) i el renderitza amb `createRoot`.
+- **Preview React en viu** (`ReactLivePreview`, només als cursos de React; Python fa servir tota l'amplada per a l'editor): transpila el TSX amb el worker de TypeScript de Monaco (`getEmitOutput`) i el renderitza amb `createRoot`.
 - Tabs `Enunciat | Professor | Alumnes | IA`; `AiHelpPanel` per revisió IA.
 - `ConsolePanel`, badge de diagnòstics (`onValidate`), confetti, autoguardat i `mooc_last_session`.
 
 Endpoints: `submitChallenge`, `getPeerSubmissions`, `getChallenge`, i `api.postProgress`.
 
-### `ExamPage` (`/courses/:courseId/exam/:challengeSlug`)
+### `TopicTestPage` (`/courses/:courseId/test/:challengeSlug`)
 Tests de resposta única o múltiple (`RadioGroup`/`FormGroup`). Carrega via `useCourse` o `getChallenge`, llegeix submissions prèvies i envia amb `submitChallenge({ answers })`. El panell de resultat deriva de `result.correct` i de la llista `choices`.
 
 ### `RendimentDashboard` (`/courses/:courseId/stats`)
@@ -484,7 +486,7 @@ npm run preview
 - Landing (Hero typewriter + stats amb `usePublicStats` + grid de cursos + features + Footer).
 - Navegador de curs de 4 pestanyes amb rail flotant i reordenació de lliçons completades.
 - **Editor Monaco** amb multi-fitxer (Python/React), temes propis, validació, **DiffEditor "Solució Profe"** i **preview React en viu**.
-- Tests (`ExamPage`) de resposta única/múltiple amb feedback i nota.
+- Tests (`TopicTestPage`) de resposta única/múltiple amb feedback i nota.
 - Rànquing d'alumne (`students/overview`) i dashboard amb 5 targetes.
 - Panell de rendiment per tema (`/stats`).
 - Perfil complet (avatar, contrasenya, idioma, organizacions visuals).
