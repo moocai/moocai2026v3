@@ -5,8 +5,6 @@ import {useNavigate} from 'react-router-dom';
 import {ArrowRight} from 'lucide-react';
 import { type MouseEvent } from 'react';
 import {useTranslation} from 'react-i18next';
-import { useQueryClient } from '@tanstack/react-query';
-import { prefetchCourse } from '../hooks/useCourse';
 import { courseImages } from '../data/courses';
 
 interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
@@ -22,7 +20,6 @@ export function CourseCard({ course, index }: CourseCardProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const lang = i18n.language.split('-')[0] || 'en';
 
   const handleCardClick = (e: MouseEvent) => {
@@ -38,7 +35,6 @@ export function CourseCard({ course, index }: CourseCardProps) {
     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.5, ease: "easeOut" }} viewport={{ once: true }} style={{ height: '100%' }}>
       <Card 
         onClick={handleCardClick}
-        onMouseEnter={() => prefetchCourse(queryClient, course.id)} 
         sx={{
           height: '100%', 
           width: {xs: '85%', md: '100%'}, 

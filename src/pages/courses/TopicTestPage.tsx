@@ -131,8 +131,9 @@ export default function TopicTestPage() {
     let review: any[];
     setSubmitting(true);
     setSubmitError(null);
+    let res: any = null;
     try {
-      const res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
+      res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
         answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
       });
       correct = !!res?.correct;
@@ -149,7 +150,7 @@ export default function TopicTestPage() {
 
     setResult({ correct, choices: review, fresh: true });
     saveAnswers({ [answerKey(courseId, currentTestSlug)]: { answers, correct, choices: review } });
-    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0);
+    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0, 1000, res);
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {

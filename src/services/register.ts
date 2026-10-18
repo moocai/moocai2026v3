@@ -1,5 +1,5 @@
 import { apiErrorMessages, publicClient } from './httpClient';
-import { clearSavedTestAnswers } from './testAnswerStorage';
+import { clearPrivateLocalData } from './testAnswerStorage';
 
 export const REGISTER_URL = '/auth/register/';
 /** Dades del formulari (organitzacions, avatar per defecte). Només `GET`. */
@@ -57,9 +57,9 @@ export async function registerUser(payload: RegisterPayload) {
 
   const data = response.data as { token?: string } | undefined;
   if (data?.token) {
-    // Sessió nova: res de l'alumne anterior (ni el seu id ni les seves respostes dels tests)
+    // Sessió nova: res de l'alumne anterior (ni el seu id, ni les respostes dels tests, ni el codi)
     localStorage.removeItem('currentStudent');
-    clearSavedTestAnswers();
+    clearPrivateLocalData();
     localStorage.setItem('token', data.token);
   }
 

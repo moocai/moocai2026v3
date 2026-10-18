@@ -47,18 +47,8 @@ export function TeacherLeaderboard() {
   useEffect(() => {
     (async () => {
       try {
-        const coursesFromApi = await courseService.getAllCourses();
-        const fullCourses = await Promise.all(
-          coursesFromApi.map(async (course) => {
-            try {
-              const detail = await courseService.getFullCourseDetail(course.slug!);
-              return { ...course, topics: detail.content || [] };
-            } catch {
-              return course;
-            }
-          })
-        );
-        setCourses(fullCourses);
+        // Només la llista: el rànquing es demana per curs i el detall no es fa servir
+        setCourses(await courseService.getAllCourses());
       } catch (err) {
         console.error('Error loading courses:', err);
       } finally {

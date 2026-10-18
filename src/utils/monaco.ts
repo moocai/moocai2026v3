@@ -1,20 +1,26 @@
 import { loader } from '@monaco-editor/react';
 
 // === Càrrega local i diferida de Monaco (node_modules, sense CDN) ===
-// El bundle de Monaco (editor + workers) s'importa dinàmicament quan una
-// lliçó munta l'editor, de manera que no forma part del chunk inicial.
+// El bundle de Monaco (editor + workers) s'importa dinàmicament, de manera que
+// no forma part del chunk inicial. Com que la càrrega és idempotent, es pot
+// avançar (`preloadMonaco`) des de la llista de problemes perquè l'editor ja
+// estigui a punt quan s'obre un problema de codi.
 let monacoPromise: Promise<any> | null = null;
+let typescriptPromise: Promise<any> | null = null;
 let loaderConfigured = false;
 
 /**
  * Carrega Monaco de manera diferida i configura el loader de
  * `@monaco-editor/react` amb la instància local. Idempotent.
+ * No inclou el servei de TypeScript: vegeu `loadMonacoTypescript`.
  */
 export function loadMonaco(): Promise<any> {
   if (!monacoPromise) {
     monacoPromise = (async () => {
       const [core, editorWorkerMod, tsWorkerMod] = await Promise.all([
         import('./monacoCore'),
+        // Només són els embolcalls (pocs bytes): el codi dels workers es descarrega
+        // quan Monaco en crea un (el de TypeScript, només amb models de React).
         import('monaco-editor/editor/editor.worker?worker'),
         import('monaco-editor/language/typescript/ts.worker?worker'),
       ]);
@@ -34,10 +40,43 @@ export function loadMonaco(): Promise<any> {
         loader.config({ monaco: m as any });
         loaderConfigured = true;
       }
+      registerMonacoThemes(m);
+      registerPythonCompletionProvider(m);
       return m;
     })();
+    // Si falla (xarxa), es podrà tornar a intentar
+    monacoPromise.catch(() => { monacoPromise = null; });
   }
   return monacoPromise;
+}
+
+/**
+ * Monaco + el servei de llenguatge de TypeScript/JSX (IntelliSense, diagnòstics
+ * i transpilació del preview de React). Només per als cursos de React: per a
+ * Python no cal descarregar-lo. Idempotent.
+ */
+export function loadMonacoTypescript(): Promise<any> {
+  if (!typescriptPromise) {
+    typescriptPromise = Promise.all([loadMonaco(), import('./monacoTypescript')]).then(([m, mod]) => {
+      m.typescript = mod.typescript;
+      setupTypescriptDefaults(m);
+      return m;
+    });
+    typescriptPromise.catch(() => { typescriptPromise = null; });
+  }
+  return typescriptPromise;
+}
+
+/**
+ * Avança la descàrrega de Monaco quan el navegador està lliure (p. ex. a la
+ * llista de problemes de codi), sense bloquejar la pàgina actual.
+ */
+export function preloadMonaco(): void {
+  if (monacoPromise) return;
+  const start = () => { void loadMonaco().catch(() => { /* es reintentarà en obrir l'editor */ }); };
+  const ric = (window as any).requestIdleCallback;
+  if (typeof ric === 'function') ric(start, { timeout: 2000 });
+  else setTimeout(start, 200);
 }
 
 export const getMonacoEditorOptions = (minimapEnabled: boolean) => ({
@@ -56,6 +95,13 @@ export const getMonacoEditorOptions = (minimapEnabled: boolean) => ({
   parameterHints: { enabled: true },
   formatOnType: true,
   formatOnPaste: true,
+  // Com a l'editor d'algorien: sense capçaleres enganxoses ni espai extra en
+  // acabar el fitxer, i indentació fixa de 4 espais (PEP 8).
+  stickyScroll: { enabled: false },
+  scrollBeyondLastLine: false,
+  insertSpaces: true,
+  detectIndentation: false,
+  tabSize: 4,
 });
 
 /** Noms dels temes personalitzats registrats per `registerMonacoThemes`. */
