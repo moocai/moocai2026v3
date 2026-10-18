@@ -17,6 +17,8 @@ export interface Course {
   professors?: string[];
   /** Rol de l'usuari al curs (`my_role`): 'student' | 'professor' | null. `undefined` si l'API no l'envia. */
   myRole?: string | null;
+  /** Progrés propi com a alumne (`my_progress`): només a la llista de cursos propis; `null` si no n'hi ha. */
+  myProgress?: { problems: number; completed: number } | null;
 }
 
 export interface Lesson {

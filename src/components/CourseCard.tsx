@@ -6,6 +6,8 @@ import {ArrowRight} from 'lucide-react';
 import { type MouseEvent } from 'react';
 import {useTranslation} from 'react-i18next';
 import { courseImages } from '../data/courses';
+import { ProgressBar } from './ui/ProgressBar';
+import { useImageUrl } from '../utils/avatarCache';
 
 interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
 
@@ -14,9 +16,10 @@ function getLocalizedText(text: string | { ca: string; es: string; en: string },
   return text[lang as keyof typeof text] || text.en || text.ca || text.es || '';
 }
 
-interface CourseCardProps {course: Course;index: number;}
+// `progress`: % completat del curs (cursos on l'usuari és alumne). Sense, el peu diu "Anar al curs".
+interface CourseCardProps {course: Course;index: number;progress?: number | null;}
 
-export function CourseCard({ course, index }: CourseCardProps) {
+export function CourseCard({ course, index, progress }: CourseCardProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
@@ -27,6 +30,14 @@ export function CourseCard({ course, index }: CourseCardProps) {
     e.preventDefault();
     navigate(`/courses/${course.id}`);
   };
+
+  // Imatge del curs: la local (si n'hi ha) o l'avatar del servidor, que necessita el token
+  // (per això passa per la memòria cau d'imatges i no per un <img src> directe).
+  const slug = course.slug || course.id;
+  const localImage = course.image || courseImages[slug];
+  const avatar = useImageUrl(localImage ? undefined : `/api/v1/courses/${encodeURIComponent(slug)}/avatar/`);
+  const imageSrc = localImage || avatar;
+  const title = getLocalizedText(course.title, lang);
 
   const logoW = course.logoWidth || course.logoSize || 100;
   const logoH = course.logoHeight || course.logoSize || 100;
@@ -59,9 +70,14 @@ export function CourseCard({ course, index }: CourseCardProps) {
           <Box sx={{ p: { xs: 1.5, md: 2 }, pb: 0 }}>
             <Box sx={{position: 'relative', height: {xs: '120px', md: '180px'}, width: '100%',borderRadius: 1, overflow: 'hidden',background: 'linear-gradient(135deg, ' + theme.palette.primary.main + '26 0%, ' + theme.palette.secondary?.main + '33 100%)', display: 'flex',alignItems: 'center', justifyContent: 'center', border: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#8400ff' : 'black'}}>    
               <motion.div whileHover={{ scale: 1.05, rotate: 2 }} transition={{ type: "spring", stiffness: 300 }}>
-                <Box
-                  component="img" src={course.image || courseImages[course.slug || course.id] || ''} alt={getLocalizedText(course.title, lang)}
-                  sx={{width: { xs: logoW * 0.65, md: logoW },height: { xs: logoH * 0.65, md: logoH }, objectFit: 'contain'}}/>
+                {imageSrc ? (
+                  <Box
+                    component="img" src={imageSrc} alt={title}
+                    sx={{width: { xs: logoW * 0.65, md: logoW },height: { xs: logoH * 0.65, md: logoH }, objectFit: 'contain'}}/>
+                ) : (
+                  // Sense imatge (el curs no té avatar): la inicial del curs, no una imatge trencada
+                  <Typography aria-hidden sx={{ fontSize: { xs: '3rem', md: '4.5rem' }, fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>{title.charAt(0).toUpperCase()}</Typography>
+                )}
               </motion.div>
             </Box>
           </Box>
@@ -73,12 +89,19 @@ export function CourseCard({ course, index }: CourseCardProps) {
             </Box>
 
             <Box>
+              {progress != null ? (
+                <Box sx={{ pt: { xs: 1.5, md: 2.5 }, borderTop: '1px solid', borderColor: 'divider' }}>
+                  <Typography sx={{ fontSize: { xs: '0.7rem', md: '0.85rem' }, fontWeight: 900, color: 'text.primary', mb: 1 }}>{t('course.percent_completed', { percent: progress })}</Typography>
+                  <ProgressBar value={progress} />
+                </Box>
+              ) : (
               <Box sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: 'divider'}}>
-                <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.enroll')}</Typography>
+                <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.go_to_course')}</Typography>
                 <Box component={motion.div} animate={{ x: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
                   <ArrowRight size={18} color={theme.palette.primary.main} strokeWidth={2.5} />
                 </Box>
               </Box>
+              )}
             </Box>
           </CardContent>
         </Card>

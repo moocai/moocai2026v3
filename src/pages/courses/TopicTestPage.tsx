@@ -7,11 +7,13 @@ import { useTranslation } from 'react-i18next';
 import { resolveSlug } from '../../hooks/useCourse';
 import { courseService, mapProblem } from '../../services/courseService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
+import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 import { MarkdownContent } from '../../components/MarkdownContent';
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
+  useRecordCourseActivity(courseId);
   const [searchParams] = useSearchParams();
   const topicParam = searchParams.get('topic');
   const queryClient = useQueryClient();
