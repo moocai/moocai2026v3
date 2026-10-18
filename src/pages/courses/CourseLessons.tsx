@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link as RouterLink } from 'react-router-dom';
 import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, Menu, MenuItem, ListItemText, useMediaQuery, Divider, Tooltip, IconButton, Stack} from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import {CheckCircle2, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
+import {CheckCircle2, XCircle, FileText, AlertTriangle, Globe, Lock, UserCheck, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
@@ -11,6 +11,9 @@ import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import ParticlesBackground from '../../components/ParticlesBackground';
 import { courseService } from '../../services/courseService';
+import { useQueryClient } from '@tanstack/react-query';
+import { resolveSlug } from '../../hooks/useCourse';
+import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 
 type I18nField = { ca: string; es: string; en: string };
 type ScopeType = 'public' | 'private' | 'assigned';
@@ -98,8 +101,12 @@ export default function CourseLessons() {
     JSON.parse(localStorage.getItem(getProgressKey()) || '{}')
   );
 
+  // Respostes dels tests (font de l'estat dels tests: correcte / incorrecte / pendent)
+  const [savedTestAnswers, setSavedTestAnswers] = useState(() => readAllSavedAnswers());
+
   const reSyncProgress = useCallback(() => {
     setProgress(JSON.parse(localStorage.getItem(getProgressKey()) || '{}'));
+    setSavedTestAnswers(readAllSavedAnswers());
   }, [getProgressKey]);
 
   useEffect(() => {
@@ -244,6 +251,9 @@ export default function CourseLessons() {
   const renderStatusChip = (status: boolean | string) =>
     status === true ? (
       <CheckCircle2 size={16} color={theme.palette.success.main} />
+    ) : status === 'wrong' ? (
+      // Test respost i incorrecte (un test només té un intent: no està pendent de res)
+      <XCircle size={16} color={theme.palette.error.main} aria-label={t('lesson.test_wrong', 'Incorrecte')} />
     ) : status === 'attempted' ? (
       <Box sx={{display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.7rem', fontWeight: 700, color: '#f59e0b',border: '1px solid #f59e0b', borderRadius: 5,px: 1, py: 0.2,}}>
         <AlertTriangle size={12} />
@@ -257,7 +267,7 @@ export default function CourseLessons() {
     );
 
   const renderStatusIcon = (status: boolean | string, defaultIcon: string) =>
-    status === true ? '✅' : status === 'attempted' ? '⚠️' : defaultIcon;
+    status === true ? '✅' : status === 'wrong' ? '❌' : status === 'attempted' ? '⚠️' : defaultIcon;
 
   const renderStatusWithDifficulty = (status: boolean | string, difficulty?: string) => (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
@@ -276,6 +286,24 @@ export default function CourseLessons() {
       return (<Box key={opts.key} component={RouterLink} to={opts.to} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
       return (<Box key={opts.key} onClick={opts.onClick} sx={{ cursor: 'pointer' }}>{content}</Box>);
   };
+
+  // Pestanya Tests: amb sessió, porta del servidor l'estat dels tests del tema actiu (així es
+  // veu bé en qualsevol navegador). Llista del tema fresca (1 petició) + GET submissions només
+  // dels tests ja resposts que no tenim desats.
+  const queryClient = useQueryClient();
+  const syncTopicId = mainTab === 2 && course?.content?.length
+    ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
+    : undefined;
+  useEffect(() => {
+    if (!courseId || !syncTopicId || !isLoggedIn()) return;
+    const courseSlug = resolveSlug(courseId);
+    queryClient.fetchQuery({
+      queryKey: ['topic-problems', courseSlug, syncTopicId],
+      queryFn: () => courseService.getTopicProblems(courseSlug, syncTopicId),
+      staleTime: 0,
+    }).then((problems: any[]) => syncTopicAnswers(courseId, courseSlug, syncTopicId, problems))
+      .catch(() => {});
+  }, [courseId, syncTopicId, queryClient]);
 
   if (loading) return (
     <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default', zIndex: 9999 }}>
@@ -426,6 +454,15 @@ export default function CourseLessons() {
     ));
   };
 
+  // Estat d'un test a partir de la resposta desada (validada amb les opcions actuals)
+  const testStatus = (sub: any): boolean | string => {
+    const saved = savedTestAnswers[answerKey(courseId!, sub.problemSlug || sub.slug)];
+    if (!saved || !Array.isArray(saved.answers) || saved.correct == null) return false;
+    const ids = new Set((sub.choices || []).map((c: any) => String(c.id)));
+    if (ids.size > 0 && !saved.answers.every((a: any) => ids.has(String(a)))) return false;
+    return saved.correct ? true : 'wrong';
+  };
+
   const renderExerciseTab = (type: 'coding' | 'test') => {const emptyMessage = type === 'coding' ? t('lesson.no_exercises', 'Encara no hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'Encara no hi ha tests per aquest curs.');
     if (allLessons.length === 0) {return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{emptyMessage}</Typography>;}
 
@@ -449,12 +486,13 @@ export default function CourseLessons() {
             {subItems.map((sub: any) => {
               const key = `${courseId}_${sub.problemSlug || sub.slug || active.id}`;
               const targetSlug = sub.slug || sub.problemSlug || active.id;
+              const status = type === 'test' ? testStatus(sub) : progress[key];
               return renderOverviewRow({
                 key: `${active.id}-${type}-${targetSlug}`,
-                icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(progress[key], emoji)}</Typography>,
+                icon: <Typography sx={{ fontSize: '1.1rem' }}>{renderStatusIcon(status, emoji)}</Typography>,
                 label: getText(sub.subtitle || sub.title),
-                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/exam/${targetSlug}`,
-                right: renderStatusWithDifficulty(progress[key] || false, sub.difficulty),
+                to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/test/${targetSlug}?topic=${encodeURIComponent(active.id)}`,
+                right: renderStatusWithDifficulty(status || false, sub.difficulty),
               });
             })}
           </Box>

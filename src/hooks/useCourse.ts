@@ -33,7 +33,7 @@ interface Course {
   isPublic?: boolean;
 }
 
-function resolveSlug(courseId: string): string {
+export function resolveSlug(courseId: string): string {
   if (courseId.startsWith('clone-')) {
     const local = localCourseService.getById(courseId);
     if (local?.originalSlug) return local.originalSlug;

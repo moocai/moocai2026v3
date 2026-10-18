@@ -56,12 +56,3 @@ export function prefetchAllCourses(queryClient: any) {
     gcTime: LIST_GC_TIME,
   });
 }
-
-export function prefetchCourseDetail(queryClient: any, slug: string) {
-  return queryClient.prefetchQuery({
-    queryKey: ['course', slug],
-    queryFn: () => courseService.getFullCourseDetail(slug),
-    staleTime: DETAIL_STALE_TIME,
-    gcTime: DETAIL_GC_TIME,
-  });
-}
