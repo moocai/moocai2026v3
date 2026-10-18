@@ -123,6 +123,12 @@ export const courseService = {
     return data;
   },
 
+  /** `GET /courses/{c}/files/{id}/download/`: un fitxer del curs (amb el token de la sessió). */
+  async downloadFile(courseSlug: string, fileId: number | string): Promise<Blob> {
+    const { data } = await apiClient.get(`/courses/${courseSlug}/files/${fileId}/download/`, { responseType: 'blob' });
+    return data;
+  },
+
   /**
    * `GET /courses/{c}/problems/`: tots els problemes del curs (sense enunciats) amb l'estat
    * propi. `null` si el backend encara no té l'endpoint (404).

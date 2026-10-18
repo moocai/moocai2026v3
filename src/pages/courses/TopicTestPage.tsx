@@ -8,8 +8,7 @@ import { resolveSlug } from '../../hooks/useCourse';
 import { courseService, mapProblem } from '../../services/courseService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownContent } from '../../components/MarkdownContent';
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
@@ -210,7 +209,8 @@ export default function TopicTestPage() {
   }
 
   const title = topicTest.title || topicTest.name || getText(topicTest.subtitle) || currentTestSlug;
-  const statement = topicTest.statement_ca || topicTest.statement || topicTest.description || getText(topicTest.text) || '';
+  // `statement` arriba de mapProblem com a objecte per idioma ({ ca, es, en }): cal triar-ne el text
+  const statement = getText(topicTest.statement) || getText(topicTest.text) || '';
   const choices: any[] = topicTest.choices || [];
 
   const isMultiChoice = topicTest.choiceType
@@ -287,9 +287,9 @@ export default function TopicTestPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3, mb: 3 }}>
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('topic_test.statement', 'Enunciat')}</Typography>
-            <Box sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{statement}</ReactMarkdown>
-            </Box>
+            <MarkdownContent fontSize="1rem" sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
+              {statement}
+            </MarkdownContent>
           </Paper>
 
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
