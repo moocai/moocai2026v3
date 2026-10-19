@@ -501,7 +501,7 @@ export default function CourseLessons() {
         )}
 
         {markdown === undefined ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
-        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx}>{markdown}</MarkdownContent>
+        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx} runnablePython>{markdown}</MarkdownContent>
         ) : (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>
         )}
 
@@ -530,7 +530,7 @@ export default function CourseLessons() {
       const courseMessage = type === 'coding' ? t('lesson.no_exercises', 'No hi ha exercicis per aquest curs.') : t('lesson.no_tests', 'No hi ha tests per aquest curs.');
       return <Typography sx={{ color: 'text.secondary', fontSize: '0.95rem' }}>{courseMessage}</Typography>;
     }
-    const emptyMessage = type === 'coding' ? t('lesson.no_topic_exercises', 'Aquest tema no té exercicis de programació.') : t('lesson.no_topic_tests', 'Aquest tema no té tests.');
+    const emptyMessage = type === 'coding' ? t('lesson.no_topic_exercises', 'Aquest tema no té problemes de programació.') : t('lesson.no_topic_tests', 'Aquest tema no té tests.');
 
     const active = allLessons.find((l) => l.id === selectedTopicId) ?? allLessons[0];
     const subItems: any[] = (active.subTopics || []).filter((s: any) => s.type === type);

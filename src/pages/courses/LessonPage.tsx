@@ -773,24 +773,24 @@ export default function LessonPage() {
 
       } else {  setStatus('fail');}
 
-      // Sincronitza els punts amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
+      // Sincronitza les estrelles amb el backend (header, leaderboard i activitat llegeixen el mateix valor).
       // Sempre es refresca després d'enviar; amb reintents només si l'activitat s'ha superat.
-      // Els punts guanyats els diu el servidor (`stars_earned`, només quan n'atorga): fora del
+      // Les estrelles guanyades les diu el servidor (`stars_earned`, només quan n'atorga): fora del
       // període del tema, o si ja estava resolt, l'enviament no en suma.
       const student = getCurrentStudent();
       const earned = Number(result?.stars_earned) || 0;
       const pointsNote: ConsoleLine | null = earned > 0
-        ? `🏆 ${t('lesson.points_earned', '+{{points}} punts!', { points: earned })}`
+        ? `⭐ ${t('lesson.points_earned', { count: earned })}`
         : passed && wasSolvedBefore
-          ? { kind: 'info', text: t('lesson.points_already_solved', 'Ja l\'havies resolt: aquest enviament no suma punts.') }
+          ? { kind: 'info', text: t('lesson.points_already_solved') }
           : passed && topicClosed
-            ? { kind: 'info', text: t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.") }
+            ? { kind: 'info', text: t('lesson.points_topic_closed') }
             : null;
       void refreshCoursePoints(course?.slug || courseId!, earned > 0 ? 4 : 0, 1000, result).then(() => {
         if (!student) return;
         setConsoleOutput(p => [...p,
           ...(pointsNote ? [pointsNote] : []),
-          `🏆 ${t('lesson.total_points', 'Punts totals: {{points}}', { points: getTotalPoints(student.id) })}`,
+          `⭐ ${t('lesson.total_points', { count: getTotalPoints(student.id) })}`,
         ]);
       });
 
@@ -943,7 +943,7 @@ export default function LessonPage() {
             <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
               {topicClosed && (
-                <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.")}</Typography>
+                <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed')}</Typography>
               )}
               <Box sx={{ maxHeight: '26vh', overflowY: 'auto' }}>
                 <MarkdownContent fontSize="0.85rem">{statementMarkdown}</MarkdownContent>
@@ -1097,7 +1097,7 @@ export default function LessonPage() {
                 {topicClosed && (
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start', p: 1.25, mb: 1, borderRadius: 1.5, bgcolor: alpha(theme.palette.warning.main, 0.1), border: `1px solid ${alpha(theme.palette.warning.main, 0.4)}` }}>
                     <AlertTriangle size={16} color={theme.palette.warning.main} style={{ flexShrink: 0, marginTop: 2 }} />
-                    <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed', "Els enviaments d'aquest tema ja no sumen punts.")}</Typography>
+                    <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed')}</Typography>
                   </Box>
                 )}
                 <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2 }}>
