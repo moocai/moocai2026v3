@@ -22,6 +22,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { problemDetailQuery, resolveSlug, useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
 import { useCodeSurface } from '../../theme/codeSurface';
+import { CODING_HEADER_HEIGHT } from '../../layouts/headerHeight';
 import { courseService } from '../../services/courseService';
 import { LAST_SESSION_KEY, userKey } from '../../services/topicTestAnswers';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
@@ -933,9 +934,10 @@ export default function LessonPage() {
   // MOBILE LAYOUT
   if (isMobile) {
     return (
-      <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
+      // pt: sota la capçalera (fixa, per sobre de la pàgina), no amagat al darrere
+      <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
         {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
-        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0, mt: 5}}>
+        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, justifyContent: 'space-between', flexShrink: 0}}>
           <BackToCourseButton label={t('lesson.back_to_course', 'Torna al curs')} onClick={handleBackToCourse} fontSize={12} />
         </Box>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
@@ -1073,10 +1075,10 @@ export default function LessonPage() {
 
   // DESKTOP LAYOUT - Editor + Visualització en temps real neta al costat + Consola abaix
   return (
-    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
+    <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
       {progressPercent > 0 && <Box sx={{ height: 4, flexShrink: 0, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
 
-      <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0, mt: 10 }}>
+      <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* COLUMNA 1: Enunciat / AI / Solucions */}
         <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
           <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} centered sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 1 * tabScale, ml: 2.5 * tabScale, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>

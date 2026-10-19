@@ -16,7 +16,9 @@ export function StarScore({ value, size = 16, sx }: { value: number; size?: numb
   return (
     <Box component="span" role="img" aria-label={label} title={label}
       sx={[{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 800, whiteSpace: 'nowrap' }, ...(Array.isArray(sx) ? sx : sx ? [sx] : [])]}>
-      <span aria-hidden="true">{value}</span>
+      {/* Caixa retallada a l'alçada de les xifres: així el centrat de flex les alinea amb
+          l'estrella sigui quina sigui la font (sense això quedaven desplaçades segons el sistema) */}
+      <Box component="span" aria-hidden="true" sx={{ textBox: 'trim-both cap alphabetic' }}>{value}</Box>
       <Star size={size} color={STAR_COLOR} fill={STAR_COLOR} aria-hidden="true" style={{ flexShrink: 0 }} />
     </Box>
   );
