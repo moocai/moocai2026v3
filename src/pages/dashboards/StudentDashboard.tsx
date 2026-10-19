@@ -721,11 +721,10 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                 {!SHOW_COURSE_SWITCHER && currentCourse && (
                   // Sense el selector: tornar al curs com a les pàgines de test i de problema (el nom
                   // del curs, que també diu de quin curs és el tauler) i el títol de la pàgina
-                  <Box sx={{ mb: { xs: 2, md: 3 } }}>
-                    <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1 }}>
-                      {getText(currentCourse.title) || currentCourse.slug}
+                  <Box sx={{ mb: { xs: 2, md: 3 }, mt:{md:-3}}}>
+                    <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1, borderRadius: 1, border: '1px solid transparent', '&:hover': { bgcolor: 'transparent', border: '1px solid red' } }}>
+                     Tornar a {getText(currentCourse.title) || currentCourse.slug}
                     </Button>
-                    <Typography component="h1" variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>{t('dashboard.title')}</Typography>
                   </Box>
                 )}
 

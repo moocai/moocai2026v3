@@ -56,7 +56,7 @@ export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressIt
             >
               {topic.title}
             </Typography>
-            <Stack spacing={0.25}>
+            <Stack direction="row" spacing={1}>
               {series.map((s) => {
                 const { total, done } = topic[s.key];
                 const pct = total > 0 ? Math.round((done / total) * 100) : null;
@@ -69,12 +69,12 @@ export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressIt
                       role="button" tabIndex={0} aria-label={tip}
                       onClick={() => onOpen(topic.id, s.key)}
                       onKeyDown={(e) => { if (e.key === 'Enter') onOpen(topic.id, s.key); }}
-                      sx={{ display: 'flex', alignItems: 'center', gap: 1, cursor: 'pointer', '&:hover .bar-fill': { opacity: 0.8 } }}
+                      sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', '&:hover .bar-fill': { opacity: 0.8 } }}
                     >
-                      <Box sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: pct == null ? 'transparent' : 'action.disabledBackground', border: pct == null ? '1px dashed' : 'none', borderColor: 'divider', overflow: 'hidden' }}>
-                        {pct != null && <Box className="bar-fill" sx={{ width: `${pct}%`, height: '100%', bgcolor: s.color, borderRadius: 4 }} />}
+                      <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: pct == null ? 'transparent' : 'action.disabledBackground', border: pct == null ? '1px dashed' : 'none', borderColor: 'divider', overflow: 'hidden' }}>
+                        {pct != null && <Box className="bar-fill" sx={{ width: `${pct}%`, height: '100%', bgcolor: s.color, borderRadius: 3 }} />}
                       </Box>
-                      <Typography variant="caption" sx={{ width: 34, textAlign: 'right', fontWeight: 700, fontSize: '0.72rem', lineHeight: 1.2, color: pct == null ? 'text.secondary' : 'text.primary' }}>
+                      <Typography variant="caption" sx={{ width: 28, textAlign: 'right', fontWeight: 700, fontSize: '0.65rem', lineHeight: 1.2, color: pct == null ? 'text.secondary' : 'text.primary' }}>
                         {pct == null ? '—' : `${pct}%`}
                       </Typography>
                     </Box>

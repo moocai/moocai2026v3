@@ -260,7 +260,7 @@ export default function CourseLessons() {
     if (!difficulty) return null;
     const { color, bg, border } = getDifficultyColor(difficulty);
     return (
-      <Box sx={{fontSize: '0.65rem', fontWeight: 700, color,border: `1px solid ${border}`, borderRadius: 5, px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em', bgcolor: bg}}>
+      <Box sx={{fontSize: '0.75rem', fontWeight: 900, color,border: `1px solid ${border}`, borderRadius: 5, px: 1, py: 0.5, textTransform: 'uppercase', letterSpacing: '0.20em', bgcolor: bg}}>
         {getDifficultyLabel(difficulty)}
       </Box>
     );
@@ -278,7 +278,7 @@ export default function CourseLessons() {
         {t('lesson.pending_send', 'Pendent per enviar')}
       </Box>
     ) : (
-      <Box sx={{fontSize: '0.7rem', fontWeight: 700, color: 'text.secondary',border: '1px solid', borderColor: 'divider', borderRadius: 5,px: 1, py: 0.2, textTransform: 'uppercase', letterSpacing: '0.05em',
+      <Box sx={{fontSize: '0.75rem', fontWeight: 900, color: 'text.secondary',border: '1px solid', borderColor: 'divider', borderRadius: 5,px: 1, py: 0.5, textTransform: 'uppercase', letterSpacing: '0.20em',
       }}>
         {t('lesson.pending', 'Pendent')}
       </Box>
@@ -298,7 +298,7 @@ export default function CourseLessons() {
     const content = (
       <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5,px: 1, py: 1.25, borderBottom: '1px solid', borderColor: 'divider','&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }}}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'primary.main' }}>{opts.icon}</Box>
-        <Typography sx={{ flex: 1, fontSize: '0.95rem', fontWeight: 600, color: 'text.primary' }}>{opts.label}</Typography>{opts.right}</Box>
+        <Typography sx={{ flex: 1, fontSize: '1.3rem', color: 'text.primary', letterSpacing: '0.05rem'}}>{opts.label}</Typography>{opts.right}</Box>
     );
     if (opts.to) {
       return (<Box key={opts.key} component={RouterLink} to={opts.to} onMouseEnter={opts.onIntent} onFocus={opts.onIntent} onTouchStart={opts.onIntent} sx={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{content}</Box>);}
@@ -431,8 +431,8 @@ export default function CourseLessons() {
       const active = item.id === activeId;
       return (
         <Box key={item.id} component={motion.button} layout transition={{ type: 'spring', stiffness: 400, damping: 34 }} type="button" onClick={() => selectTopic(item.id)} aria-current={active ? 'true' : undefined}
-          sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : 'divider', bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary',fontWeight: 700, fontSize: '0.95rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
-          <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : 'divider', bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary', fontSize: '1.3rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
+          <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {/* Estrella com a algorien: plena si el tema dona punts (tema en curs), buida si no */}
             {item.current !== undefined && (
               <Tooltip title={item.current ? t('lesson.topic_gives_stars', 'Els problemes d\'aquest tema donen estrelles!') : t('lesson.topic_no_stars', 'Aquest tema no dona estrelles')} placement="top">
@@ -445,7 +445,7 @@ export default function CourseLessons() {
             <span>{item.title}</span>
           </Box>
           <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexShrink: 0 }}>
-            {item.percent !== undefined && (<Typography component="span" sx={{ fontSize: '0.8rem', fontWeight: 800, opacity: 0.8 }}>{item.percent}%</Typography>)}
+            {item.percent !== undefined && (<Typography component="span" sx={{ fontSize: '1rem', fontWeight: 900, opacity: 0.8 }}>{item.percent}%</Typography>)}
             {item.done && (<CheckCircle2 size={16} color={active ? '#fff' : theme.palette.success.main} />)}
           </Box>
         </Box>
@@ -694,7 +694,7 @@ export default function CourseLessons() {
               </Box>
             */}
 
-              <Typography variant="h2" sx={{fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.5rem' },letterSpacing: '0.03em', mt: { xs: 1, lg: 0 }, mb: 2, lineHeight: 1.1}}>
+              <Typography variant="h2" sx={{fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.2rem' },letterSpacing: '0.03em', mt: { xs: 1, lg: 0 }, mb: 2, lineHeight: 1.1}}>
                 {getText(course.title)}
               </Typography>
             </Box>
@@ -702,7 +702,7 @@ export default function CourseLessons() {
             {/* Mòbil: botó "Topics" per obrir/tancar el menú de temes */}
             <Button onClick={() => setMobileNavOpen((v) => !v)} aria-label={mobileNavOpen ? t('lesson.close_topics', 'Tancar temes') : t('lesson.open_topics', 'Obrir temes')} aria-expanded={mobileNavOpen} aria-controls="lesson-topics" variant="outlined" startIcon={mobileNavOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />} sx={{ display: { xs: 'inline-flex', md: 'none' }, textTransform: 'none', fontWeight: 900, fontSize: '1rem', borderRadius: 999, borderColor: '#00685d', color: '#00685d', px: 2, mt: { xs: 2 }, mb: { xs: -3 } }}> Topics </Button>
 
-            <Typography sx={{ color: 'text.secondary', fontSize: { xs: '1rem', md: '1.4rem' }, lineHeight: 1.7, mb: 6, maxWidth: '900px' }}>
+            <Typography sx={{ color: 'text.secondary', fontSize: { xs: '1rem', md: '1.4rem' }, maxWidth: '900px' }}>
               {getText(course.description)}
             </Typography>
 

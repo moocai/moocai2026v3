@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
-import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon } from '@mui/icons-material';
+import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon, KeyboardArrowDown as KeyboardArrowDownIcon } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha} from '@mui/material';
+import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha, Menu, MenuItem } from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
 import { ThemeToggleButton } from './ThemeToggleButton';
@@ -39,6 +39,7 @@ export function Header() {
   const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
   const [studentName, setStudentName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [navAnchor, setNavAnchor] = useState<HTMLElement | null>(null);
   const points = usePoints();
   const navigate = useNavigate();
   const location = useLocation();
@@ -84,6 +85,27 @@ export function Header() {
       performScroll();
     }
   };
+
+  // Quin botó de navegació queda actiu segons l'adreça actual
+  const activeNav = (() => {
+    if (location.pathname === '/') return 'courses';
+    if (location.pathname.startsWith('/dashboards')) return 'dashboard';
+    if (location.pathname.includes('/surveys')) return 'surveys';
+    if (location.pathname.includes('/drive')) return 'drive';
+    if (location.pathname.includes('/challenges')) return 'challenges';
+    if (location.pathname.includes('/exams')) return 'exams';
+    return null;
+  })();
+
+  // Botons de navegació que formen el toggle (només surten si estan disponibles)
+  const navItems: { key: string; label: string; onClick: () => void }[] = [
+    { key: 'courses', label: t('footer.courses'), onClick: scrollToCourses },
+    ...(isLoggedIn && dashboardTarget ? [{ key: 'dashboard', label: t('dashboard.title'), onClick: () => navigate(dashboardTarget) }] : []),
+    ...(isLoggedIn && surveysTarget ? [{ key: 'surveys', label: t('surveys.title'), onClick: () => navigate(surveysTarget) }] : []),
+    ...(isLoggedIn && driveTarget ? [{ key: 'drive', label: t('drive.title'), onClick: () => navigate(driveTarget) }] : []),
+    ...(isLoggedIn && challengesTarget ? [{ key: 'challenges', label: t('challenges.title'), onClick: () => navigate(challengesTarget) }] : []),
+    ...(isLoggedIn && examsTarget ? [{ key: 'exams', label: t('exams.title'), onClick: () => navigate(examsTarget) }] : []),
+  ];
 
   const handleRoleChange = (newRole: 'student' | 'teacher') => {
     setRole(newRole);
@@ -162,39 +184,36 @@ export function Header() {
 
           {/* DESKTOP NAV */}
           <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: compact ? 2 : 3, mr: compact ? 0 : -5}}>
-            <Button onClick={scrollToCourses} sx={commonButtonStyle}>
-              {t('footer.courses')}
+            <Button
+              onClick={(e) => setNavAnchor(navAnchor ? null : e.currentTarget)}
+              endIcon={
+                <KeyboardArrowDownIcon
+                  sx={{ transition: 'transform 0.2s ease', transform: navAnchor ? 'rotate(180deg)' : 'none' }}
+                />
+              }
+              sx={{ ...commonButtonStyle, px: 1.5 }}
+            >
+              {navItems.find((item) => item.key === activeNav)?.label ?? t('nav.menu')}
             </Button>
-
-            {isLoggedIn && dashboardTarget && (
-              <Button onClick={() => navigate(dashboardTarget)} sx={commonButtonStyle}>
-                {t('dashboard.title')}
-              </Button>
-            )}
-
-            {isLoggedIn && surveysTarget && (
-              <Button onClick={() => navigate(surveysTarget)} sx={commonButtonStyle}>
-                {t('surveys.title')}
-              </Button>
-            )}
-
-            {isLoggedIn && driveTarget && (
-              <Button onClick={() => navigate(driveTarget)} sx={commonButtonStyle}>
-                {t('drive.title')}
-              </Button>
-            )}
-
-            {isLoggedIn && challengesTarget && (
-              <Button onClick={() => navigate(challengesTarget)} sx={commonButtonStyle}>
-                {t('challenges.title')}
-              </Button>
-            )}
-
-            {isLoggedIn && examsTarget && (
-              <Button onClick={() => navigate(examsTarget)} sx={commonButtonStyle}>
-                {t('exams.title')}
-              </Button>
-            )}
+            <Menu
+              anchorEl={navAnchor}
+              open={!!navAnchor}
+              onClose={() => setNavAnchor(null)}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+              slotProps={{ paper: { sx: { mt: 3, minWidth: 200, borderRadius: 2 } } }}
+            >
+              {navItems.map((item) => (
+                <MenuItem
+                  key={item.key}
+                  selected={item.key === activeNav}
+                  onClick={() => { item.onClick(); setNavAnchor(null); }}
+                  sx={{ fontWeight: item.key === activeNav ? 900 : 700, gap: 1 }}
+                >
+                  {item.label}
+                </MenuItem>
+              ))}
+            </Menu>
 
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
@@ -239,34 +258,28 @@ export function Header() {
 
               {/* 1. Cursos + Dashboard + nom usuari */}
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, width: '100%', flexWrap: 'wrap' }}>
-                <Button onClick={scrollToCourses} sx={{ color: 'text.primary', fontWeight: 900, py: 2, fontSize: '1.4rem' }}>
-                  {t('footer.courses').toUpperCase()}
-                </Button>
-                {isLoggedIn && dashboardTarget && (
-                  <Button onClick={() => { navigate(dashboardTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
-                    {t('dashboard.title')}
-                  </Button>
-                )}
-                {isLoggedIn && surveysTarget && (
-                  <Button onClick={() => { navigate(surveysTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
-                    {t('surveys.title')}
-                  </Button>
-                )}
-                {isLoggedIn && driveTarget && (
-                  <Button onClick={() => { navigate(driveTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
-                    {t('drive.title')}
-                  </Button>
-                )}
-                {isLoggedIn && challengesTarget && (
-                  <Button onClick={() => { navigate(challengesTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
-                    {t('challenges.title')}
-                  </Button>
-                )}
-                {isLoggedIn && examsTarget && (
-                  <Button onClick={() => { navigate(examsTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
-                    {t('exams.title')}
-                  </Button>
-                )}
+                {navItems.map((item) => {
+                  const active = item.key === activeNav;
+                  return (
+                    <Button
+                      key={item.key}
+                      onClick={() => { item.onClick(); setMobileOpen(false); }}
+                      sx={{
+                        color: active ? 'primary.main' : 'text.secondary',
+                        fontWeight: active ? 900 : 700,
+                        fontSize: '1.1rem',
+                        textTransform: 'none',
+                        py: 1,
+                        px: 2,
+                        borderRadius: 999,
+                        border: '1px solid',
+                        borderColor: active ? '#8400ff' : 'divider',
+                      }}
+                    >
+                      {item.label}
+                    </Button>
+                  );
+                })}
                 {isLoggedIn && (
                   <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
                     <PointsBadge points={points} />

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Box, Typography, Stack, CircularProgress, Tooltip } from '@mui/material';
-import { ArrowDownward, ArrowUpward, InfoOutlined } from '@mui/icons-material';
+import { Box, Typography, Stack, CircularProgress, Tooltip, Button, useMediaQuery } from '@mui/material';
+import { ArrowDownward, ArrowUpward, InfoOutlined, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { courseService } from '../../services/courseService';
 import { useSeriesColors } from './chartColors';
@@ -93,10 +93,16 @@ function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boole
 }
 
 /* ─── ChartCard ─── */
+const STATS_TOPICS_LIMIT = 4;
+
 function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: string; help: string; data: TopicRow[]; accent: string; delayStart?: number }) {
   const { t } = useTranslation();
   const [active, setActive] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // En pantalles grans (p. ex. 2590×1440) hi caben més temes sense fer créixer la targeta
+  const isLargeScreen = useMediaQuery('(min-width: 1920px)');
+  const limit = isLargeScreen ? 10 : STATS_TOPICS_LIMIT;
 
   useEffect(() => {
     const el = ref.current;
@@ -112,24 +118,27 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
   return (
     <Box ref={ref} sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
       <Box sx={{ px: 2.5, py: 2, borderBottom: 1, borderColor: 'divider' }}>
-        <Stack direction="row" spacing={1} sx={{ mb: 1, alignItems: 'center' }}>
-          <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: accent, flexShrink: 0 }} />
-          <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{title}</Typography>
-          <Typography variant="caption" color="text.secondary">({t('dashboard.stats_topics_count', { count: data.length })})</Typography>
-          <Tooltip title={help} arrow placement="top">
-            <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
-          </Tooltip>
-        </Stack>
-        <Stack direction="row" spacing={2.5}>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Box sx={{ width: 14, height: 10, borderRadius: '3px', bgcolor: accent }} />
-            <Typography variant="caption" color="text.secondary">{t('dashboard.stats_you')}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
+            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: accent, flexShrink: 0 }} />
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{title}</Typography>
+            <Typography variant="caption" color="text.secondary">({t('dashboard.stats_topics_count', { count: data.length })})</Typography>
+            <Tooltip title={help} arrow placement="top">
+              <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
+            </Tooltip>
           </Stack>
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-            <Box sx={{ width: 3, height: 14, borderRadius: 1, bgcolor: 'text.primary' }} />
-            <Typography variant="caption" color="text.secondary">{t('dashboard.stats_class_average')}</Typography>
+          {/* Llegenda a la dreta del box, separada del títol */}
+          <Stack direction="row" spacing={2.5} sx={{ ml: 'auto', alignItems: 'center' }}>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+              <Box sx={{ width: 14, height: 10, borderRadius: '3px', bgcolor: accent }} />
+              <Typography variant="caption" color="text.secondary">{t('dashboard.stats_you')}</Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+              <Box sx={{ width: 3, height: 14, borderRadius: 1, bgcolor: 'text.primary' }} />
+              <Typography variant="caption" color="text.secondary">{t('dashboard.stats_class_average')}</Typography>
+            </Stack>
           </Stack>
-        </Stack>
+        </Box>
       </Box>
 
       <Box sx={{ px: { xs: 1.5, sm: 2.5 }, py: 1.5 }}>
@@ -146,7 +155,7 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
                 </Typography>
               </Tooltip>
             </Stack>
-            {data.map((row, i) => (
+            {(expanded ? data : data.slice(0, limit)).map((row, i) => (
               <BarRow key={row.topic} row={row} active={active} accent={accent} delayMs={i * 55} />
             ))}
             <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider', alignItems: 'center' }}>
@@ -165,6 +174,20 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
               <Box sx={{ width: { xs: 38, sm: 46 }, flexShrink: 0 }} />
               <Box sx={{ width: { xs: 48, sm: 56 }, flexShrink: 0 }} />
             </Stack>
+            {data.length > limit && (
+              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 1.5 }}>
+                <Button
+                  size="small"
+                  onClick={() => setExpanded((v) => !v)}
+                  endIcon={expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
+                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                >
+                  {expanded
+                    ? t('dashboard.stats_show_less')
+                    : t('dashboard.stats_show_more', { count: data.length - limit })}
+                </Button>
+              </Box>
+            )}
           </>
         )}
       </Box>
