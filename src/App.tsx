@@ -7,7 +7,14 @@ import LessonTopic from './pages/courses/${courseId}/${lesson.id}/LessonTopic';
 import TopicTestPage from './pages/courses/TopicTestPage';
 import StudentDashboard from './pages/dashboards/StudentDashboard';
 import ProfilePage from './pages/ProfilePage';
-import RendimentDashboard from './features/student/RendimentDashboard';
+import NotificationsPage from './pages/NotificationsPage';
+import SurveysPage from './pages/courses/SurveysPage';
+import SurveyPage from './pages/courses/SurveyPage';
+import DrivePage from './pages/courses/DrivePage';
+import ChallengesPage from './pages/courses/ChallengesPage';
+import ChallengePage from './pages/courses/ChallengePage';
+import ExamsPage from './pages/courses/ExamsPage';
+import ExamPage from './pages/courses/ExamPage';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
 import TeacherIndex from './pages/teacher/TeacherIndex';
@@ -19,6 +26,12 @@ import Test from './pages/teacher/Test';
 import Hackathon from './pages/teacher/Hackathon';
 import InviteStudents from './pages/teacher/InviteStudents';
 import { useThemeMode } from './hooks/useTheme';
+
+// L'antiga pàgina "Més estadístiques" ara és una secció del tauler del curs
+function LegacyStatsRedirect() {
+  const { courseId = '' } = useParams();
+  return <Navigate to={`/dashboards/student?course=${encodeURIComponent(courseId)}`} replace />;
+}
 
 // Enllaços antics (/exam/) continuen funcionant
 function LegacyExamRedirect() {
@@ -38,7 +51,17 @@ function App() {
           <Route path="/courses/:courseId/:lessonId/topic" element={<LessonTopic />} />
           <Route path="/courses/:courseId/test/:challengeSlug" element={<TopicTestPage />} />
           <Route path="/courses/:courseId/exam/:challengeSlug" element={<LegacyExamRedirect />} />
-          <Route path="/courses/:courseId/stats" element={<RendimentDashboard />} />
+          <Route path="/courses/:courseId/stats" element={<LegacyStatsRedirect />} />
+          <Route path="/courses/:courseId/surveys" element={<SurveysPage />} />
+          <Route path="/courses/:courseId/surveys/:surveySlug" element={<SurveyPage />} />
+          <Route path="/courses/:courseId/drive" element={<DrivePage />} />
+          <Route path="/courses/:courseId/drive/:folderId" element={<DrivePage />} />
+          <Route path="/courses/:courseId/challenges" element={<ChallengesPage />} />
+          <Route path="/courses/:courseId/challenges/:challengeSlug" element={<ChallengePage />} />
+          <Route path="/courses/:courseId/exams" element={<ExamsPage />} />
+          <Route path="/courses/:courseId/exams/:examSlug" element={<ExamPage />} />
+          <Route path="/courses/:courseId/exams/:examSlug/:lessonId" element={<LessonPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
           <Route path="/dashboards/student" element={<StudentDashboard />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

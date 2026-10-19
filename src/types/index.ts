@@ -12,6 +12,17 @@ export interface Course {
   logoWidth?: number;
   logoHeight?: number;
   content?: Lesson[];
+  isPublic?: boolean;
+  active?: boolean;
+  professors?: string[];
+  /** Rol de l'usuari al curs (`my_role`): 'student' | 'professor' | null. `undefined` si l'API no l'envia. */
+  myRole?: string | null;
+  /** Progrés propi com a alumne (`my_progress`): només a la llista de cursos propis; `null` si no n'hi ha. */
+  myProgress?: { problems: number; completed: number } | null;
+  /** El curs té reptes de ML (`allows_challenges`). `undefined` si l'API no l'envia. */
+  allowsChallenges?: boolean;
+  /** L'alumnat del curs té almenys un examen (obert o tancat) (`has_exams`). `undefined` si l'API no l'envia. */
+  hasExams?: boolean;
 }
 
 export interface Lesson {
@@ -140,4 +151,27 @@ export interface ContactoChat {
   avatar: string;
   mensajes: MensajeChat[];
   ultimoMensaje: string;
+}
+/** Una carpeta del Drive del curs (`GET /courses/{c}/drive/`). */
+export interface DriveFile {
+  id: number;
+  name: string;
+  size: number;
+  kind: string;
+  hidden: boolean;
+  uploaded_at: string;
+}
+
+export interface DriveFolderEntry {
+  id: number;
+  name: string;
+  hidden: boolean;
+}
+
+export interface DriveListing {
+  folder: { id: number; name: string };
+  /** Del Drive (primer) a la carpeta actual (últim) */
+  breadcrumbs: { id: number; name: string }[];
+  folders: DriveFolderEntry[];
+  files: DriveFile[];
 }

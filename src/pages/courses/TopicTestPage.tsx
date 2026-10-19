@@ -6,15 +6,19 @@ import { ChevronLeft, ChevronRight, Zap, CircleCheck, CircleX,} from 'lucide-rea
 import { useTranslation } from 'react-i18next';
 import { resolveSlug } from '../../hooks/useCourse';
 import { courseService, mapProblem } from '../../services/courseService';
+import { examKeys } from '../../services/examService';
 import { refreshCoursePoints } from '../../utils/pointsSync';
+import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { MarkdownContent } from '../../components/MarkdownContent';
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
+  useRecordCourseActivity(courseId);
   const [searchParams] = useSearchParams();
-  const topicParam = searchParams.get('topic');
+  // Dins d'un examen (?exam=): el tema és l'examen i "enrere" hi torna
+  const examParam = searchParams.get('exam');
+  const topicParam = searchParams.get('topic') ?? examParam;
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -127,15 +131,17 @@ export default function TopicTestPage() {
   // Envia la resposta al servidor, que la corregeix i retorna totes les opcions amb la correcció
   const submitAnswers = async (answers: string[]) => {
     if (!courseId || !currentTestSlug || !topicSlug) return;
-    let correct: boolean;
+    // `null` als exàmens: el servidor no diu si la resposta és correcta
+    let correct: boolean | null;
     let review: any[];
     setSubmitting(true);
     setSubmitError(null);
+    let res: any = null;
     try {
-      const res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
+      res = await courseService.submitChallenge(courseSlug, topicSlug, currentTestSlug, {
         answers: answers.map((a) => (/^\d+$/.test(a) ? Number(a) : a)) as any,
       });
-      correct = !!res?.correct;
+      correct = typeof res?.correct === 'boolean' ? res.correct : null;
       review = Array.isArray(res?.choices) ? res.choices : [];
     } catch (error: any) {
       const status = error?.response?.status;
@@ -149,7 +155,12 @@ export default function TopicTestPage() {
 
     setResult({ correct, choices: review, fresh: true });
     saveAnswers({ [answerKey(courseId, currentTestSlug)]: { answers, correct, choices: review } });
-    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct ? 4 : 0);
+    if (isLoggedIn()) void refreshCoursePoints(courseSlug, correct === true ? 4 : 0, 1000, res);
+    if (examParam) {
+      // La nota de l'examen i l'estat dels seus problemes (llista d'exàmens i pàgina de l'examen)
+      void queryClient.invalidateQueries({ queryKey: examKeys.list(courseSlug) });
+      void queryClient.invalidateQueries({ queryKey: ['topic-problems', courseSlug, topicSlug] });
+    }
   };
 
   const handleCheckboxChange = (value: string, checked: boolean) => {
@@ -177,7 +188,8 @@ export default function TopicTestPage() {
     // La URL segueix el test actual (per recarregar o compartir) sense tornar a carregar la pàgina
     const slug = topicTests[idx]?.problemSlug;
     if (slug && courseId && topicSlug) {
-      window.history.replaceState(window.history.state, '', `/courses/${courseId}/test/${slug}?topic=${encodeURIComponent(topicSlug)}`);
+      const query = examParam ? `exam=${encodeURIComponent(examParam)}` : `topic=${encodeURIComponent(topicSlug)}`;
+      window.history.replaceState(window.history.state, '', `/courses/${courseId}/test/${slug}?${query}`);
     }
   };
 
@@ -209,7 +221,8 @@ export default function TopicTestPage() {
   }
 
   const title = topicTest.title || topicTest.name || getText(topicTest.subtitle) || currentTestSlug;
-  const statement = topicTest.statement_ca || topicTest.statement || topicTest.description || getText(topicTest.text) || '';
+  // `statement` arriba de mapProblem com a objecte per idioma ({ ca, es, en }): cal triar-ne el text
+  const statement = getText(topicTest.statement) || getText(topicTest.text) || '';
   const choices: any[] = topicTest.choices || [];
 
   const isMultiChoice = topicTest.choiceType
@@ -218,6 +231,8 @@ export default function TopicTestPage() {
 
   // ---- Feedback just després d'enviar ----
   const answered = !!result;
+  // Exàmens: només es diu que s'ha enviat, mai si és correcta (ni quines opcions ho són)
+  const revealed = answered && typeof result.correct === 'boolean';
 
   // Si el backend retorna result.choices el fem servir; si no, caiem a les opcions locals
   const reviewChoices: any[] = Array.isArray(result?.choices) ? result.choices : [];
@@ -225,7 +240,7 @@ export default function TopicTestPage() {
   const correctIds = new Set<string>(correctChoices.map((c: any) => String(c.id)));
 
   const choiceState = (value: string): 'correct' | 'wrong' | null => {
-    if (!answered) return null;
+    if (!revealed) return null;
     if (correctIds.has(value)) return 'correct';
     if (selectedAnswers.includes(value)) return 'wrong';
     return null;
@@ -259,7 +274,7 @@ export default function TopicTestPage() {
 
   // Explicació del professor (si n'hi ha), un cop respost
   const choiceExplanation = (value: string) => {
-    if (!answered) return null;
+    if (!revealed) return null;
     const review = reviewChoices.find((c: any) => String(c.id) === value);
     const explanation = review?.explanation_html || review?.explanationHtml || '';
     if (!explanation) return null;
@@ -272,9 +287,15 @@ export default function TopicTestPage() {
       <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
         {/* Botó de tornar enrere */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
-            {getText(courseTitle) || t('lesson.back', 'Tornar')}
-          </Button>
+          {examParam ? (
+            <Button component={RouterLink} to={`/courses/${courseId}/exams/${encodeURIComponent(examParam)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              {t('exams.back_to_exam')}
+            </Button>
+          ) : (
+            <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+              {getText(courseTitle) || t('lesson.back', 'Tornar')}
+            </Button>
+          )}
         </Box>
 
         {/* Títol principal */}
@@ -286,9 +307,9 @@ export default function TopicTestPage() {
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3, mb: 3 }}>
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('topic_test.statement', 'Enunciat')}</Typography>
-            <Box sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{statement}</ReactMarkdown>
-            </Box>
+            <MarkdownContent fontSize="1rem" sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
+              {statement}
+            </MarkdownContent>
           </Paper>
 
           <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
@@ -309,11 +330,14 @@ export default function TopicTestPage() {
                 <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                   {topicTests.map((st: any, idx: number) => {
                     const saved = savedAnswers[`${courseId}_${st.problemSlug}`];
-                    const status = saved?.correct === true ? true : saved?.correct === false ? 'attempted' : null;
+                    const status = saved?.correct === true ? true : saved?.correct === false ? 'attempted'
+                      : saved ? 'submitted' : null;
                     const isCurrent = idx === currentIdx;
-                    const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main : null;
+                    const color = status === true ? theme.palette.success.main : status === 'attempted' ? theme.palette.error.main
+                      : status === 'submitted' ? '#8400ff' : null;
                     const statusLabel = status === true ? t('topic_test.status_correct', 'encertada')
                       : status === 'attempted' ? t('topic_test.status_wrong', 'fallada')
+                      : status === 'submitted' ? t('exams.answer_submitted')
                       : t('topic_test.status_pending', 'pendent');
                     return (
                       <ButtonBase
@@ -341,7 +365,10 @@ export default function TopicTestPage() {
             <Box ref={resultRef} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, fontWeight: 900, fontSize: { xs: '1.1rem', md: '1.25rem' } }}>
                 {/* Resultat global del test: icona al costat del títol, sense línies extra */}
-                {answered && result.correct !== null && (
+                {answered && !revealed && (
+                  <Typography component="span" sx={{ fontWeight: 800, color: '#8400ff', fontSize: '0.9rem' }}>{t('exams.answer_submitted')}</Typography>
+                )}
+                {revealed && (
                   <Box component="span" role="img"
                     aria-label={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}
                     title={result.correct ? t('topic_test.result_correct', 'Resposta correcta') : t('topic_test.result_wrong', 'Resposta incorrecta')}

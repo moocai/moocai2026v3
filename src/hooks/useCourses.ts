@@ -2,10 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { Course } from '../types';
 import { courseService } from '../services/courseService';
 
-// Les mateixes queryKey que `useCourse` (['course', slug]) i que la portada,
-// de manera que la cache de React Query es comparteix entre el prefetch del
-// MainLayout, la portada, el dashboard i les pàgines de lliçó: una sola
-// petició per curs encara que s'obri des de llocs diferents.
+// Les mateixes queryKey que `useCourse` (['course', slug]): la cache de React
+// Query es comparteix entre la portada, el dashboard i les pàgines del curs.
+// Res no es precarrega: cada pàgina demana (amb `enabled`) només el que mostra.
 export const ALL_COURSES_KEY = ['courses'] as const;
 export const PUBLIC_COURSES_KEY = ['public-courses'] as const;
 
@@ -45,14 +44,5 @@ export function useCourseDetail(slug: string | undefined) {
     staleTime: DETAIL_STALE_TIME,
     gcTime: DETAIL_GC_TIME,
     retry: 1,
-  });
-}
-
-export function prefetchAllCourses(queryClient: any) {
-  return queryClient.prefetchQuery({
-    queryKey: ALL_COURSES_KEY,
-    queryFn: () => courseService.getAllCourses(),
-    staleTime: LIST_STALE_TIME,
-    gcTime: LIST_GC_TIME,
   });
 }

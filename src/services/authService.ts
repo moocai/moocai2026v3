@@ -1,6 +1,7 @@
 import { registerUser, type RegisterPayload } from './register';
 import { publicClient } from './httpClient';
-import { clearSavedTestAnswers } from './testAnswerStorage';
+import { clearPrivateLocalData } from './testAnswerStorage';
+import { resetSessionCaches } from './sessionCache';
 
 const LOGOUT_TIMEOUT = 5000;
 
@@ -10,9 +11,11 @@ export const authService = {
     const data = response.data;
 
     if (data?.token) {
-      // Respostes d'un altre alumne que no va tancar sessió: fora abans d'entrar
-      clearSavedTestAnswers();
+      // Respostes i codi d'un altre alumne que no va tancar sessió: fora abans d'entrar
+      clearPrivateLocalData();
       localStorage.setItem('token', data.token);
+      // El que s'havia portat amb la sessió anterior (o sense sessió) no és d'aquest usuari
+      resetSessionCaches();
     }
     if (data?.user) {data.user.password = '***';}
 
@@ -26,7 +29,8 @@ export const authService = {
 
     localStorage.removeItem('token');
     localStorage.removeItem('currentStudent');
-    clearSavedTestAnswers();
+    clearPrivateLocalData();
+    resetSessionCaches();
 
     if (token) {
       void publicClient
