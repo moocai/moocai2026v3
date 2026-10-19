@@ -14,6 +14,7 @@ import { StarScore } from './StarScore';
 import { headerHeightFor, isCodingRoute } from '../layouts/headerHeight';
 // Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
 import { usePoints } from '../utils/pointsSync';
+import { useAllCourses } from '../hooks/useCourses';
 const logo = '/img/logo.webp';
 
 /** Pastilla d'estrelles (la puntuació), pensada per anar al costat de l'àvia. */
@@ -44,15 +45,23 @@ export function Header() {
   // Problema de codi: capçalera més baixa perquè l'alumne tingui més espai per al codi
   const compact = isCodingRoute(location.pathname);
   const headerHeight = headerHeightFor(location.pathname);
-  // "Tauler" només dins d'un curs (i al mateix tauler): obre el tauler d'aquell curs
-  const courseInPath = /^\/courses\/([^/]+)/.exec(location.pathname)?.[1];
-  const dashboardTarget = courseInPath
-    ? `/dashboards/student?course=${encodeURIComponent(decodeURIComponent(courseInPath))}`
-    : location.pathname === '/dashboards/student' ? `${location.pathname}${location.search}` : null;
+  // "Tauler" només dins d'un curs (i al mateix tauler): obre el tauler d'aquell curs.
+  // El curs surt de l'adreça: /courses/<curs>/... o, al tauler d'un curs, ?course=<curs>.
+  const onDashboard = location.pathname === '/dashboards/student';
+  const dashboardCourse = onDashboard ? new URLSearchParams(location.search).get('course') : null;
+  const courseInPath = /^\/courses\/([^/]+)/.exec(location.pathname)?.[1]
+    ?? (dashboardCourse ? encodeURIComponent(dashboardCourse) : undefined);
+  const dashboardTarget = onDashboard ? `${location.pathname}${location.search}`
+    : courseInPath ? `/dashboards/student?course=${encodeURIComponent(decodeURIComponent(courseInPath))}` : null;
   // "Enquestes", com a algorien, només dins d'un curs: són de cada curs
   const surveysTarget = courseInPath ? `/courses/${courseInPath}/surveys` : null;
   // "Drive": fitxers generals del curs (els de cada tema són a la pestanya Fitxers del curs)
   const driveTarget = courseInPath ? `/courses/${courseInPath}/drive` : null;
+  // "Reptes" (de ML): només als cursos que en tenen
+  const courses = useAllCourses(isLoggedIn && !!courseInPath);
+  const courseAllowsChallenges = !!courseInPath
+    && courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath))?.allowsChallenges === true;
+  const challengesTarget = courseAllowsChallenges ? `/courses/${courseInPath}/challenges` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
 
@@ -171,6 +180,12 @@ export function Header() {
               </Button>
             )}
 
+            {isLoggedIn && challengesTarget && (
+              <Button onClick={() => navigate(challengesTarget)} sx={commonButtonStyle}>
+                {t('challenges.title')}
+              </Button>
+            )}
+
             {!isLoggedIn && (
               <Button onClick={() => navigate('/dashboards/student')} sx={commonButtonStyle}>{t('auth.access')}</Button>
             )}
@@ -230,6 +245,11 @@ export function Header() {
                 {isLoggedIn && driveTarget && (
                   <Button onClick={() => { navigate(driveTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
                     {t('drive.title')}
+                  </Button>
+                )}
+                {isLoggedIn && challengesTarget && (
+                  <Button onClick={() => { navigate(challengesTarget); setMobileOpen(false); }} sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '1rem', textTransform: 'none' }}>
+                    {t('challenges.title')}
                   </Button>
                 )}
                 {isLoggedIn && (

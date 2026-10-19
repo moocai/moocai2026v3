@@ -31,6 +31,9 @@ interface Course {
   /** El detall del curs el retorna l'API com a `is_public`; les llistes, com `isPublic`. */
   is_public?: boolean;
   isPublic?: boolean;
+  /** El curs té problemes de programació / tests (`allows_coding` / `allows_tests` del detall) */
+  allows_coding?: boolean;
+  allows_tests?: boolean;
 }
 
 export function resolveSlug(courseId: string): string {

@@ -3,6 +3,7 @@ import i18n from '../i18n';
 import { getLocalizedText } from '../utils/formatters';
 import { apiClient } from './httpClient';
 import { applyServerSolutions } from './topicTestAnswers';
+import { onSessionChange } from './sessionCache';
 
 /* ------------------------------------------------------------------ */
 /* Servei                                                             */
@@ -31,6 +32,7 @@ function toCourses(data: unknown): Course[] {
     myRole: c.my_role,
     // Progrés de l'alumne al curs (només a `GET /courses/`); `undefined` amb el backend antic
     myProgress: c.my_progress,
+    allowsChallenges: c.allows_challenges,
   }));
 }
 
@@ -316,3 +318,6 @@ export const courseService = {
     }
   },
 };
+
+// Els detalls dels cursos depenen de qui els demana (temes bloquejats, respostes pròpies…)
+onSessionChange(() => courseService.clearCache());
