@@ -30,6 +30,8 @@ export default {
     click_to_login: "Haz clic para iniciar sesión",
     role_student: "Alumno",
     role_teacher: "Profesor",
+    view_teacher: "Vista de profesor",
+    view_student: "Vista de alumno",
     register_student: "Registrar Alumno",
     register_teacher: "Registrar Profesor",
     points: "estrellas",

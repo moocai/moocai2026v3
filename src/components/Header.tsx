@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon, KeyboardArrowDown as KeyboardArrowDownIcon } from '@mui/icons-material';
+import PersonIcon from '@mui/icons-material/Person';
+import SchoolIcon from '@mui/icons-material/School';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha, Menu, MenuItem } from '@mui/material';
 import { authService } from '../services/authService';
@@ -29,6 +31,30 @@ function PointsBadge({ points }: { points: number }) {
     >
       <StarScore value={points} sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }} />
     </Box>
+  );
+}
+
+/** Botó de capçalera: segons el rol, torna a la vista del propi rol (mai el canvia). */
+function RoleViewButton({ role, onClick }: { role: 'student' | 'teacher'; onClick: () => void }) {
+  const { t } = useTranslation();
+  const label = role === 'teacher' ? t('dashboard.view_teacher') : t('dashboard.view_student');
+  return (
+    <IconButton
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      sx={{
+        width: 40, height: 40,
+        bgcolor: 'action.hover',
+        border: 2,
+        borderColor: 'divider',
+        '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
+      }}
+    >
+      {role === 'teacher'
+        ? <PersonIcon sx={{ fontSize: 24, color: 'primary.main' }} />
+        : <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />}
+    </IconButton>
   );
 }
 
@@ -193,7 +219,7 @@ export function Header() {
               }
               sx={{ ...commonButtonStyle, px: 1.5 }}
             >
-              {navItems.find((item) => item.key === activeNav)?.label ?? t('nav.menu')}
+              {navItems.find((item) => item.key === activeNav)?.label ?? t('Menú')}
             </Button>
             <Menu
               anchorEl={navAnchor}
@@ -223,6 +249,7 @@ export function Header() {
             {!studentName && <LanguageSwitcher />}
             {studentName && <PointsBadge points={points} />}
             {isLoggedIn && <NotificationBell />}
+            {isLoggedIn && <RoleViewButton role={role} onClick={() => handleRoleChange(role)} />}
             {/* Aquí s'integra el menú d'avatar de l'usuari amb la imatge del header */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
@@ -241,6 +268,7 @@ export function Header() {
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
             {isLoggedIn && <NotificationBell />}
+            {isLoggedIn && <RoleViewButton role={role} onClick={() => handleRoleChange(role)} />}
             {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>

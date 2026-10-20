@@ -30,6 +30,8 @@ export default {
     click_to_login: "Click to log in",
     role_student: "Student",
     role_teacher: "Teacher",
+    view_teacher: "Teacher view",
+    view_student: "Student view",
     register_student: "Register Student",
     register_teacher: "Register Teacher",
     points: "stars",
