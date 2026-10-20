@@ -153,6 +153,8 @@ export default function StudentDashboard() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
+  // Rol triat a la pantalla d'entrada: decideix si el compte serà alumne o professor
+  const [loginRole, setLoginRole] = useState<'student' | 'teacher'>('student');
   const [courseTabIndex, setCourseTabIndex] = useState(0);
   // L'àmbit es recupera de seguida (sense esperar les llistes): així només es
   // demana la llista de cursos públics si realment és la que es veu.
@@ -332,15 +334,18 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     setLoginLoading(true);
     try {
       const data = await authService.login(username, password);
-      const role = 'student';
       const student: Student = {
         id: data?.user?.id != null ? String(data.user.id) : username,
         name: data?.user?.name || username,
         email: data?.user?.email || username,
-        role,
+        role: loginRole,
       };
       setSelectedStudent(student);
       localStorage.setItem('currentStudent', JSON.stringify(student));
+      // El rol triat a l'entrada marca la vista: només qui entra com a professor tindrà
+      // accés a l'àrea de professorat (i podrà anar i tornar amb el botó del Header).
+      localStorage.setItem('mooc_role', loginRole);
+      localStorage.setItem('mooc_has_teacher', loginRole === 'teacher' ? 'true' : 'false');
       fetchProgress(student.id);
       courseService.clearCache();
       setUsername("");
@@ -348,7 +353,11 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       setLoginLoading(false);
       addNotification(t('notifications.welcome', { name: student.name }), 'success');
       window.dispatchEvent(new Event('auth-state-change'));
-      await goAfterLogin();
+      if (loginRole === 'teacher') {
+        navigate('/teacher');
+      } else {
+        await goAfterLogin();
+      }
     } catch (err: any) {
       setLoginError(true);
       setLoginLoading(false);
@@ -621,6 +630,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                   onSubmit={handleLogin}
                   error={loginError}
                   loading={loginLoading}
+                  role={loginRole}
+                  onRoleChange={setLoginRole}
                 />
             ) : (
               <>

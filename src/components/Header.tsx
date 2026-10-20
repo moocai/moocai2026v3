@@ -34,13 +34,14 @@ function PointsBadge({ points }: { points: number }) {
   );
 }
 
-/** Botó de capçalera: segons el rol, torna a la vista del propi rol (mai el canvia). */
-function RoleViewButton({ role, onClick }: { role: 'student' | 'teacher'; onClick: () => void }) {
+/** Botó de capçalera: segons el rol, canvia entre la vista de professor i la d'alumne. */
+function RoleViewButton({ role, onClick, disabled }: { role: 'student' | 'teacher'; onClick: () => void; disabled?: boolean }) {
   const { t } = useTranslation();
-  const label = role === 'teacher' ? t('dashboard.view_teacher') : t('dashboard.view_student');
+  const label = role === 'teacher' ? t('dashboard.view_student') : t('dashboard.view_teacher');
   return (
     <IconButton
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
       title={label}
       sx={{
@@ -63,6 +64,9 @@ export function Header() {
   const { mode } = useThemeMode();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
+  // L'accés de professor s'obté a l'entrada (selector de rol del login). Sense ell,
+  // el botó no deixa anar a l'àrea de professorat.
+  const [hasTeacherAccess, setHasTeacherAccess] = useState(() => localStorage.getItem('mooc_has_teacher') === 'true');
   const [studentName, setStudentName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navAnchor, setNavAnchor] = useState<HTMLElement | null>(null);
@@ -134,6 +138,8 @@ export function Header() {
   ];
 
   const handleRoleChange = (newRole: 'student' | 'teacher') => {
+    // Un alumne no pot passar a la vista de professor
+    if (newRole === 'teacher' && !hasTeacherAccess) return;
     setRole(newRole);
     localStorage.setItem('mooc_role', newRole);
     window.dispatchEvent(new Event('auth-state-change'));
@@ -142,6 +148,12 @@ export function Header() {
     } else {
       navigate('/dashboards/student');
     }
+  };
+
+  // El botó del header alterna la vista, però només qui ha entrat com a professor
+  // pot anar a l'àrea de professorat. Un alumne no hi pot saltar.
+  const handleRoleToggle = () => {
+    handleRoleChange(role === 'teacher' ? 'student' : 'teacher');
   };
 
   const checkAuth = () => {
@@ -154,6 +166,7 @@ export function Header() {
     } else {
       setStudentName('');
     }
+    setHasTeacherAccess(localStorage.getItem('mooc_has_teacher') === 'true');
     if (savedRole === 'teacher' || savedRole === 'student') {
       setRole(savedRole);
     }
@@ -179,6 +192,11 @@ export function Header() {
 
   const handleLogout = () => {
     authService.logout();
+    // Sense sessió no es conserva el rol ni l'accés de professor
+    localStorage.removeItem('mooc_role');
+    localStorage.removeItem('mooc_has_teacher');
+    setRole('student');
+    setHasTeacherAccess(false);
     setIsLoggedIn(false);
     setMobileOpen(false);
     window.dispatchEvent(new Event('authChange'));
@@ -249,7 +267,7 @@ export function Header() {
             {!studentName && <LanguageSwitcher />}
             {studentName && <PointsBadge points={points} />}
             {isLoggedIn && <NotificationBell />}
-            {isLoggedIn && <RoleViewButton role={role} onClick={() => handleRoleChange(role)} />}
+            {isLoggedIn && <RoleViewButton role={role} onClick={handleRoleToggle} disabled={!hasTeacherAccess} />}
             {/* Aquí s'integra el menú d'avatar de l'usuari amb la imatge del header */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
@@ -268,7 +286,7 @@ export function Header() {
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
             {isLoggedIn && <NotificationBell />}
-            {isLoggedIn && <RoleViewButton role={role} onClick={() => handleRoleChange(role)} />}
+            {isLoggedIn && <RoleViewButton role={role} onClick={handleRoleToggle} disabled={!hasTeacherAccess} />}
             {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
@@ -327,7 +345,7 @@ export function Header() {
                 <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', width: '100%', height: '44px' }}>
                   <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
                   <Button disableRipple onClick={() => { handleRoleChange('student'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                  <Button disableRipple onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
+                  <Button disableRipple disabled={!hasTeacherAccess} onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
                 </Box>
               )}
 

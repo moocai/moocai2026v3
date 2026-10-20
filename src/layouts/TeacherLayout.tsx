@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { Box, IconButton, Typography, Stack, Avatar } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
@@ -16,12 +16,27 @@ export function TeacherLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
+  // L'accés de professor s'obté triant "Professor" a l'entrada. Un alumne que arriba
+  // aquí per URL no el té i se'l torna al seu tauler.
+  const [hasTeacherAccess] = useState(() => localStorage.getItem('mooc_has_teacher') === 'true');
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 900) setMobileOpen(false); };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    // Només es marca el rol de professor si realment es té accés; si no, el guard
+    // de sota redirigeix i no s'ha de tocar el rol (evita bucles amb MainLayout).
+    if (!hasTeacherAccess) return;
+    localStorage.setItem('mooc_role', 'teacher');
+    window.dispatchEvent(new Event('auth-state-change'));
+  }, [hasTeacherAccess]);
+
+  if (!hasTeacherAccess) {
+    return <Navigate to="/dashboards/student" replace />;
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: isFancy ? 'transparent' : 'background.default' }}>
@@ -56,7 +71,12 @@ export function TeacherLayout() {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <ThemeToggleButton />
             <IconButton
-              onClick={() => navigate('/dashboards/student')}
+              onClick={() => {
+                // Canvia a vista d'alumne: el rol passa a 'student' i el Header podrà tornar
+                localStorage.setItem('mooc_role', 'student');
+                window.dispatchEvent(new Event('auth-state-change'));
+                navigate('/dashboards/student');
+              }}
               sx={{
                 width: 40, height: 40,
                 bgcolor: 'action.hover',
