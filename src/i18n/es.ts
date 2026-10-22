@@ -506,7 +506,6 @@ export default {
     invitacionEnviando: "Enviando...",
     invitacionEnviada: "Invitación enviada a {{email}}",
     invitacionError: "Error al enviar la invitación",
-    vistaEstudiante: "Vista de estudiante",
     codigoEjecutado: "✅ Código ejecutado correctamente"
   },
   lesson: {

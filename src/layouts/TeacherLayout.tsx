@@ -10,6 +10,8 @@ import { Sidebar } from '../features/teacher/Sidebar';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import { ChatWidget } from '../features/teacher/ChatWidget';
 import { useThemeMode } from '../hooks/useTheme';
+import { useAllCourses } from '../hooks/useCourses';
+import { isCourseProfessor, studentViewPath } from '../utils/courseRole';
 
 export function TeacherLayout() {
   const navigate = useNavigate();
@@ -18,9 +20,11 @@ export function TeacherLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
-  // L'accés de professor s'obté triant "Professor" a l'entrada. Un alumne que arriba
-  // aquí per URL no el té i se'l torna al seu tauler.
-  const [hasTeacherAccess] = useState(() => localStorage.getItem('mooc_has_teacher') === 'true');
+  // L'àrea de professorat és per a qui és professor d'algun curs (el rol és per curs).
+  // Qui no ho és de cap (p. ex. un alumne que hi arriba per URL) torna a la portada.
+  const isLoggedIn = !!localStorage.getItem('token');
+  const courses = useAllCourses(isLoggedIn);
+  const hasTeacherAccess = !!courses.data?.some(isCourseProfessor);
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 900) setMobileOpen(false); };
@@ -28,16 +32,12 @@ export function TeacherLayout() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    // Només es marca el rol de professor si realment es té accés; si no, el guard
-    // de sota redirigeix i no s'ha de tocar el rol (evita bucles amb MainLayout).
-    if (!hasTeacherAccess) return;
-    localStorage.setItem('mooc_role', 'teacher');
-    window.dispatchEvent(new Event('auth-state-change'));
-  }, [hasTeacherAccess]);
-
-  if (!hasTeacherAccess) {
+  if (!isLoggedIn) {
     return <Navigate to="/dashboards/student" replace />;
+  }
+  if (courses.isPending) return null;
+  if (!hasTeacherAccess) {
+    return <Navigate to="/" replace />;
   }
 
   return (
@@ -74,10 +74,9 @@ export function TeacherLayout() {
             <ThemeToggleButton />
             <IconButton
               onClick={() => {
-                // Canvia a vista d'alumne: el rol passa a 'student' i el Header podrà tornar
-                localStorage.setItem('mooc_role', 'student');
-                window.dispatchEvent(new Event('auth-state-change'));
-                navigate('/dashboards/student');
+                // Vista d'alumne del curs triat (des d'allà el Header permet tornar-hi)
+                const slug = localStorage.getItem('teacher_selected_course');
+                navigate(slug ? studentViewPath(slug) : '/');
               }}
               sx={{
                 width: 40, height: 40,
@@ -86,8 +85,8 @@ export function TeacherLayout() {
                 borderColor: 'divider',
                 '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
               }}
-              title={t('teacher.vistaEstudiante')}
-              aria-label={t('teacher.vistaEstudiante')}
+              title={t('dashboard.view_student')}
+              aria-label={t('dashboard.view_student')}
             >
               <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />
             </IconButton>

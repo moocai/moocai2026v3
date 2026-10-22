@@ -496,7 +496,6 @@ export default {
     invitacionEnviando: "Enviant...",
     invitacionEnviada: "Invitació enviada a {{email}}",
     invitacionError: "No s'ha pogut enviar la invitació",
-    vistaEstudiante: "Vista d'alumne",
     codigoEjecutado: "✅ Codi executat correctament"
   },
   lesson: {

@@ -498,7 +498,6 @@ export default {
     invitacionEnviando: "Sending...",
     invitacionEnviada: "Invitation sent to {{email}}",
     invitacionError: "The invitation couldn't be sent",
-    vistaEstudiante: "Student view",
     codigoEjecutado: "✅ Code ran successfully"
   },
   lesson: {
