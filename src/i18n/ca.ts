@@ -30,7 +30,8 @@ export default {
     confirm_password: "Confirma la contrasenya",
     passwords_mismatch: "Les contrasenyes no coincideixen",
     register_error: "No s'ha pogut crear el compte. Revisa les dades.",
-    register_submit: "Crear"
+    register_submit: "Crear",
+    forgot_error: "No s'ha pogut enviar el correu. Revisa l'adreça i torna-ho a provar."
   },
     dashboard: {
     last_session: "Última sessió",

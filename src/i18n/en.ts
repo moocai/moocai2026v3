@@ -30,7 +30,8 @@ export default {
     confirm_password: "Confirm password",
     passwords_mismatch: "The passwords don't match",
     register_error: "The account couldn't be created. Check the details.",
-    register_submit: "Create"
+    register_submit: "Create",
+    forgot_error: "We couldn't send the email. Check the address and try again."
   },
     dashboard: {
     last_session: "Last session",

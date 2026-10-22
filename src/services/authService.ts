@@ -27,6 +27,15 @@ export const authService = {
 
   register: (payload: RegisterPayload) => registerUser(payload),
 
+  /**
+   * `POST /auth/password-reset/`: el servidor envia un enllaç per triar una contrasenya nova
+   * (si l'adreça és d'un compte amb el correu confirmat). Respon igual (202) tant si n'hi ha
+   * com si no, per no revelar quines adreces tenen compte.
+   */
+  requestPasswordReset: async (email: string) => {
+    await publicClient.post('/auth/password-reset/', { email });
+  },
+
   logout: () => {
     const token = localStorage.getItem('token');
 
