@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { Box, IconButton, Button, Typography, Stack } from '@mui/material';
+import { Navigate, Outlet, useParams } from 'react-router-dom';
+import { Box, IconButton, Typography, Stack, CircularProgress } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 const logo = '/img/logo.webp';
 import { Sidebar } from '../features/teacher/Sidebar';
@@ -8,33 +8,31 @@ import { LanguageSwitcher } from '../components/LanguageSwitcher';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import { ChatWidget } from '../features/teacher/ChatWidget';
 import { useThemeMode } from '../hooks/useTheme';
-import { useTranslation } from 'react-i18next';
+import { CourseViewToggle } from '../components/CourseViewToggle';
+import { useCourseRole } from '../hooks/useCourseRole';
 
 export function TeacherLayout() {
-  const { t } = useTranslation();
-  const navigate = useNavigate();
+  const { courseId } = useParams();
+  const { isProfessor, isLoading } = useCourseRole(courseId);
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
-
-  const handleRoleChange = (newRole: 'student' | 'teacher') => {
-    setRole(newRole);
-    localStorage.setItem('mooc_role', newRole);
-    window.dispatchEvent(new Event('auth-state-change'));
-    if (newRole === 'teacher') {
-      navigate('/teacher');
-    } else {
-      navigate('/dashboards/student');
-    }
-  };
 
   useEffect(() => {
     const handleResize = () => { if (window.innerWidth >= 900) setMobileOpen(false); };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  if (isLoading) return (
+    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <CircularProgress color="primary" />
+    </Box>
+  );
+
+  // The teacher view is only for professors of this course; anyone else gets the student view.
+  if (!isProfessor) return <Navigate to={`/courses/${courseId}`} replace />;
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: isFancy ? 'transparent' : 'background.default' }}>
@@ -67,11 +65,7 @@ export function TeacherLayout() {
             </Stack>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '8px', p: 0.3, position: 'relative', width: '130px', height: '32px' }}>
-              <Box sx={{ position: 'absolute', top: 3, bottom: 3, left: role === 'student' ? 3 : 'calc(50% + 1px)', width: 'calc(50% - 4px)', bgcolor: 'primary.main', borderRadius: '6px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-              <Button disableRipple onClick={() => handleRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-              <Button disableRipple onClick={() => handleRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-            </Box>
+            <CourseViewToggle />
             <LanguageSwitcher />
             <ThemeToggleButton />
           </Box>

@@ -10,9 +10,9 @@ export function TeacherDashboard() {
   const navigate = useNavigate();
 
   const actions = [
-    { label: t('teacher.gestionarEstudiantes'), desc: t('teacher.gestionarEstudiantesDesc'), icon: <PeopleIcon sx={{ fontSize: 40 }} />, path: '/teacher/students' },
-    { label: t('teacher.corregirEjercicios'), desc: t('teacher.corregirEjerciciosDesc'), icon: <AssignmentIcon sx={{ fontSize: 40 }} />, path: '/teacher/exercises' },
-    { label: t('teacher.gestionarHackathon'), desc: t('teacher.gestionarHackathonDesc'), icon: <CodeIcon sx={{ fontSize: 40 }} />, path: '/teacher/hackathon' },
+    { label: t('teacher.gestionarEstudiantes'), desc: t('teacher.gestionarEstudiantesDesc'), icon: <PeopleIcon sx={{ fontSize: 40 }} />, path: 'students' },
+    { label: t('teacher.corregirEjercicios'), desc: t('teacher.corregirEjerciciosDesc'), icon: <AssignmentIcon sx={{ fontSize: 40 }} />, path: 'exercises' },
+    { label: t('teacher.gestionarHackathon'), desc: t('teacher.gestionarHackathonDesc'), icon: <CodeIcon sx={{ fontSize: 40 }} />, path: 'hackathon' },
   ];
 
   return (

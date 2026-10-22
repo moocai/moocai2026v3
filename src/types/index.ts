@@ -12,6 +12,7 @@ export interface Course {
   logoWidth?: number;
   logoHeight?: number;
   content?: Lesson[];
+  myRole?: 'student' | 'professor' | null;
 }
 
 export interface Lesson {

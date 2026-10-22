@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { ThemeToggleButton } from './ThemeToggleButton';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import { useThemeMode } from '../hooks/useTheme';
+import { CourseViewToggle } from './CourseViewToggle';
 const logo = '/img/logo.webp';
 
 export function Header() {
@@ -16,7 +17,6 @@ export function Header() {
   const theme = useTheme();
   const { mode } = useThemeMode();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -39,25 +39,10 @@ export function Header() {
     }
   };
 
-  const handleRoleChange = (newRole: 'student' | 'teacher') => {
-    setRole(newRole);
-    localStorage.setItem('mooc_role', newRole);
-    window.dispatchEvent(new Event('auth-state-change'));
-    if (newRole === 'teacher') {
-      navigate('/teacher');
-    } else {
-      navigate('/dashboards/student');
-    }
-  };
-
   const checkAuth = () => {
     const token = localStorage.getItem('token');
     const currentStudent = localStorage.getItem('currentStudent');
-    const savedRole = localStorage.getItem('mooc_role') as 'student' | 'teacher' | null;
     setIsLoggedIn(!!token || !!currentStudent);
-    if (savedRole === 'teacher' || savedRole === 'student') {
-      setRole(savedRole);
-    }
   };
 
   useEffect(() => {
@@ -119,13 +104,10 @@ export function Header() {
               {t('footer.courses')}
             </Button>
 
+            <CourseViewToggle />
+
             {isLoggedIn ? (
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '8px', p: 0.3, position: 'relative', width: '130px', height: '32px' }}>
-                  <Box sx={{ position: 'absolute', top: 3, bottom: 3, left: role === 'student' ? 3 : 'calc(50% + 1px)', width: 'calc(50% - 4px)', bgcolor: 'primary.main', borderRadius: '6px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-                  <Button disableRipple onClick={() => handleRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                  <Button disableRipple onClick={() => handleRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '6px', fontWeight: 800, fontSize: '0.7rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', minWidth: 0, '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-                </Box>
                 <Button component={RouterLink} to="/dashboards/student" startIcon={<GraduationCap size={18} />} sx={{ fontWeight: 800, color: 'text.primary', textTransform: 'none', px: 2, height: 40, bgcolor: theme.palette.mode === 'light' ? alpha(theme.palette.primary.main, 0.15) : 'action.hover', borderRadius: '12px' }}>
                   {t('dashboard.my_progress')}
                 </Button>
@@ -164,13 +146,9 @@ export function Header() {
 
               {/* 2. Accedir / Progress */}
               <Stack spacing={2} sx={{ width: '100%' }}>
+                <CourseViewToggle size="large" onChange={() => setMobileOpen(false)} />
                 {isLoggedIn ? (
                   <>
-                    <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', width: '100%', height: '44px' }}>
-                      <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-                      <Button disableRipple onClick={() => { handleRoleChange('student'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                      <Button disableRipple onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-                    </Box>
                     <Button fullWidth component={RouterLink} to="/dashboards/student" startIcon={<GraduationCap />} onClick={() => setMobileOpen(false)} sx={{ fontWeight: 800, borderRadius: '12px', py: 2, color: 'text.primary', bgcolor: theme.palette.mode === 'light' ? alpha(theme.palette.primary.main, 0.08) : 'action.hover', fontSize: '1.1rem' }}>
                       {t('dashboard.my_progress')}
                     </Button>

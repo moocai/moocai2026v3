@@ -8,8 +8,6 @@ import { type FormEvent } from 'react';
 
 interface LoginProps {
   students: Student[];
-  newRole: 'student' | 'teacher';
-  onRoleChange: (role: 'student' | 'teacher') => void;
   showCreateForm: boolean;
   onShowCreateForm: (show: boolean) => void;
   newName: string;
@@ -26,8 +24,6 @@ interface LoginProps {
 
 export function Login({
   students,
-  newRole,
-  onRoleChange,
   showCreateForm,
   onShowCreateForm,
   newName,
@@ -48,11 +44,6 @@ export function Login({
     <motion.div key="login" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center', justifyContent: 'center', mb: 3, mt: 3 }}>
         <Typography variant="h6" sx={{ fontWeight: 900 }}>{t('dashboard.title')}</Typography>
-        <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '10px', p: 0.5, position: 'relative', width: '200px', height: '36px', cursor: 'pointer' }}>
-          <Box sx={{ position: 'absolute', top: 3, bottom: 3, left: newRole === 'student' ? 3 : 'calc(50% + 1px)', width: 'calc(50% - 4px)', bgcolor: 'primary.main', borderRadius: '8px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-          <Button disableRipple onClick={() => onRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '8px', fontWeight: 800, fontSize: '0.75rem', textTransform: 'none', color: newRole === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-          <Button disableRipple onClick={() => onRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '8px', fontWeight: 800, fontSize: '0.75rem', textTransform: 'none', color: newRole === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-        </Box>
       </Stack>
 
       <Box sx={{flex: 1,overflowY: 'auto',overflowX: 'hidden',pb: 2,}}>
@@ -65,7 +56,7 @@ export function Login({
                 <UserPlus size={20} color={theme.palette.text.secondary} />
               </Box>
               <Typography variant="body1" sx={{ fontWeight: 900, color: 'text.secondary' }}>
-                {newRole === 'teacher' ? t('dashboard.create_teacher_title') : t('dashboard.create_user_title')}
+                {t('dashboard.create_profile_title')}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5, textAlign: 'center' }}>
                 {t('dashboard.click_to_login')}
@@ -77,23 +68,18 @@ export function Login({
                 <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <UserPlus size={18} color={theme.palette.primary.main} />
-                    <Typography variant="h6" sx={{ fontWeight: 900 }}>{newRole === 'teacher' ? t('dashboard.create_teacher_title') : t('dashboard.create_user_title')}</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 900 }}>{t('dashboard.create_profile_title')}</Typography>
                   </Stack>
                   <IconButton size="small" onClick={() => onShowCreateForm(false)} sx={{ color: 'text.secondary' }}><X size={18} /></IconButton>
                 </Stack>
 
-                <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative' }}>
-                  <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: newRole === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s ease' }} />
-                  <Button type="button" disableRipple onClick={() => onRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', py: 0.75, fontWeight: 800, fontSize: '0.8rem', textTransform: 'none', color: newRole === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                  <Button type="button" disableRipple onClick={() => onRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', py: 0.75, fontWeight: 800, fontSize: '0.8rem', textTransform: 'none', color: newRole === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-                </Box>
 
                 <TextField fullWidth label={t('dashboard.name_label')} variant="filled" value={newName} onChange={e => onNewNameChange(e.target.value)} required sx={{ '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } }} />
                 <TextField fullWidth label={t('dashboard.email_label')} variant="filled" value={newEmail} onChange={e => onNewEmailChange(e.target.value)} required sx={{ '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } }} />
                 <TextField fullWidth label={t('dashboard.pin_label')} variant="filled" type="password" value={newPin} onChange={e => onNewPinChange(e.target.value)} required slotProps={{ htmlInput: { maxLength: 20 } }} sx={{ '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } }} />
 
                 <Button type="submit" variant="contained" fullWidth sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-                  {newRole === 'teacher' ? 'Registrar Professor' : 'Registrar Estudiant'}
+                  {t('dashboard.register_profile')}
                 </Button>
               </Stack>
             </Card>
@@ -104,8 +90,7 @@ export function Login({
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Box sx={{display: 'grid',gridTemplateColumns: { xs: 'repeat(2, 1fr)', md: 'repeat(auto-fill, minmax(200px, 1fr))' },gap: 3,alignItems: 'start',mt:2}}>
-            {students.filter(s => newRole === 'teacher' ? s.role === 'teacher' : (s.role === 'student' || !s.role))
-              .map(s => (<Box key={s.id} sx={{ minWidth: 0 }}><StudentCard student={s} onLogin={onLogin} onDelete={onDeleteStudent} error={errorId === s.id} /></Box>))}
+            {students.map(s => (<Box key={s.id} sx={{ minWidth: 0 }}><StudentCard student={s} onLogin={onLogin} onDelete={onDeleteStudent} error={errorId === s.id} /></Box>))}
           </Box>
         </Box>
 

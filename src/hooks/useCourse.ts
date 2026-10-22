@@ -27,6 +27,7 @@ interface Course {
   content: Lesson[];
   disabled?: boolean;
   slug?: string;
+  my_role?: 'student' | 'professor' | null;
 }
 
 export function useCourse(courseId: string | undefined) {

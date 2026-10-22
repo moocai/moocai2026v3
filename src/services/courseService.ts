@@ -40,6 +40,7 @@ export const courseService = {
       level: '',
       duration: '',
       instructor: '',
+      myRole: c.my_role ?? null,
     }));
   },
 

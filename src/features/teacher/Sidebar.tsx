@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { Box, List, ListItemButton, ListItemIcon, ListItemText, IconButton, Divider, Collapse } from '@mui/material';
 import HomeIcon from '@mui/icons-material/Home';
 import PeopleIcon from '@mui/icons-material/People';
@@ -28,15 +28,15 @@ interface MenuItem {
 }
 
 const teacherMenu: MenuItem[] = [
-  { href: '/teacher', labelKey: 'teacher.inicio', icon: 'home' },
-  { href: '/teacher/students', labelKey: 'teacher.estudiantes', icon: 'users' },
+  { href: '', labelKey: 'teacher.inicio', icon: 'home' },
+  { href: '/students', labelKey: 'teacher.estudiantes', icon: 'users' },
   { labelKey: 'teacher.zonaEducativa', icon: 'book', children: [
-    { href: '/teacher/exercises', labelKey: 'teacher.ejercicios', icon: 'code' },
-    { href: '/teacher/exercises/list', labelKey: 'teacher.listaEjercicios', icon: 'clipboard' },
+    { href: '/exercises', labelKey: 'teacher.ejercicios', icon: 'code' },
+    { href: '/exercises/list', labelKey: 'teacher.listaEjercicios', icon: 'clipboard' },
   ]},
-  { href: '/teacher/hackathon', labelKey: 'teacher.hackathon', icon: 'code' },
-  { href: '/teacher/courses', labelKey: 'teacher.cursos', icon: 'book' },
-  { href: '/teacher/invite', labelKey: 'teacher.invitar', icon: 'mail' },
+  { href: '/hackathon', labelKey: 'teacher.hackathon', icon: 'code' },
+  { href: '/courses', labelKey: 'teacher.cursos', icon: 'book' },
+  { href: '/invite', labelKey: 'teacher.invitar', icon: 'mail' },
 ];
 
 function SidebarIcon({ icon, isActive }: { icon: string; isActive: boolean }) {
@@ -56,7 +56,10 @@ function SidebarIcon({ icon, isActive }: { icon: string; isActive: boolean }) {
 export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const { courseId } = useParams();
   const { t } = useTranslation();
+  // Menu hrefs are relative to the teacher view of the current course.
+  const base = `/teacher/${courseId}`;
   const [submenuOpen, setSubmenuOpen] = useState(() => localStorage.getItem('teacher_submenu') === 'true');
 
   useEffect(() => {
@@ -65,16 +68,16 @@ export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarPr
 
   const handleNav = (href: string) => {
     onNavigate?.();
-    navigate(href);
+    navigate(base + href);
   };
 
-  const isActive = (href: string) => location.pathname === href;
+  const isActive = (href: string) => location.pathname === base + href;
 
   return (
     <Box sx={{ height: '100%', width: isCollapsed ? 64 : 256, bgcolor: 'background.paper', borderRight: 1, borderColor: 'divider', display: 'flex', flexDirection: 'column', transition: 'width 0.3s', overflow: 'hidden' }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: isCollapsed ? 'center' : 'space-between', p: 1.5, minHeight: 56 }}>
         {!isCollapsed && (
-          <Box onClick={() => handleNav('/teacher')} sx={{ fontWeight: 700, fontSize: 18, textDecoration: 'none', color: 'text.primary', cursor: 'pointer' }}>
+          <Box onClick={() => handleNav('')} sx={{ fontWeight: 700, fontSize: 18, textDecoration: 'none', color: 'text.primary', cursor: 'pointer' }}>
             {t('teacher.appName')}
           </Box>
         )}
@@ -125,7 +128,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse, onNavigate }: SidebarPr
         })}
       </List>
       <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-        <ListItemButton onClick={() => { localStorage.removeItem('currentStudent'); localStorage.removeItem('mooc_role'); navigate('/dashboards/student'); }} sx={{ borderRadius: 1, mx: 0.5, my: 0.5, justifyContent: isCollapsed ? 'center' : 'flex-start', py: 0.75 }}>
+        <ListItemButton onClick={() => { localStorage.removeItem('currentStudent'); navigate('/dashboards/student'); }} sx={{ borderRadius: 1, mx: 0.5, my: 0.5, justifyContent: isCollapsed ? 'center' : 'flex-start', py: 0.75 }}>
           <ListItemIcon sx={{ minWidth: isCollapsed ? 0 : 40 }}>
             <LogoutIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
           </ListItemIcon>

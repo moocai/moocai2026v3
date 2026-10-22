@@ -38,7 +38,6 @@ export default function StudentDashboard() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPin, setNewPin] = useState("");
-  const [newRole, setNewRole] = useState<'student' | 'teacher'>('student');
 
   const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
   const getText = (field: any): string => {
@@ -132,13 +131,13 @@ export default function StudentDashboard() {
   const handleCreateStudent = (e: FormEvent) => {
     e.preventDefault();
     if (!newName || !newEmail || !newPin) return;
-    const newStudent = { id: `local-${Date.now()}`, name: newName, email: newEmail, code: newPin, role: newRole };
+    const newStudent = { id: `local-${Date.now()}`, name: newName, email: newEmail, code: newPin };
     const updatedLocal = [...JSON.parse(localStorage.getItem('mooc_local_students') || '[]'), newStudent];
     localStorage.setItem('mooc_local_students', JSON.stringify(updatedLocal));
     setStudents(prev => [...prev, newStudent]);
-    setNewName(""); setNewEmail(""); setNewPin(""); setNewRole("student");
+    setNewName(""); setNewEmail(""); setNewPin("");
     setShowCreateForm(false);
-    addNotification(t('notifications.account_created', { name: newName, role: newRole }), 'success');
+    addNotification(t('notifications.account_created', { name: newName }), 'success');
     window.dispatchEvent(new Event('studentsUpdated'));
   };
 
@@ -150,7 +149,7 @@ export default function StudentDashboard() {
     const localOnly = JSON.parse(localStorage.getItem('mooc_local_students') || '[]');
     localStorage.setItem('mooc_local_students', JSON.stringify(localOnly.filter((s: any) => s.id !== id)));
     setStudents(prev => prev.filter(s => s.id !== id));
-    addNotification(t('notifications.user_deleted', { name: target.name, role: target.role || 'student' }), 'info');
+    addNotification(t('notifications.user_deleted', { name: target.name }), 'info');
     window.dispatchEvent(new Event('studentsUpdated'));
     if (selectedStudent?.id === id) {handleLogoutAction();}
     return true;
@@ -163,17 +162,12 @@ export default function StudentDashboard() {
       setTimeout(() => setErrorId(null), 500);
       return; 
     }
-    if (student.role === 'teacher') {
-      localStorage.setItem('mooc_role', 'teacher');
-      window.dispatchEvent(new Event('auth-state-change'));
-      navigate('/teacher');
-    } else {
-      setSelectedStudent(student);
-      localStorage.setItem('currentStudent', JSON.stringify(student));
-      fetchProgress(student.id);
-      addNotification(t('notifications.welcome', { name: student.name }), 'success');
-      window.dispatchEvent(new Event('auth-state-change'));
-    }
+    // Login is role-agnostic: whether the user teaches or studies is decided per course.
+    setSelectedStudent(student);
+    localStorage.setItem('currentStudent', JSON.stringify(student));
+    fetchProgress(student.id);
+    addNotification(t('notifications.welcome', { name: student.name }), 'success');
+    window.dispatchEvent(new Event('auth-state-change'));
   };
 
   const handleLogoutAction = () => {
@@ -243,8 +237,6 @@ export default function StudentDashboard() {
           {!selectedStudent ? (
                 <Login
                   students={students}
-                  newRole={newRole}
-                  onRoleChange={(role) => setNewRole(role)}
                   showCreateForm={showCreateForm}
                   onShowCreateForm={(show) => setShowCreateForm(show)}
                   newName={newName}

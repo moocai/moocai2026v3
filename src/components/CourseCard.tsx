@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { prefetchCourse } from '../hooks/useCourse';
 import { courseImages } from '../data/courses';
 
-interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
+interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean; myRole?: 'student' | 'professor' | null;}
 
 function getLocalizedText(text: string | { ca: string; es: string; en: string }, lang: string): string {
   if (typeof text === 'string') return text;
@@ -29,7 +29,8 @@ export function CourseCard({ course, index }: CourseCardProps) {
     if (course.disabled) return;
     e.preventDefault();
     e.stopPropagation();
-    navigate(`/courses/${course.id}`);
+    // Professors land on the teacher view of their course; everyone else on the student view.
+    navigate(course.myRole === 'professor' ? `/teacher/${course.id}` : `/courses/${course.id}`);
   };
   const logoW = course.logoWidth || course.logoSize || 100;
   const logoH = course.logoHeight || course.logoSize || 100;
