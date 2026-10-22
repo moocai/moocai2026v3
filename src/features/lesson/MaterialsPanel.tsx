@@ -26,7 +26,7 @@ export function MaterialsPanel({ courseId, topicSlug, problemSlug }: {
   problemSlug?: string;
 }) {
   const { t, i18n } = useTranslation();
-  const lang = getBaseLanguage(i18n.language, 'ca');
+  const lang = getBaseLanguage(i18n.language);
   const slug = resolveSlug(courseId);
   const { data: course, isLoading } = useCourse(courseId);
   const topics: any[] = course?.content ?? [];

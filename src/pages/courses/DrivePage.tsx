@@ -99,7 +99,7 @@ export default function DrivePage() {
         ) : (
           <Box sx={{ border: '2px solid', borderColor: ACCENT, borderRadius: 3, bgcolor: 'background.paper', overflow: 'hidden', mb: 4 }}>
             {/* Camí: Drive › carpeta › subcarpeta */}
-            <Stack direction="row" component="nav" aria-label="breadcrumb" sx={{ alignItems: 'center', flexWrap: 'wrap', px: 2, py: 1.5, gap: 0.5 }}>
+            <Stack direction="row" component="nav" aria-label={t('nav.breadcrumb')} sx={{ alignItems: 'center', flexWrap: 'wrap', px: 2, py: 1.5, gap: 0.5 }}>
               {crumbs.map((c, i) => {
                 const last = i === crumbs.length - 1;
                 const label = i === 0 ? t('drive.title') : c.name;

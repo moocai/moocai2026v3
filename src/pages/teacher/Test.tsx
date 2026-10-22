@@ -8,6 +8,7 @@ import BarChartIcon from '@mui/icons-material/BarChart';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useTranslation } from 'react-i18next';
 import { courseService } from '../../services/courseService';
+import { getLocalizedText } from '../../utils/formatters';
 
 interface TestQuestion {
   id: string;
@@ -50,10 +51,10 @@ export default function Test() {
             if (st.choices && Array.isArray(st.choices) && st.choices.length > 0) {
               all.push({
                 id: st.problemSlug || st.subtitle || Math.random().toString(),
-                titulo: typeof st.subtitle === 'object' ? (st.subtitle.es || st.subtitle.ca || st.subtitle.en || '') : (st.subtitle || ''),
-                descripcion: typeof st.text === 'object' ? (st.text.es || st.text.ca || st.text.en || '') : (st.text || ''),
+                titulo: getLocalizedText(st.subtitle),
+                descripcion: getLocalizedText(st.text),
                 nivel: nivelFromDifficulty(st.difficulty || ''),
-                categoria: typeof topic.title === 'object' ? (topic.title.es || topic.title.ca || topic.title.en || '') : (topic.title || ''),
+                categoria: getLocalizedText(topic.title),
                 choices: st.choices,
               });
             }

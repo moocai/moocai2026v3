@@ -11,6 +11,7 @@ import { refreshCoursePoints } from '../../utils/pointsSync';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 import { MarkdownContent } from '../../components/MarkdownContent';
+import { getLocalizedText } from '../../utils/formatters';
 
 export default function TopicTestPage() {
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
@@ -40,14 +41,10 @@ export default function TopicTestPage() {
   const resultRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const lang = i18n.language?.split('-')[0] || 'ca';
+  const lang = i18n.language;
   const courseSlug = courseId ? resolveSlug(courseId) : '';
 
-  const getText = useCallback((field: any): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return field[lang] || field.ca || field.es || field.en || '';
-  }, [lang]);
+  const getText = useCallback((field: any): string => getLocalizedText(field, lang), [lang]);
 
   useEffect(() => {
     const load = () => setSavedAnswers(readAllSavedAnswers());

@@ -23,19 +23,19 @@ export function CourseForm({ onSubmit, onCancel }: CourseFormProps) {
 
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <TextField label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
-      <TextField label="Descripción" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} multiline rows={3} required />
-      <TextField label="Duración" value={duracion} onChange={(e) => setDuracion(e.target.value)} required placeholder="8 semanas" />
+      <TextField label={t('teacher.cursoNombre')} value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+      <TextField label={t('teacher.cursoDescripcion')} value={descripcion} onChange={(e) => setDescripcion(e.target.value)} multiline rows={3} required />
+      <TextField label={t('teacher.cursoDuracion')} value={duracion} onChange={(e) => setDuracion(e.target.value)} required placeholder={t('teacher.cursoDuracionEjemplo')} />
       <FormControl>
-        <InputLabel id="estado-curso-label">Estado</InputLabel>
-        <Select labelId="estado-curso-label" label="Estado" value={estado} onChange={(e) => setEstado(e.target.value as CursoEstado)}>
-          <MenuItem value="activo">Activo</MenuItem>
-          <MenuItem value="inactivo">Inactivo</MenuItem>
-          <MenuItem value="borrador">Borrador</MenuItem>
+        <InputLabel id="estado-curso-label">{t('teacher.estado')}</InputLabel>
+        <Select labelId="estado-curso-label" label={t('teacher.estado')} value={estado} onChange={(e) => setEstado(e.target.value as CursoEstado)}>
+          <MenuItem value="activo">{t('teacher.estadoActivo')}</MenuItem>
+          <MenuItem value="inactivo">{t('teacher.estadoInactivo')}</MenuItem>
+          <MenuItem value="borrador">{t('teacher.estadoBorrador')}</MenuItem>
         </Select>
       </FormControl>
       <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
-        {onCancel && <Button onClick={onCancel}>Cancelar</Button>}
+        {onCancel && <Button onClick={onCancel}>{t('teacher.cancelar')}</Button>}
         <Button type="submit" variant="contained">{t('teacher.crearCurso')}</Button>
       </Stack>
     </Box>

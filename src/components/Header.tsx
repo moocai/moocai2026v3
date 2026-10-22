@@ -237,7 +237,7 @@ export function Header() {
               }
               sx={{ ...commonButtonStyle, px: 1.5 }}
             >
-              {navItems.find((item) => item.key === activeNav)?.label ?? t('Menú')}
+              {navItems.find((item) => item.key === activeNav)?.label ?? t('nav.menu')}
             </Button>
             <Menu
               anchorEl={navAnchor}
@@ -289,7 +289,7 @@ export function Header() {
             {isLoggedIn && <RoleViewButton role={role} onClick={handleRoleToggle} disabled={!hasTeacherAccess} />}
             {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
-            <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
+            <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? t('nav.close_menu') : t('nav.open_menu')}>
               {mobileOpen ? <CloseIcon fontSize="large" /> : <MenuIcon fontSize="large" />}
             </IconButton>
           </Stack>

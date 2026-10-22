@@ -1,6 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { clearPrivateLocalData } from './testAnswerStorage';
 import { resetSessionCaches } from './sessionCache';
+import { currentLanguage } from '../i18n';
 
 // @ts-ignore - Vite replaces import.meta.env statically at build time
 const API_BASE_URL = `${import.meta.env.VITE_API_URL || ''}/api/v1`;
@@ -32,6 +33,15 @@ function clearSession(): void {
 
 export const apiClient = axios.create({ baseURL: API_BASE_URL, timeout: 100000 });
 export const publicClient = axios.create({ baseURL: API_BASE_URL });
+
+// El servidor respon (noms, enunciats, missatges) en l'idioma de la petició: el de la interfície,
+// no el del navegador, perquè tot quadri amb el que s'ha triat.
+for (const client of [apiClient, publicClient]) {
+  client.interceptors.request.use((config) => {
+    config.headers['Accept-Language'] = currentLanguage();
+    return config;
+  });
+}
 
 apiClient.interceptors.request.use((config) => {
   const token = currentToken();

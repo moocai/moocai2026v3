@@ -8,7 +8,8 @@ import * as ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
 
-type RenderMessage = { type: 'render'; js: string; dark: boolean };
+type PreviewMessages = { noComponent: string; unsupportedModule: string };
+type RenderMessage = { type: 'render'; js: string; dark: boolean; messages: PreviewMessages };
 
 const root = createRoot(document.getElementById('root')!);
 let renderCount = 0;
@@ -26,7 +27,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 /** Avalua el JavaScript compilat i retorna el component React a renderitzar. */
-function evaluateComponent(js: string): any {
+function evaluateComponent(js: string, messages: PreviewMessages): any {
   const moduleObj: { exports: any } = { exports: {} };
   const interop = (mod: any) => Object.assign({ __esModule: true, default: mod }, mod);
   const modules: Record<string, any> = {
@@ -36,7 +37,7 @@ function evaluateComponent(js: string): any {
   };
   const requireShim = (id: string) => {
     if (id in modules) return modules[id];
-    throw new Error(`Mòdul no suportat al preview: ${id}`);
+    throw new Error(messages.unsupportedModule.replace('{module}', id));
   };
   const factory = new Function(
     'React', 'ReactDOM', 'ReactDOMClient', 'exports', 'module', 'require',
@@ -51,12 +52,12 @@ function evaluateComponent(js: string): any {
 window.addEventListener('message', (event: MessageEvent<RenderMessage>) => {
   // Només la pàgina que conté l'iframe pot demanar què es renderitza
   if (event.source !== window.parent || event.data?.type !== 'render') return;
-  const { js, dark } = event.data;
+  const { js, dark, messages } = event.data;
   document.body.style.background = dark ? '#1e1e1e' : '#ffffff';
   document.body.style.color = dark ? '#ffffff' : '#111111';
   try {
-    const Comp = evaluateComponent(js);
-    if (!Comp) throw new Error("No s'ha trobat cap component. Defineix `function App() { ... }`.");
+    const Comp = evaluateComponent(js, messages);
+    if (!Comp) throw new Error(messages.noComponent);
     report(null);
     renderCount += 1;
     root.render(<ErrorBoundary key={renderCount}><Comp /></ErrorBoundary>);

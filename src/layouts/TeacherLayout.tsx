@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { Box, IconButton, Typography, Stack, Avatar } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
@@ -12,6 +13,7 @@ import { useThemeMode } from '../hooks/useTheme';
 
 export function TeacherLayout() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode } = useThemeMode();
@@ -84,7 +86,8 @@ export function TeacherLayout() {
                 borderColor: 'divider',
                 '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
               }}
-              title="Vista de estudiante"
+              title={t('teacher.vistaEstudiante')}
+              aria-label={t('teacher.vistaEstudiante')}
             >
               <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />
             </IconButton>

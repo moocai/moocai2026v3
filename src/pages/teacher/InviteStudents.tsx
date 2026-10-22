@@ -21,10 +21,10 @@ export default function InviteStudents() {
     
     try {
       await api.inviteUser(email);
-      setSuccess(`Invitación enviada a ${email}`);
+      setSuccess(t('teacher.invitacionEnviada', { email }));
       setEmail('');
     } catch (err: any) {
-      const errorMessage = apiErrorMessages(err).join('. ') || err.message || 'Error al enviar la invitación';
+      const errorMessage = apiErrorMessages(err).join('. ') || err.message || t('teacher.invitacionError');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -38,7 +38,7 @@ export default function InviteStudents() {
       </Typography>
       <Stack component="form" onSubmit={handleSubmit} spacing={2} sx={{ maxWidth: 500 }}>
         <TextField 
-          label="Email" 
+          label={t('teacher.invitacionEmail')} 
           type="email" 
           value={email} 
           onChange={(e) => setEmail(e.target.value)} 
@@ -52,7 +52,7 @@ export default function InviteStudents() {
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? 'Enviando...' : t('teacher.invitarAlumnos')}
+          {loading ? t('teacher.invitacionEnviando') : t('teacher.invitarAlumnos')}
         </Button>
         {success && <Alert severity="success">{success}</Alert>}
         {error && <Alert severity="error">{error}</Alert>}

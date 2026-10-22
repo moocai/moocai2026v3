@@ -25,6 +25,7 @@ import { TopicProgressChart, type TopicProgressItem } from '../../features/stude
 import { CourseStatsCharts } from '../../features/student/CourseStatsCharts';
 import { useSeriesColors } from '../../features/student/chartColors';
 import { resolveSlug } from '../../hooks/useCourse';
+import { getLocalizedText } from '../../utils/formatters';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -211,12 +212,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const topSpace = isQhdUp ? 12 : isFhdUp ? 6 : 6;
   const tabsTopSpace = isTallScreen ? 10 : (isFhdUp || isQhdUp ? 8 : 0);
 
-  const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
-  const getText = (field: any): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return field[lang] || field['ca'] || '';
-  };
+  const lang = i18n.language;
+  const getText = (field: any): string => getLocalizedText(field, lang);
 
   const getCourseTopics = (course: Course): Topic[] => {
     if (course.topics && course.topics.length > 0) return course.topics;
@@ -734,7 +731,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                   // del curs, que també diu de quin curs és el tauler) i el títol de la pàgina
                   <Box sx={{ mb: { xs: 2, md: 3 }, mt:{md:-3}}}>
                     <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1, borderRadius: 1, border: '1px solid transparent', '&:hover': { bgcolor: 'transparent', border: '1px solid red' } }}>
-                     Tornar a {getText(currentCourse.title) || currentCourse.slug}
+                     {t('lesson.back_to_named_course', { course: getText(currentCourse.title) || currentCourse.slug })}
                     </Button>
                   </Box>
                 )}
