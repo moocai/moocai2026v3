@@ -6,7 +6,8 @@ export default {
     login_students: "Accés Alumnes",
     incorrect_pin: "Contrassenya incorrecte",
     access: "Inicia sessió",
-    enroll_login_required: "Has d'iniciar sessió per inscriure't al curs"
+    enroll_login_required: "Has d'iniciar sessió per inscriure't al curs",
+    forgot_error: "No s'ha pogut enviar el correu. Revisa l'adreça i torna-ho a provar."
   },
     dashboard: {
     last_session: "Última sessió",
