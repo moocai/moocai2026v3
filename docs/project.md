@@ -29,7 +29,7 @@ Versions reals de `package.json`:
 | **Cache/Query** | @tanstack/react-query | ^5.101.0 | Cache de cursos i prefetching |
 | **Editor** | **@monaco-editor/react · monaco-editor** | **^4.7.0 / ^0.57.0** | Editor VS Code (LessonPage, ExerciseEditor) |
 | **Animacions** | framer-motion · @react-spring/web | ^12.38.0 / ^10.1.0 | Animacions (Header) i toastos |
-| **i18n** | i18next · react-i18next · i18next-browser-languagedetector | ^26.0.6 / ^17.0.4 / ^8.2.1 | Multiidioma (CA, ES, EN) |
+| **i18n** | i18next · react-i18next | ^26.0.6 / ^17.0.4 | Multiidioma (CA, ES, EN) |
 | **HTTP** | axios | ^1.15.0 | Peticions REST |
 | **Confetti** | canvas-confetti | ^1.9.2 | Animació en completar |
 | **Markdown** | react-markdown · remark-gfm | ^10.1.0 / ^4.0.1 | Render de teoria |
@@ -70,7 +70,7 @@ moocai2026/
     ├── index.css                     # Scrollbar (var --scrollbar-thumb: #8400ff)
     ├── App.css                       # ⚠️ ORFE — boilerplate del starter Vite, no s'importa
     ├── env.d.ts                      # Declaracions d'assets (*.css, *.svg, *?worker)
-    ├── i18n.ts                       # ✅ Config i18next ACTIVA (fallback 'ca')
+    ├── i18n.ts                       # ✅ Config i18next: idioma inicial i ordre de reserva (en → ca → es)
     │
     ├── i18n/                         # Recursos de traducció
     │   ├── ca.ts, es.ts, en.ts       # 11 seccions cadascun
@@ -97,7 +97,7 @@ moocai2026/
     ├── contexts/
     │   ├── AuthContext.tsx           # ⚠️ Provider muntat, però useAuth() no es consumeix enlloc
     │   ├── ThemeContext.tsx          # 3 modes + ParticlesBackground
-    │   ├── I18nContext.tsx           # idioma (clau mooc-language)
+    │   ├── I18nContext.tsx           # reflecteix l'idioma d'i18next (el canvia `services/language.ts`)
     │   └── NotificationContext.tsx   # toastos (2s)
     │
     ├── data/
@@ -420,16 +420,15 @@ Carregador local (sense CDN), temes `mooc-light/dark/fancy`, opcions d'editor (`
 
 ## 13. Internacionalització
 
-- **3 idiomes**: `ca` (fallback), `es`, `en`.
-- **11 seccions** a cada fitxer: `auth`, `dashboard`, `home`, `hero`, `footer`, `course`, `common`, `profile`, `notifications`, `teacher`, `lesson`.
-- Config activa: **`src/i18n.ts`** (importada per `I18nContext` i `courseService`). `src/i18n/index.ts` és un duplicat mort.
-- `LanguageDetector` desa a la clau `i18nextLng`, mentre que `I18nContext` usa `mooc-language` → **dues claus per a l'idioma**. A més, `LanguageSwitcher` crida `i18n.changeLanguage` directament i no passa per `I18nContext`, així que no actualitza `mooc-language`.
+- **3 idiomes**: `ca`, `es`, `en`. Tot el que es veu va en un sol idioma, `i18n.language`.
+- **Ordre de preferència** (el d'algorien): 1) l'idioma triat explícitament (selector de la capçalera o del perfil; clau `mooc-language` i, amb sessió, `PATCH /users/me/settings/ { language }`); 2) l'idioma del compte (arriba amb el login; clau `mooc-account-language`, es buida en tancar la sessió); 3) el primer idioma del navegador suportat; 4) l'anglès. Si en iniciar sessió hi ha un idioma triat en aquest navegador, guanya i es desa al compte.
+- **Contingut del servidor**: totes les peticions porten `Accept-Language` amb l'idioma de la interfície (el servidor tradueix noms, enunciats i missatges segons aquesta capçalera). En canviar d'idioma es buiden les memòries cau de `courseService` i es tornen a demanar les consultes de React Query.
+- **Camps traduïts** (`{ ca, es, en }`): sempre amb `getLocalizedText` (`utils/formatters.ts`), que fa servir l'idioma de la interfície i, si falta, el mateix ordre de reserva que el servidor (en → ca → es). Les claus que faltin a un fitxer també es busquen en aquest ordre.
+- **Cap text visible fix al codi**: tot passa per `t()`. Els missatges de l'iframe del preview de React els hi envia la pàgina ja traduïts.
+- Config: **`src/i18n.ts`**; canvis d'idioma: **`src/services/language.ts`** (`chooseLanguage`, `applyAccountLanguage`, `clearAccountLanguage`).
 
-### Defectes de traducció coneguts
-- `Footer.tsx:46` crida `t('Accedir')` (clau literal sense prefix); no existeix → es mostra "Accedir".
-- `ca.ts` diu "Contrassenya (10 digits)" però `isValidPin` exigeix 4.
-- Diversos textos de professor estan hardcoded en castellà (`CourseForm`, `ChatWidget`, alertes d'`InviteStudents`).
-- `StudentDashboard` usa `<...>` amb valor per defecte en català (`t('dashboard.code_correct', 'Problemes de programació')`) per a claus que no existeixen als fitxers d'idioma.
+### Comprovar-ho
+- Totes les claus que fa servir el codi han d'existir als tres fitxers (`ca`, `es`, `en`): els valors per defecte de `t('clau', '…')` no s'haurien de veure mai.
 
 ---
 
@@ -471,7 +470,7 @@ npm run preview
    - Progrés: `mooc_global_progress_${id}` (mapa `${courseId}_${lessonId}`), `mooc_shared_all_progress`.
    - Codi i submissions: `code_${userId}_${courseId}_${lessonId}` (+ `_view`), `mooc_submissions_${courseId}_${lessonId}`.
    - Sessió/UX: `mooc_last_session`, `mooc_dashboard_last_course`, `mooc_tab_${slug}`, `mooc_expanded_${slug}`, `mooc_done_order_${slug}`, `mooc_streak_${id}`.
-   - Config: `mooc-theme-mode`, `mooc-language` (+ `i18nextLng`).
+   - Config: `mooc-theme-mode`, `mooc-language` (idioma triat), `mooc-account-language` (idioma del compte amb sessió).
    - Professor: `mooc_local_courses`, `mooc_local_students`, `mooc_deleted_ids`, `teacher_selected_course(_name)`, `teacher_selected_topic`, `teacher_selected_exercise`, `teacher_submenu`, `teacher_exercise_${id}`.
 3. **`src/data/courses.ts`** — mapa d'imatges (només 2 entrades).
 
@@ -508,7 +507,7 @@ npm run preview
 - `RendimentDashboard` fabrica la "mitjana" amb `Math.random()`.
 - `Test.tsx` i `CodePreview`/`ExerciseEditor` executen/serveixen codi/HTML sense sanejament.
 - Sense guarda de ruta a `/teacher`; sense validació de token a l'engegada.
-- `Footer` només a Home; `LanguageSwitcher` no persisteix a `mooc-language`.
+- `Footer` només a Home.
 - Clau i18n `dashboard.code_correct`/`tests_correct` inexistents als fitxers (es veuen en català).
 
 ---

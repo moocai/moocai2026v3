@@ -1,15 +1,10 @@
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { Box } from '@mui/material';
 import { Header } from '../components/Header';
 
 // El layout no precarrega res: cada pàgina demana només les dades que mostra
 // (la pantalla de login, per exemple, no necessita cap llista de cursos).
 export function MainLayout() {
-  // Si el rol actual és professor, la zona d'alumne no es veu: es torna al tauler de professor.
-  // El professor veu la part d'alumne canviant el rol amb el botó del Header.
-  if (localStorage.getItem('mooc_role') === 'teacher') {
-    return <Navigate to="/teacher" replace />;
-  }
   return (
     <Box sx={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <Header />

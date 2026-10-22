@@ -1,21 +1,31 @@
-type I18nField = { ca: string; es: string; en: string };
-type SupportedLang = 'ca' | 'es' | 'en';
+import { FALLBACK_LANGUAGES, currentLanguage, toSupportedLanguage, type SupportedLanguage } from '../i18n';
 
+type I18nField = Partial<Record<SupportedLanguage, string | null>>;
+
+/**
+ * Text d'un camp traduït (`{ ca, es, en }`) en l'idioma de la interfície (o `lang`). Si no hi és,
+ * el primer que hi hagi en l'ordre de reserva del servidor (anglès, català, castellà).
+ */
 export function getLocalizedText(
   field: string | I18nField | undefined | null,
-  lang: SupportedLang = 'ca'
+  lang: string = currentLanguage(),
 ): string {
   if (!field) return '';
   if (typeof field === 'string') return field;
-  return field[lang] || field.ca || field.es || field.en || '';
+  const wanted = toSupportedLanguage(lang) ?? currentLanguage();
+  for (const code of [wanted, ...FALLBACK_LANGUAGES]) {
+    const text = field[code];
+    if (text) return text;
+  }
+  return '';
 }
 
+/** `'es-ES'` → `'es'`; un idioma no suportat → `fallback` (per defecte, el de la interfície). */
 export function getBaseLanguage(
   locale: string | undefined,
-  fallback: SupportedLang = 'ca'
-): SupportedLang {
-  const lang = locale?.split('-')[0] as SupportedLang;
-  return lang || fallback;
+  fallback: SupportedLanguage = currentLanguage(),
+): SupportedLanguage {
+  return toSupportedLanguage(locale) ?? fallback;
 }
 
 export function formatProgressPercent(done: number, total: number): number {
@@ -31,7 +41,7 @@ export function padNumber(num: number, length: number = 2): string {
   return String(num).padStart(length, '0');
 }
 
-export function formatTimestamp(timestamp: number, locale: string = 'ca'): string {
+export function formatTimestamp(timestamp: number, locale: string = currentLanguage()): string {
   return new Date(timestamp).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import i18n from '../i18n';
 
 // Model virtual on es compila el codi TSX de l'alumne (no es mostra).
 const PREVIEW_URI = 'file:///preview/App.tsx';
@@ -11,13 +13,13 @@ async function transpileTsx(monaco: any, code: string): Promise<string> {
   else if (model.getValue() !== code) model.setValue(code);
 
   const getTsWorker = monaco.typescript?.getTypeScriptWorker ?? monaco.languages?.typescript?.getTypeScriptWorker;
-  if (!getTsWorker) throw new Error('El worker de TypeScript no està disponible.');
+  if (!getTsWorker) throw new Error(i18n.t('lesson.preview_ts_unavailable'));
 
   const getWorker = await getTsWorker();
   const client = await getWorker(uri);
   const output = await client.getEmitOutput(uri.toString());
   const js = output?.outputFiles?.find((f: { name: string }) => /\.js$/i.test(f.name))?.text;
-  if (!js) throw new Error("No s'ha pogut compilar el codi TSX.");
+  if (!js) throw new Error(i18n.t('lesson.preview_compile_error'));
   return js;
 }
 
@@ -33,6 +35,7 @@ interface ReactLivePreviewProps {
  * s'executa a la pàgina de l'aplicació: no pot llegir-ne el token de sessió ni el localStorage.
  */
 export function ReactLivePreview({ monaco, code, dark }: ReactLivePreviewProps) {
+  const { t } = useTranslation();
   const frameRef = useRef<HTMLIFrameElement | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +58,12 @@ export function ReactLivePreview({ monaco, code, dark }: ReactLivePreviewProps) 
         const js = await transpileTsx(monaco, code);
         if (cancelled) return;
         // L'iframe té origen opac ("null"): el destí ha de ser '*'; el codi no és cap secret.
-        frameRef.current?.contentWindow?.postMessage({ type: 'render', js, dark }, '*');
+        // L'iframe no té traduccions: els seus missatges hi van ja en l'idioma de la interfície
+        const messages = {
+          noComponent: t('lesson.preview_no_component'),
+          unsupportedModule: t('lesson.preview_unsupported_module', { module: '{module}' }),
+        };
+        frameRef.current?.contentWindow?.postMessage({ type: 'render', js, dark, messages }, '*');
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err));
       }
@@ -64,7 +72,7 @@ export function ReactLivePreview({ monaco, code, dark }: ReactLivePreviewProps) 
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [monaco, code, dark, ready]);
+  }, [monaco, code, dark, ready, t]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', background: dark ? '#1e1e1e' : '#ffffff' }}>
@@ -72,7 +80,7 @@ export function ReactLivePreview({ monaco, code, dark }: ReactLivePreviewProps) 
         ref={frameRef}
         src="/preview.html"
         sandbox="allow-scripts"
-        title="React preview"
+        title={t('lesson.preview_frame_title')}
         style={{ border: 0, width: '100%', height: '100%', display: 'block' }}
       />
       {error && (

@@ -1,5 +1,6 @@
-import { createContext, use, useState, useEffect, ReactNode } from 'react';
-import i18n from '../i18n';
+import { createContext, use, useEffect, useState, ReactNode } from 'react';
+import i18n, { currentLanguage } from '../i18n';
+import { chooseLanguage } from '../services/language';
 
 interface I18nContextValue {
   language: string;
@@ -8,32 +9,19 @@ interface I18nContextValue {
 
 const I18nContext = createContext<I18nContextValue | undefined>(undefined);
 
-const STORAGE_KEY = 'mooc-language';
-
+// L'idioma és el d'i18next (vegeu `i18n.ts`): aquest context només el reflecteix, perquè el
+// perfil i el selector de la capçalera mostrin sempre el mateix.
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) return stored;
-    }
-    return i18n.language || 'ca';
-  });
-
-  const setLanguage = (lang: string) => {
-    setLanguageState(lang);
-    i18n.changeLanguage(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
-  };
+  const [language, setLanguageState] = useState<string>(currentLanguage);
 
   useEffect(() => {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored !== i18n.language) {
-      i18n.changeLanguage(stored);
-    }
+    const sync = () => setLanguageState(currentLanguage());
+    i18n.on('languageChanged', sync);
+    return () => i18n.off('languageChanged', sync);
   }, []);
 
   return (
-    <I18nContext.Provider value={{ language, setLanguage }}>
+    <I18nContext.Provider value={{ language, setLanguage: chooseLanguage }}>
       {children}
     </I18nContext.Provider>
   );

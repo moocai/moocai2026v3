@@ -8,13 +8,10 @@ import {useTranslation} from 'react-i18next';
 import { courseImages } from '../data/courses';
 import { ProgressBar } from './ui/ProgressBar';
 import { useImageUrl } from '../utils/avatarCache';
+import { getLocalizedText } from '../utils/formatters';
+import { courseEntryPath } from '../utils/courseRole';
 
-interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
-
-function getLocalizedText(text: string | { ca: string; es: string; en: string }, lang: string): string {
-  if (typeof text === 'string') return text;
-  return text[lang as keyof typeof text] || text.en || text.ca || text.es || '';
-}
+interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean; myRole?: string | null;}
 
 // `progress`: % completat del curs (cursos on l'usuari és alumne). Sense, el peu diu "Anar al curs".
 interface CourseCardProps {course: Course;index: number;progress?: number | null;}
@@ -23,12 +20,13 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const navigate = useNavigate();
-  const lang = i18n.language.split('-')[0] || 'en';
+  const lang = i18n.language;
 
   const handleCardClick = (e: MouseEvent) => {
     if (course.disabled) return;
     e.preventDefault();
-    navigate(`/courses/${course.id}`);
+    // Professor del curs → vista de professor; alumne → vista d'alumne
+    navigate(courseEntryPath(course));
   };
 
   // Imatge del curs: la local (si n'hi ha) o l'avatar del servidor, que necessita el token

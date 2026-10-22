@@ -25,6 +25,7 @@ import { TopicProgressChart, type TopicProgressItem } from '../../features/stude
 import { CourseStatsCharts } from '../../features/student/CourseStatsCharts';
 import { useSeriesColors } from '../../features/student/chartColors';
 import { resolveSlug } from '../../hooks/useCourse';
+import { getLocalizedText } from '../../utils/formatters';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -153,8 +154,6 @@ export default function StudentDashboard() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
-  // Rol triat a la pantalla d'entrada: decideix si el compte serà alumne o professor
-  const [loginRole, setLoginRole] = useState<'student' | 'teacher'>('student');
   const [courseTabIndex, setCourseTabIndex] = useState(0);
   // L'àmbit es recupera de seguida (sense esperar les llistes): així només es
   // demana la llista de cursos públics si realment és la que es veu.
@@ -211,12 +210,8 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const topSpace = isQhdUp ? 12 : isFhdUp ? 6 : 6;
   const tabsTopSpace = isTallScreen ? 10 : (isFhdUp || isQhdUp ? 8 : 0);
 
-  const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
-  const getText = (field: any): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return field[lang] || field['ca'] || '';
-  };
+  const lang = i18n.language;
+  const getText = (field: any): string => getLocalizedText(field, lang);
 
   const getCourseTopics = (course: Course): Topic[] => {
     if (course.topics && course.topics.length > 0) return course.topics;
@@ -338,14 +333,10 @@ const isMdUp = useMediaQuery('(max-height:900px)');
         id: data?.user?.id != null ? String(data.user.id) : username,
         name: data?.user?.name || username,
         email: data?.user?.email || username,
-        role: loginRole,
+        role: 'student',
       };
       setSelectedStudent(student);
       localStorage.setItem('currentStudent', JSON.stringify(student));
-      // El rol triat a l'entrada marca la vista: només qui entra com a professor tindrà
-      // accés a l'àrea de professorat (i podrà anar i tornar amb el botó del Header).
-      localStorage.setItem('mooc_role', loginRole);
-      localStorage.setItem('mooc_has_teacher', loginRole === 'teacher' ? 'true' : 'false');
       fetchProgress(student.id);
       courseService.clearCache();
       setUsername("");
@@ -353,11 +344,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
       setLoginLoading(false);
       addNotification(t('notifications.welcome', { name: student.name }), 'success');
       window.dispatchEvent(new Event('auth-state-change'));
-      if (loginRole === 'teacher') {
-        navigate('/teacher');
-      } else {
-        await goAfterLogin();
-      }
+      await goAfterLogin();
     } catch (err: any) {
       setLoginError(true);
       setLoginLoading(false);
@@ -630,8 +617,6 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                   onSubmit={handleLogin}
                   error={loginError}
                   loading={loginLoading}
-                  role={loginRole}
-                  onRoleChange={setLoginRole}
                 />
             ) : (
               <>
@@ -734,7 +719,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                   // del curs, que també diu de quin curs és el tauler) i el títol de la pàgina
                   <Box sx={{ mb: { xs: 2, md: 3 }, mt:{md:-3}}}>
                     <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1, borderRadius: 1, border: '1px solid transparent', '&:hover': { bgcolor: 'transparent', border: '1px solid red' } }}>
-                     Tornar a {getText(currentCourse.title) || currentCourse.slug}
+                     {t('lesson.back_to_named_course', { course: getText(currentCourse.title) || currentCourse.slug })}
                     </Button>
                   </Box>
                 )}

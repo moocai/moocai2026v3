@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Box, Typography, Button } from '@mui/material';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { useThemeMode } from '../../hooks/useTheme';
@@ -11,6 +12,7 @@ interface CodePreviewProps {
 }
 
 export function CodePreview({ code, monaco, onOutput }: CodePreviewProps) {
+  const { t } = useTranslation();
   const { mode } = useThemeMode();
   const [executedCode, setExecutedCode] = useState<string>('');
   const [hasRun, setHasRun] = useState(false);
@@ -53,7 +55,7 @@ export function CodePreview({ code, monaco, onOutput }: CodePreviewProps) {
       } else if (result !== undefined) {
         output.push(typeof result === 'object' ? JSON.stringify(result, null, 2) : String(result));
       } else {
-        output.push('✅ Código ejecutado correctamente');
+        output.push(t('teacher.codigoEjecutado'));
       }
     } catch (err) {
       output.push(`❌ ${err instanceof Error ? err.message : String(err)}`);
@@ -84,7 +86,7 @@ export function CodePreview({ code, monaco, onOutput }: CodePreviewProps) {
         flexShrink: 0 
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>PREVIEW</Typography>
+          <Typography sx={{ fontSize: 11, color: 'white', fontWeight: 900 }}>{t('teacher.previewTitulo')}</Typography>
         </Box>
         <Button
           size="small"
@@ -92,7 +94,7 @@ export function CodePreview({ code, monaco, onOutput }: CodePreviewProps) {
           onClick={handleRun}
           sx={{ textTransform: 'none', fontSize: '0.7rem', color: '#34d399', minWidth: 'auto', fontWeight: 700 }}
         >
-          Ejecutar
+          {t('teacher.ejecutar')}
         </Button>
       </Box>
       <Box sx={{ flex: 1, overflow: 'hidden' }}>
@@ -101,7 +103,7 @@ export function CodePreview({ code, monaco, onOutput }: CodePreviewProps) {
         ) : (
           <Box sx={{ p: 2, height: '100%' }}>
             <Typography sx={{ fontSize: 9, color: '#444', fontFamily: 'monospace' }}>
-              {hasRun ? '// No hay código React para mostrar' : '// Pulsa Ejecutar para ver el preview'}
+              {hasRun ? t('teacher.previewSinCodigo') : t('teacher.previewPulsaEjecutar')}
             </Typography>
           </Box>
         )}

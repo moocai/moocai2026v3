@@ -4,9 +4,34 @@ export default {
     logout: "Salir",
     start: "Inicio",
     login_students: "Acceso Alumnos",
-    incorrect_pin: "Contraseña incorrecto",
+    incorrect_pin: "Usuario o contraseña incorrectos",
     access: "Iniciar sesión",
-    enroll_login_required: "Debes iniciar sesión para inscribirte al curso"
+    enroll_login_required: "Debes iniciar sesión para inscribirte al curso",
+    register_success_title: "Cuenta creada correctamente",
+    register_success_text: "¡Bienvenido/a, {{name}}! Ya puedes iniciar sesión con tu usuario.",
+    back_to_login: "Volver a iniciar sesión",
+    username_or_email: "Usuario o correo electrónico",
+    password: "Contraseña",
+    forgot_password: "¿Has olvidado la contraseña?",
+    create_account: "Crear una cuenta",
+    forgot_sent: "Si existe una cuenta con esta dirección, recibirás un correo con instrucciones para establecer una nueva.",
+    forgot_intro: "Introduce tu dirección de correo electrónico y te enviaremos instrucciones para establecer una nueva.",
+    email_address: "Dirección de correo electrónico",
+    send_reset_link: "Enviar el enlace de restablecimiento",
+    login_link: "Iniciar sesión",
+    choose_file: "Elegir archivo",
+    avatar_hint: "Sube la foto de tu avatar",
+    first_name: "Nombre",
+    last_name: "Apellidos",
+    email: "Correo electrónico",
+    username: "Nombre de usuario",
+    organization: "Organización",
+    no_organization: "Sin organización",
+    confirm_password: "Confirma la contraseña",
+    passwords_mismatch: "Las contraseñas no coinciden",
+    register_error: "No se ha podido crear la cuenta. Revisa los datos.",
+    register_submit: "Crear",
+    forgot_error: "No se ha podido enviar el correo. Revisa la dirección y vuelve a intentarlo."
   },
     dashboard: {
     last_session: "Última sesión",
@@ -95,6 +120,9 @@ export default {
     next_up_answer: "Contestar",
     next_up_not_accepted: "todavía no aceptado",
     next_up_all_done: "Has hecho todos los problemas disponibles. ¡Muy bien!",
+    stats_show_less: "Mostrar menos",
+    stats_show_more_one: "Mostrar {{count}} más",
+    stats_show_more_other: "Mostrar {{count}} más"
   },
   home: {
     enrolled_title: "Mis cursos",
@@ -120,7 +148,7 @@ export default {
   },
   hero: {
     subtitle: "Únete a los alumnos que ya están dominando las tecnologías de 2026 con proyectos reales.",
-    build_apps: "Build Real-World Apps",
+    build_apps: "Crea aplicaciones reales",
     stats: {
       students: "Estudiantes",
       courses: "Cursos Activos",
@@ -184,7 +212,8 @@ export default {
     current_password_required: "Se necesita la contraseña actual para cambiarla",
     passwords_mismatch: "Las contraseñas no coinciden",
     saved: "Perfil actualizado correctamente ✅",
-    save: "Guardar los cambios"
+    save: "Guardar los cambios",
+    org_type_training_centre: "Centro de formación"
   },
 
   notification_center: {
@@ -353,7 +382,7 @@ export default {
     progress_error: "Error al guardar el progreso ⚠️",
     account_created: "Cuenta creada correctamente, {{name}} ({{role}}) 🎉",
     user_deleted: "Usuario eliminado: {{name}} ({{role}}) 🗑️",
-    incorrect_pin: "Contraseña incorrecto ❌",
+    incorrect_pin: "Usuario o contraseña incorrectos ❌",
     welcome: "Bienvenido/a, {{name}} 👋",
     session_closed: "Sesión cerrada 👋",
     course_reset: "Curso reiniciado correctamente 🗑️",
@@ -459,7 +488,26 @@ export default {
     eliminarCurso: "Eliminar curso",
     eliminarCursoConfirmar: "¿Seguro que quieres eliminar \"{{nombre}}\"? Esta acción no se puede deshacer.",
     eliminar: "Eliminar",
-    solucionProfesor: "Solución del profesor"
+    solucionProfesor: "Solución del profesor",
+    filtroTodos: "Todos",
+    estadoActivo: "Activo",
+    estadoInactivo: "Inactivo",
+    estadoCompletado: "Completado",
+    estadoBloqueado: "Bloqueado",
+    estadoBorrador: "Borrador",
+    cursoNombre: "Nombre",
+    cursoDescripcion: "Descripción",
+    cursoDuracion: "Duración",
+    cursoDuracionEjemplo: "8 semanas",
+    ejecutar: "Ejecutar",
+    previewTitulo: "VISTA PREVIA",
+    previewSinCodigo: "// No hay código React para mostrar",
+    previewPulsaEjecutar: "// Pulsa Ejecutar para ver la vista previa",
+    invitacionEmail: "Correo electrónico",
+    invitacionEnviando: "Enviando...",
+    invitacionEnviada: "Invitación enviada a {{email}}",
+    invitacionError: "Error al enviar la invitación",
+    codigoEjecutado: "✅ Código ejecutado correctamente"
   },
   lesson: {
     syllabus: "Temario",
@@ -626,7 +674,15 @@ export default {
     points_earned_other: "¡+{{count}} estrellas!",
     total_points: "Estrellas totales: {{count}}",
     sending: "Enviando al servidor...",
-    submitted: "Respuesta enviada al servidor"
+    submitted: "Respuesta enviada al servidor",
+    back_to_named_course: "Volver a {{course}}",
+    preview_frame_title: "Vista previa de React",
+    preview_ts_unavailable: "El worker de TypeScript no está disponible.",
+    preview_compile_error: "No se ha podido compilar el código TSX.",
+    preview_no_component: "No se ha encontrado ningún componente. Define `function App() { ... }`.",
+    preview_unsupported_module: "Módulo no soportado en la vista previa: {{module}}",
+    python_worker_error: "No se ha podido iniciar el worker de Python",
+    topic_not_found: "No se ha encontrado el tema"
   },
   difficulty: {
     easy: "Fácil",
@@ -650,9 +706,15 @@ export default {
     statement: "Enunciado",
     status_correct: "acertada",
     status_pending: "pendiente",
-    status_wrong: "fallada",
+    status_wrong: "fallida",
     submit: "Enviar",
     submit_busy: "El servidor está ocupado. Vuelve a intentarlo dentro de un rato.",
     submit_error: "No se ha podido enviar la respuesta."
+  },
+  nav: {
+    menu: "Menú",
+    open_menu: "Abrir el menú",
+    close_menu: "Cerrar el menú",
+    breadcrumb: "Ruta de navegación"
   }
 };

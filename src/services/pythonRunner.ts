@@ -3,6 +3,7 @@
 // els mateixos que els de Python, i un programa que no acaba es pot aturar.
 // input() es respon des de la consola: vegeu `answerPythonInput` i `public/python-input-sw.js`.
 import type { RunnerMessages, RunnerRequest, RunnerResponse } from '../workers/pythonRunner.worker';
+import i18n from '../i18n';
 
 export type PythonStream = 'stdout' | 'stderr';
 export type PythonRunStatus = 'ok' | 'error' | 'stopped' | 'timeout' | 'load-error';
@@ -95,7 +96,7 @@ function startWorker(): Promise<void> {
     worker = w;
     await new Promise<void>((resolve, reject) => {
       w.onmessage = (event: MessageEvent<RunnerResponse>) => handleMessage(event.data, resolve, reject);
-      w.onerror = (event) => reject(new Error(event.message || 'No s\'ha pogut iniciar el worker de Python'));
+      w.onerror = (event) => reject(new Error(event.message || i18n.t('lesson.python_worker_error')));
       send({ type: 'init', indexURL: indexURL(), sizes: __PYODIDE_SIZES__ });
     });
     ready = true;

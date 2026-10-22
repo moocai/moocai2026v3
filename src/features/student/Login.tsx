@@ -4,6 +4,7 @@ import {Lock, User, Mail, UserRound, Camera, ArrowLeft, Upload, Check} from 'luc
 import {useTranslation} from 'react-i18next';
 import {type ChangeEvent, type FormEvent, useEffect, useState} from 'react';
 import {type Organization, extractRegisterErrors, loadRegistrationData, registerUser} from '../../services/register';
+import {authService} from '../../services/authService';
 
 interface LoginProps {
   username: string;
@@ -13,8 +14,6 @@ interface LoginProps {
   onSubmit: (e: FormEvent) => void;
   error?: boolean;
   loading?: boolean;
-  role: 'student' | 'teacher';
-  onRoleChange: (role: 'student' | 'teacher') => void;
 }
 
 export function Login({
@@ -25,14 +24,14 @@ export function Login({
   onSubmit,
   error,
   loading,
-  role,
-  onRoleChange,
 }: LoginProps) {
   const { t } = useTranslation();
   const theme = useTheme();
   const [view, setView] = useState<'login' | 'register' | 'forgot'>('login');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState(false);
 
   const [nom, setNom] = useState('');
   const [cognoms, setCognoms] = useState('');
@@ -87,7 +86,7 @@ export function Login({
     e.preventDefault();
     setRegisterError(null);
     if (regPassword !== regConfirm) {
-      setRegisterError('Les contrasenyes no coincideixen');
+      setRegisterError(t('auth.passwords_mismatch'));
       return;
     }
     setRegisterLoading(true);
@@ -117,11 +116,23 @@ export function Login({
     setRegisterError(null);
     setForgotSent(false);
     setForgotEmail('');
+    setForgotError(false);
   };
 
-  const handleForgot = (e: FormEvent) => {
+  // Demana al servidor que enviï el correu de restabliment. La resposta és la mateixa tant si
+  // l'adreça té compte com si no; només un error (xarxa, adreça no vàlida) no es dona per enviat.
+  const handleForgot = async (e: FormEvent) => {
     e.preventDefault();
-    setForgotSent(true);
+    setForgotLoading(true);
+    setForgotError(false);
+    try {
+      await authService.requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch {
+      setForgotError(true);
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const cardSx = {
@@ -149,13 +160,13 @@ export function Login({
               <Check size={32} />
             </Avatar>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Compte creat correctament
+              {t('auth.register_success_title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Benvingut/da, {nom} {cognoms}! Ja pots iniciar sessió amb el teu usuari.
+              {t('auth.register_success_text', { name: `${nom} ${cognoms}`.trim() })}
             </Typography>
             <Button variant="contained" fullWidth onClick={goBackToLogin} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-              Tornar a iniciar sessió
+              {t('auth.back_to_login')}
             </Button>
           </Stack>
         </Card>
@@ -170,15 +181,9 @@ export function Login({
               {t('auth.login')}
             </Typography>
 
-            <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', height: 44 }}>
-              <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-              <Button disableRipple onClick={() => onRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-              <Button disableRipple onClick={() => onRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-            </Box>
-
             <TextField
               fullWidth
-              label="Username or email"
+              label={t('auth.username_or_email')}
               variant="filled"
               value={username}
               onChange={e => onUsernameChange(e.target.value)}
@@ -197,7 +202,7 @@ export function Login({
 
             <TextField
               fullWidth
-              label="Password"
+              label={t('auth.password')}
               type="password"
               value={password}
               onChange={e => onPasswordChange(e.target.value)}
@@ -233,7 +238,7 @@ export function Login({
               onClick={() => setView('forgot')}
               sx={{ fontWeight: 600 }}
             >
-              Has oblidat la contrasenya?
+              {t('auth.forgot_password')}
             </Button>
             <Button
               variant="contained"
@@ -241,7 +246,7 @@ export function Login({
               onClick={() => setView('register')}
               sx={{ borderRadius: '12px', py: 1.2, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}
             >
-              Crear un Compte
+              {t('auth.create_account')}
             </Button>
           </Stack>
         </Card>
@@ -257,28 +262,28 @@ export function Login({
               >
               </Button>
               <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
-                Has oblidat la contrasenya?
+                {t('auth.forgot_password')}
               </Typography>
             </Stack>
 
             {forgotSent ? (
               <>
                 <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                  Si existeix un compte amb aquesta adreça, rebràs un correu amb instruccions per establir-ne una de nova.
+                  {t('auth.forgot_sent')}
                 </Typography>
                 <Button variant="contained" fullWidth onClick={goBackToLogin} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-                  Tornar a iniciar sessió
+                  {t('auth.back_to_login')}
                 </Button>
               </>
             ) : (
               <>
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-                  Introdueix la teva adreça de correu electrònic i t'enviarem instruccions per establir-ne una de nova.
+                  {t('auth.forgot_intro')}
                 </Typography>
 
                 <TextField
                   fullWidth
-                  label="Adreça de correu electrònic"
+                  label={t('auth.email_address')}
                   variant="filled"
                   type="email"
                   value={forgotEmail}
@@ -289,8 +294,15 @@ export function Login({
                   sx={fieldSx}
                 />
 
-                <Button type="submit" variant="contained" fullWidth sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-                  Envia l'enllaç de restabliment
+                {forgotError && (
+                  <Typography variant="body2" color="error" sx={{ textAlign: 'center', fontWeight: 600 }}>
+                    {t('auth.forgot_error')}
+                  </Typography>
+                )}
+
+                <Button type="submit" variant="contained" fullWidth disabled={forgotLoading} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
+                  {forgotLoading && <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />}
+                  {t('auth.send_reset_link')}
                 </Button>
               </>
             )}
@@ -310,10 +322,10 @@ export function Login({
                 onClick={goBackToLogin}
                 sx={{ fontWeight: 700, color: '#ffffff' }}
               >
-                Iniciar sessió
+                {t('auth.login_link')}
               </Button>
               <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
-                Crear un Compte
+                {t('auth.create_account')}
               </Typography>
             </Stack>
 
@@ -330,11 +342,11 @@ export function Login({
                       startIcon={<Upload size={18} />}
                       sx={{ borderRadius: '12px', fontWeight: 700 }}
                     >
-                      Tria fitxer
+                      {t('auth.choose_file')}
                       <input type="file" hidden accept="image/*" onChange={handleAvatarChange} />
                     </Button>
                     <Typography variant="caption" color="text.secondary">
-                      {avatar ? avatar.name : 'Penja la foto del teu avatar'}
+                      {avatar ? avatar.name : t('auth.avatar_hint')}
                     </Typography>
                   </Stack>
                 </Box>
@@ -343,7 +355,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Nom"
+                  label={t('auth.first_name')}
                   variant="filled"
                   value={nom}
                   onChange={e => setNom(e.target.value)}
@@ -356,7 +368,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Cognoms"
+                  label={t('auth.last_name')}
                   variant="filled"
                   value={cognoms}
                   onChange={e => setCognoms(e.target.value)}
@@ -369,7 +381,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Email"
+                  label={t('auth.email')}
                   variant="filled"
                   type="email"
                   value={email}
@@ -384,7 +396,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Nom d'usuari"
+                  label={t('auth.username')}
                   variant="filled"
                   value={regUsername}
                   onChange={e => setRegUsername(e.target.value)}
@@ -397,13 +409,13 @@ export function Login({
 
               <Grid size={{ xs: 12 }}>
                 <FormControl fullWidth variant="filled" sx={fieldSx}>
-                  <InputLabel>Organització</InputLabel>
+                  <InputLabel>{t('auth.organization')}</InputLabel>
                   <Select
                     value={org}
                     onChange={e => setOrg(e.target.value as string)}
-                    label="Organització"
+                    label={t('auth.organization')}
                   >
-                    <MenuItem value="">Sense organització</MenuItem>
+                    <MenuItem value="">{t('auth.no_organization')}</MenuItem>
                     {orgs.map(o => (
                       <MenuItem key={o.id} value={String(o.id)}>{o.name}</MenuItem>
                     ))}
@@ -414,7 +426,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Contrasenya"
+                  label={t('auth.password')}
                   variant="filled"
                   type="password"
                   value={regPassword}
@@ -429,7 +441,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Confirma Contrasenya"
+                  label={t('auth.confirm_password')}
                   variant="filled"
                   type="password"
                   value={regConfirm}
@@ -452,7 +464,7 @@ export function Login({
               <Grid size={{ xs: 12 }}>
                 <Button type="submit" variant="contained" color="success" fullWidth disabled={registerLoading} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
                   {registerLoading && <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />}
-                  Crear
+                  {t('auth.register_submit')}
                 </Button>
               </Grid>
             </Grid>
