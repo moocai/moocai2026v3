@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { courseService } from '../../services/courseService';
 import { localCourseService } from '../../services/localCourseService';
 import { TeacherLeaderboard } from '../../features/teacher/TeacherLeaderboard';
+import { isCourseProfessor } from '../../utils/courseRole';
 
 interface CourseOption {
   id: string;
@@ -24,13 +25,22 @@ export function TeacherDashboard() {
   useEffect(() => {
     (async () => {
       try {
-        const apiCourses = await courseService.getAllCourses();
+        // Només els cursos on l'usuari és professor: als altres hi és alumne (o no hi és)
+        const apiCourses = (await courseService.getAllCourses()).filter(isCourseProfessor);
         const localCourses = localCourseService.getAll();
         const all: CourseOption[] = [
           ...localCourses.map((c) => ({ id: c.id, nombre: c.nombre })),
           ...apiCourses.map((c) => ({ id: c.slug || c.id, nombre: c.title || c.id })),
         ];
         setCourses(all);
+        // Un curs triat abans que ja no és dels seus (p. ex. d'un altre usuari) es desselecciona
+        const saved = localStorage.getItem('teacher_selected_course');
+        if (saved && !all.some((c) => c.id === saved)) {
+          setSelectedCourse('');
+          localStorage.removeItem('teacher_selected_course');
+          localStorage.removeItem('teacher_selected_course_name');
+          window.dispatchEvent(new Event('teacher-course-changed'));
+        }
       } catch {
         setCourses(localCourseService.getAll().map((c) => ({ id: c.id, nombre: c.nombre })));
       } finally {
