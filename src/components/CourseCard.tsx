@@ -8,8 +8,9 @@ import {useTranslation} from 'react-i18next';
 import { courseImages } from '../data/courses';
 import { ProgressBar } from './ui/ProgressBar';
 import { useImageUrl } from '../utils/avatarCache';
+import { courseEntryPath } from '../utils/courseRole';
 
-interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean;}
+interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean; myRole?: string | null;}
 
 function getLocalizedText(text: string | { ca: string; es: string; en: string }, lang: string): string {
   if (typeof text === 'string') return text;
@@ -28,7 +29,8 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
   const handleCardClick = (e: MouseEvent) => {
     if (course.disabled) return;
     e.preventDefault();
-    navigate(`/courses/${course.id}`);
+    // Professor del curs → vista de professor; alumne → vista d'alumne
+    navigate(courseEntryPath(course));
   };
 
   // Imatge del curs: la local (si n'hi ha) o l'avatar del servidor, que necessita el token

@@ -13,8 +13,6 @@ interface LoginProps {
   onSubmit: (e: FormEvent) => void;
   error?: boolean;
   loading?: boolean;
-  role: 'student' | 'teacher';
-  onRoleChange: (role: 'student' | 'teacher') => void;
 }
 
 export function Login({
@@ -25,8 +23,6 @@ export function Login({
   onSubmit,
   error,
   loading,
-  role,
-  onRoleChange,
 }: LoginProps) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -169,12 +165,6 @@ export function Login({
             <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
               {t('auth.login')}
             </Typography>
-
-            <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', height: 44 }}>
-              <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-              <Button disableRipple onClick={() => onRoleChange('student')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-              <Button disableRipple onClick={() => onRoleChange('teacher')} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-            </Box>
 
             <TextField
               fullWidth
