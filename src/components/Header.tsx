@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon, KeyboardArrowDown as KeyboardArrowDownIcon } from '@mui/icons-material';
-import PersonIcon from '@mui/icons-material/Person';
 import SchoolIcon from '@mui/icons-material/School';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha, Menu, MenuItem } from '@mui/material';
@@ -17,6 +16,7 @@ import { headerHeightFor, isCodingRoute } from '../layouts/headerHeight';
 // Punts del servidor (els mateixos que el leaderboard i la pàgina d'activitat)
 import { usePoints } from '../utils/pointsSync';
 import { useAllCourses } from '../hooks/useCourses';
+import { isCourseProfessor, teacherViewPath } from '../utils/courseRole';
 const logo = '/img/logo.webp';
 
 /** Pastilla d'estrelles (la puntuació), pensada per anar al costat de l'àvia. */
@@ -34,14 +34,13 @@ function PointsBadge({ points }: { points: number }) {
   );
 }
 
-/** Botó de capçalera: segons el rol, canvia entre la vista de professor i la d'alumne. */
-function RoleViewButton({ role, onClick, disabled }: { role: 'student' | 'teacher'; onClick: () => void; disabled?: boolean }) {
+/** Botó de capçalera (vista d'alumne d'un curs on s'és professor): passa a la vista de professor. */
+function TeacherViewButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation();
-  const label = role === 'teacher' ? t('dashboard.view_student') : t('dashboard.view_teacher');
+  const label = t('dashboard.view_teacher');
   return (
     <IconButton
       onClick={onClick}
-      disabled={disabled}
       aria-label={label}
       title={label}
       sx={{
@@ -52,9 +51,7 @@ function RoleViewButton({ role, onClick, disabled }: { role: 'student' | 'teache
         '&:hover': { bgcolor: 'action.selected', borderColor: 'primary.main' },
       }}
     >
-      {role === 'teacher'
-        ? <PersonIcon sx={{ fontSize: 24, color: 'primary.main' }} />
-        : <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />}
+      <SchoolIcon sx={{ fontSize: 24, color: 'primary.main' }} />
     </IconButton>
   );
 }
@@ -63,10 +60,6 @@ export function Header() {
   const { t } = useTranslation();
   const { mode } = useThemeMode();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [role, setRole] = useState<'student' | 'teacher'>(() => (localStorage.getItem('mooc_role') as 'student' | 'teacher') || 'student');
-  // L'accés de professor s'obté a l'entrada (selector de rol del login). Sense ell,
-  // el botó no deixa anar a l'àrea de professorat.
-  const [hasTeacherAccess, setHasTeacherAccess] = useState(() => localStorage.getItem('mooc_has_teacher') === 'true');
   const [studentName, setStudentName] = useState('');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [navAnchor, setNavAnchor] = useState<HTMLElement | null>(null);
@@ -90,12 +83,11 @@ export function Header() {
   const driveTarget = courseInPath ? `/courses/${courseInPath}/drive` : null;
   // "Reptes" (de ML): només als cursos que en tenen
   const courses = useAllCourses(isLoggedIn && !!courseInPath);
-  const courseAllowsChallenges = !!courseInPath
-    && courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath))?.allowsChallenges === true;
+  const currentCourse = courseInPath ? courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath)) : undefined;
+  const courseAllowsChallenges = currentCourse?.allowsChallenges === true;
   const challengesTarget = courseAllowsChallenges ? `/courses/${courseInPath}/challenges` : null;
   // "Exàmens": només si l'alumnat del curs en té algun
-  const courseHasExams = !!courseInPath
-    && courses.data?.find((c) => c.slug === decodeURIComponent(courseInPath))?.hasExams === true;
+  const courseHasExams = currentCourse?.hasExams === true;
   const examsTarget = courseHasExams ? `/courses/${courseInPath}/exams` : null;
 
   const handleDrawerToggle = () => setMobileOpen(!mobileOpen);
@@ -137,38 +129,23 @@ export function Header() {
     ...(isLoggedIn && examsTarget ? [{ key: 'exams', label: t('exams.title'), onClick: () => navigate(examsTarget) }] : []),
   ];
 
-  const handleRoleChange = (newRole: 'student' | 'teacher') => {
-    // Un alumne no pot passar a la vista de professor
-    if (newRole === 'teacher' && !hasTeacherAccess) return;
-    setRole(newRole);
-    localStorage.setItem('mooc_role', newRole);
-    window.dispatchEvent(new Event('auth-state-change'));
-    if (newRole === 'teacher') {
-      navigate('/teacher');
-    } else {
-      navigate('/dashboards/student');
-    }
-  };
-
-  // El botó del header alterna la vista, però només qui ha entrat com a professor
-  // pot anar a l'àrea de professorat. Un alumne no hi pot saltar.
-  const handleRoleToggle = () => {
-    handleRoleChange(role === 'teacher' ? 'student' : 'teacher');
+  // El rol és per curs: el botó de vista de professor només surt dins d'un curs on
+  // l'usuari és professor (a un alumne del curs no li surt).
+  const canSwitchToTeacher = isLoggedIn && isCourseProfessor(currentCourse);
+  const goToTeacherView = () => {
+    if (!currentCourse) return;
+    setMobileOpen(false);
+    navigate(teacherViewPath(currentCourse.slug || currentCourse.id, currentCourse.title));
   };
 
   const checkAuth = () => {
     const token = localStorage.getItem('token');
     const currentStudent = localStorage.getItem('currentStudent');
-    const savedRole = localStorage.getItem('mooc_role') as 'student' | 'teacher' | null;
     setIsLoggedIn(!!token || !!currentStudent);
     if (currentStudent) {
       try { setStudentName(JSON.parse(currentStudent).name); } catch { setStudentName(''); }
     } else {
       setStudentName('');
-    }
-    setHasTeacherAccess(localStorage.getItem('mooc_has_teacher') === 'true');
-    if (savedRole === 'teacher' || savedRole === 'student') {
-      setRole(savedRole);
     }
   };
 
@@ -192,11 +169,6 @@ export function Header() {
 
   const handleLogout = () => {
     authService.logout();
-    // Sense sessió no es conserva el rol ni l'accés de professor
-    localStorage.removeItem('mooc_role');
-    localStorage.removeItem('mooc_has_teacher');
-    setRole('student');
-    setHasTeacherAccess(false);
     setIsLoggedIn(false);
     setMobileOpen(false);
     window.dispatchEvent(new Event('authChange'));
@@ -267,7 +239,7 @@ export function Header() {
             {!studentName && <LanguageSwitcher />}
             {studentName && <PointsBadge points={points} />}
             {isLoggedIn && <NotificationBell />}
-            {isLoggedIn && <RoleViewButton role={role} onClick={handleRoleToggle} disabled={!hasTeacherAccess} />}
+            {canSwitchToTeacher && <TeacherViewButton onClick={goToTeacherView} />}
             {/* Aquí s'integra el menú d'avatar de l'usuari amb la imatge del header */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
 
@@ -286,7 +258,7 @@ export function Header() {
           <Stack direction="row" spacing={1} sx={{ display: { md: 'none' }, alignItems: 'center' }}>
             <ThemeToggleButton />
             {isLoggedIn && <NotificationBell />}
-            {isLoggedIn && <RoleViewButton role={role} onClick={handleRoleToggle} disabled={!hasTeacherAccess} />}
+            {canSwitchToTeacher && <TeacherViewButton onClick={goToTeacherView} />}
             {/* Si vols que l'avatar també surti a mòbil abans d'obrir el menú */}
             {studentName && <UserAvatarMenu studentName={studentName} />}
             <IconButton sx={{ color: 'text.primary' }} onClick={handleDrawerToggle} aria-label={mobileOpen ? 'Close menu' : 'Open menu'}>
@@ -338,18 +310,13 @@ export function Header() {
 
               <Divider sx={{ width: '100%', opacity: 0.1 }} />
 
-              {/* 2. Accedir o Rol */}
-              {!isLoggedIn ? (
-                <Button fullWidth onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ ...commonButtonStyle, py: 2, fontSize: '1.1rem' }}>{t('auth.access').toUpperCase()}</Button>
-              ) : (
-                <Box sx={{ display: 'flex', bgcolor: 'action.hover', borderRadius: '12px', p: 0.5, position: 'relative', width: '100%', height: '44px' }}>
-                  <Box sx={{ position: 'absolute', top: 4, bottom: 4, left: role === 'student' ? 4 : 'calc(50% + 2px)', width: 'calc(50% - 6px)', bgcolor: 'primary.main', borderRadius: '10px', transition: 'left 0.25s cubic-bezier(0.4, 0, 0.2, 1)', zIndex: 0 }} />
-                  <Button disableRipple onClick={() => { handleRoleChange('student'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'student' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_student')}</Button>
-                  <Button disableRipple disabled={!hasTeacherAccess} onClick={() => { handleRoleChange('teacher'); setMobileOpen(false); }} sx={{ flex: 1, zIndex: 1, borderRadius: '10px', fontWeight: 800, fontSize: '0.85rem', textTransform: 'none', color: role === 'teacher' ? '#fff' : 'text.secondary', '&:hover': { bgcolor: 'transparent' } }}>{t('dashboard.role_teacher')}</Button>
-                </Box>
+              {/* 2. Accedir */}
+              {!isLoggedIn && (
+                <>
+                  <Button fullWidth onClick={() => { navigate('/dashboards/student'); setMobileOpen(false); }} sx={{ ...commonButtonStyle, py: 2, fontSize: '1.1rem' }}>{t('auth.access').toUpperCase()}</Button>
+                  <Divider sx={{ width: '100%', opacity: 0.1 }} />
+                </>
               )}
-
-              <Divider sx={{ width: '100%', opacity: 0.1 }} />
 
               {/* 3. Language */}
               <Box sx={{ textAlign: 'center' }}>
