@@ -32,7 +32,6 @@ export function Login({
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState(false);
-
   const [nom, setNom] = useState('');
   const [cognoms, setCognoms] = useState('');
   const [email, setEmail] = useState('');
@@ -86,7 +85,7 @@ export function Login({
     e.preventDefault();
     setRegisterError(null);
     if (regPassword !== regConfirm) {
-      setRegisterError('Les contrasenyes no coincideixen');
+      setRegisterError(t('auth.passwords_mismatch'));
       return;
     }
     setRegisterLoading(true);
@@ -160,13 +159,13 @@ export function Login({
               <Check size={32} />
             </Avatar>
             <Typography variant="h6" sx={{ fontWeight: 800 }}>
-              Compte creat correctament
+              {t('auth.register_success_title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Benvingut/da, {nom} {cognoms}! Ja pots iniciar sessió amb el teu usuari.
+              {t('auth.register_success_text', { name: `${nom} ${cognoms}`.trim() })}
             </Typography>
             <Button variant="contained" fullWidth onClick={goBackToLogin} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-              Tornar a iniciar sessió
+              {t('auth.back_to_login')}
             </Button>
           </Stack>
         </Card>
@@ -183,7 +182,7 @@ export function Login({
 
             <TextField
               fullWidth
-              label="Username or email"
+              label={t('auth.username_or_email')}
               variant="filled"
               value={username}
               onChange={e => onUsernameChange(e.target.value)}
@@ -202,7 +201,7 @@ export function Login({
 
             <TextField
               fullWidth
-              label="Password"
+              label={t('auth.password')}
               type="password"
               value={password}
               onChange={e => onPasswordChange(e.target.value)}
@@ -238,7 +237,7 @@ export function Login({
               onClick={() => setView('forgot')}
               sx={{ fontWeight: 600 }}
             >
-              Has oblidat la contrasenya?
+              {t('auth.forgot_password')}
             </Button>
             <Button
               variant="contained"
@@ -246,7 +245,7 @@ export function Login({
               onClick={() => setView('register')}
               sx={{ borderRadius: '12px', py: 1.2, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}
             >
-              Crear un Compte
+              {t('auth.create_account')}
             </Button>
           </Stack>
         </Card>
@@ -262,28 +261,28 @@ export function Login({
               >
               </Button>
               <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
-                Has oblidat la contrasenya?
+                {t('auth.forgot_password')}
               </Typography>
             </Stack>
 
             {forgotSent ? (
               <>
                 <Typography variant="body2" sx={{ textAlign: 'center' }}>
-                  Si existeix un compte amb aquesta adreça, rebràs un correu amb instruccions per establir-ne una de nova.
+                  {t('auth.forgot_sent')}
                 </Typography>
                 <Button variant="contained" fullWidth onClick={goBackToLogin} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
-                  Tornar a iniciar sessió
+                  {t('auth.back_to_login')}
                 </Button>
               </>
             ) : (
               <>
                 <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-                  Introdueix la teva adreça de correu electrònic i t'enviarem instruccions per establir-ne una de nova.
+                  {t('auth.forgot_intro')}
                 </Typography>
 
                 <TextField
                   fullWidth
-                  label="Adreça de correu electrònic"
+                  label={t('auth.email_address')}
                   variant="filled"
                   type="email"
                   value={forgotEmail}
@@ -302,7 +301,7 @@ export function Login({
 
                 <Button type="submit" variant="contained" fullWidth disabled={forgotLoading} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
                   {forgotLoading && <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />}
-                  Envia l'enllaç de restabliment
+                  {t('auth.send_reset_link')}
                 </Button>
               </>
             )}
@@ -322,10 +321,10 @@ export function Login({
                 onClick={goBackToLogin}
                 sx={{ fontWeight: 700, color: '#ffffff' }}
               >
-                Iniciar sessió
+                {t('auth.login_link')}
               </Button>
               <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
-                Crear un Compte
+                {t('auth.create_account')}
               </Typography>
             </Stack>
 
@@ -342,11 +341,11 @@ export function Login({
                       startIcon={<Upload size={18} />}
                       sx={{ borderRadius: '12px', fontWeight: 700 }}
                     >
-                      Tria fitxer
+                      {t('auth.choose_file')}
                       <input type="file" hidden accept="image/*" onChange={handleAvatarChange} />
                     </Button>
                     <Typography variant="caption" color="text.secondary">
-                      {avatar ? avatar.name : 'Penja la foto del teu avatar'}
+                      {avatar ? avatar.name : t('auth.avatar_hint')}
                     </Typography>
                   </Stack>
                 </Box>
@@ -355,7 +354,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Nom"
+                  label={t('auth.first_name')}
                   variant="filled"
                   value={nom}
                   onChange={e => setNom(e.target.value)}
@@ -368,7 +367,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Cognoms"
+                  label={t('auth.last_name')}
                   variant="filled"
                   value={cognoms}
                   onChange={e => setCognoms(e.target.value)}
@@ -381,7 +380,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Email"
+                  label={t('auth.email')}
                   variant="filled"
                   type="email"
                   value={email}
@@ -396,7 +395,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Nom d'usuari"
+                  label={t('auth.username')}
                   variant="filled"
                   value={regUsername}
                   onChange={e => setRegUsername(e.target.value)}
@@ -409,13 +408,13 @@ export function Login({
 
               <Grid size={{ xs: 12 }}>
                 <FormControl fullWidth variant="filled" sx={fieldSx}>
-                  <InputLabel>Organització</InputLabel>
+                  <InputLabel>{t('auth.organization')}</InputLabel>
                   <Select
                     value={org}
                     onChange={e => setOrg(e.target.value as string)}
-                    label="Organització"
+                    label={t('auth.organization')}
                   >
-                    <MenuItem value="">Sense organització</MenuItem>
+                    <MenuItem value="">{t('auth.no_organization')}</MenuItem>
                     {orgs.map(o => (
                       <MenuItem key={o.id} value={String(o.id)}>{o.name}</MenuItem>
                     ))}
@@ -426,7 +425,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Contrasenya"
+                  label={t('auth.password')}
                   variant="filled"
                   type="password"
                   value={regPassword}
@@ -441,7 +440,7 @@ export function Login({
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField
                   fullWidth
-                  label="Confirma Contrasenya"
+                  label={t('auth.confirm_password')}
                   variant="filled"
                   type="password"
                   value={regConfirm}
@@ -464,7 +463,7 @@ export function Login({
               <Grid size={{ xs: 12 }}>
                 <Button type="submit" variant="contained" color="success" fullWidth disabled={registerLoading} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
                   {registerLoading && <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />}
-                  Crear
+                  {t('auth.register_submit')}
                 </Button>
               </Grid>
             </Grid>

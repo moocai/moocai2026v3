@@ -18,6 +18,7 @@ import { preloadMonaco } from '../../utils/monaco';
 import { useRecordCourseActivity } from '../../utils/lastCourse';
 // import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
+import { getLocalizedText } from '../../utils/formatters';
 
 type I18nField = { ca: string; es: string; en: string };
 // Selector de curs desactivat: dins d'un curs no cal canviar-ne; per canviar de curs, el menú Cursos de la capçalera.
@@ -229,12 +230,8 @@ export default function CourseLessons() {
     return Math.round((done.length / completable.length) * 100);
   };
 
-  const lang = (i18n.language?.split('-')[0] as keyof I18nField) || 'ca';
-  const getText = (field: I18nField | string | undefined): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return field[lang] || field['ca'] || '';
-  };
+  const lang = i18n.language;
+  const getText = (field: I18nField | string | undefined): string => getLocalizedText(field, lang);
 
   const getDifficultyColor = (difficulty?: string) => {
     switch (difficulty) {
@@ -700,7 +697,7 @@ export default function CourseLessons() {
             </Box>
 
             {/* Mòbil: botó "Topics" per obrir/tancar el menú de temes */}
-            <Button onClick={() => setMobileNavOpen((v) => !v)} aria-label={mobileNavOpen ? t('lesson.close_topics', 'Tancar temes') : t('lesson.open_topics', 'Obrir temes')} aria-expanded={mobileNavOpen} aria-controls="lesson-topics" variant="outlined" startIcon={mobileNavOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />} sx={{ display: { xs: 'inline-flex', md: 'none' }, textTransform: 'none', fontWeight: 900, fontSize: '1rem', borderRadius: 999, borderColor: '#00685d', color: '#00685d', px: 2, mt: { xs: 2 }, mb: { xs: -3 } }}> Topics </Button>
+            <Button onClick={() => setMobileNavOpen((v) => !v)} aria-label={mobileNavOpen ? t('lesson.close_topics', 'Tancar temes') : t('lesson.open_topics', 'Obrir temes')} aria-expanded={mobileNavOpen} aria-controls="lesson-topics" variant="outlined" startIcon={mobileNavOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />} sx={{ display: { xs: 'inline-flex', md: 'none' }, textTransform: 'none', fontWeight: 900, fontSize: '1rem', borderRadius: 999, borderColor: '#00685d', color: '#00685d', px: 2, mt: { xs: 2 }, mb: { xs: -3 } }}> {t('lesson.topics')} </Button>
 
             <Typography sx={{ color: 'text.secondary', fontSize: { xs: '1rem', md: '1.4rem' }, maxWidth: '900px' }}>
               {getText(course.description)}
@@ -728,8 +725,8 @@ export default function CourseLessons() {
 
         {/* Mòbil: separador + botó de topics dins del mateix rail flotant */}
         <Box sx={{ display: { xs: 'block', md: 'none' }, width: 22, height: 1, bgcolor: 'divider', my: -1, flexShrink: 0 }} />
-        <Tooltip title="Topics" placement="left">
-          <Box component="button" type="button" aria-label="Topics" aria-controls="lesson-topics" onClick={() => setMobileNavOpen(true)} sx={{ display: { xs: 'flex', md: 'none' }, width: { xs: 36, md: 44 }, height: { xs: 36, md: 44 }, alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', cursor: 'pointer', bgcolor: 'transparent', color: 'text.secondary', transition: 'background-color 0.2s, color 0.2s', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.12) } }}><ListIcon size={20} /></Box>
+        <Tooltip title={t('lesson.topics')} placement="left">
+          <Box component="button" type="button" aria-label={t('lesson.topics')} aria-controls="lesson-topics" onClick={() => setMobileNavOpen(true)} sx={{ display: { xs: 'flex', md: 'none' }, width: { xs: 36, md: 44 }, height: { xs: 36, md: 44 }, alignItems: 'center', justifyContent: 'center', border: 'none', borderRadius: '50%', cursor: 'pointer', bgcolor: 'transparent', color: 'text.secondary', transition: 'background-color 0.2s, color 0.2s', '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.12) } }}><ListIcon size={20} /></Box>
         </Tooltip>
       </Box>
 

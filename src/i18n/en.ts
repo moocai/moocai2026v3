@@ -4,9 +4,33 @@ export default {
     logout: "Logout",
     start: "Home",
     login_students: "Student Access",
-    incorrect_pin: "Incorrect PIN",
+    incorrect_pin: "Incorrect username or password",
     access: "Log in / Sign in",
     enroll_login_required: "You must log in to enroll in the course",
+    register_success_title: "Account created",
+    register_success_text: "Welcome, {{name}}! You can now log in with your username.",
+    back_to_login: "Back to log in",
+    username_or_email: "Username or email",
+    password: "Password",
+    forgot_password: "Forgot your password?",
+    create_account: "Create an account",
+    forgot_sent: "If an account exists with this address, you'll get an email with instructions to set a new password.",
+    forgot_intro: "Enter your email address and we'll send you instructions to set a new password.",
+    email_address: "Email address",
+    send_reset_link: "Send reset link",
+    login_link: "Log in",
+    choose_file: "Choose file",
+    avatar_hint: "Upload a photo for your avatar",
+    first_name: "First name",
+    last_name: "Last name",
+    email: "Email",
+    username: "Username",
+    organization: "Organization",
+    no_organization: "No organization",
+    confirm_password: "Confirm password",
+    passwords_mismatch: "The passwords don't match",
+    register_error: "The account couldn't be created. Check the details.",
+    register_submit: "Create",
     forgot_error: "We couldn't send the email. Check the address and try again."
   },
     dashboard: {
@@ -96,6 +120,9 @@ export default {
     next_up_answer: "Answer",
     next_up_not_accepted: "not accepted yet",
     next_up_all_done: "You have done every problem available. Well done!",
+    stats_show_less: "Show less",
+    stats_show_more_one: "Show {{count}} more",
+    stats_show_more_other: "Show {{count}} more"
   },
   home: {
     enrolled_title: "My courses",
@@ -177,7 +204,8 @@ export default {
     current_password_required: "The current password is required to change it",
     passwords_mismatch: "The passwords do not match",
     saved: "Profile updated successfully ✅",
-    save: "Save changes"
+    save: "Save changes",
+    org_type_training_centre: "Training centre"
   },
 
   notification_center: {
@@ -346,7 +374,7 @@ export default {
     progress_error: "Error saving progress ⚠️",
     account_created: "Account created successfully, {{name}} ({{role}}) 🎉",
     user_deleted: "User deleted: {{name}} ({{role}}) 🗑️",
-    incorrect_pin: "Incorrect PIN ❌",
+    incorrect_pin: "Incorrect username or password ❌",
     welcome: "Welcome, {{name}} 👋",
     session_closed: "Session closed 👋",
     course_reset: "Course reset successfully 🗑️",
@@ -452,7 +480,26 @@ export default {
     eliminarCurso: "Delete course",
     eliminarCursoConfirmar: "Are you sure you want to delete \"{{nombre}}\"? This action cannot be undone.",
     eliminar: "Delete",
-    solucionProfesor: "Teacher's solution"
+    solucionProfesor: "Teacher's solution",
+    filtroTodos: "All",
+    estadoActivo: "Active",
+    estadoInactivo: "Inactive",
+    estadoCompletado: "Completed",
+    estadoBloqueado: "Blocked",
+    estadoBorrador: "Draft",
+    cursoNombre: "Name",
+    cursoDescripcion: "Description",
+    cursoDuracion: "Duration",
+    cursoDuracionEjemplo: "8 weeks",
+    ejecutar: "Run",
+    previewTitulo: "PREVIEW",
+    previewSinCodigo: "// No React code to show",
+    previewPulsaEjecutar: "// Press Run to see the preview",
+    invitacionEmail: "Email",
+    invitacionEnviando: "Sending...",
+    invitacionEnviada: "Invitation sent to {{email}}",
+    invitacionError: "The invitation couldn't be sent",
+    codigoEjecutado: "✅ Code ran successfully"
   },
   lesson: {
     syllabus: "Syllabus",
@@ -619,7 +666,15 @@ export default {
     points_earned_other: "+{{count}} stars!",
     total_points: "Total stars: {{count}}",
     sending: "Sending to the server...",
-    submitted: "Answer sent to the server"
+    submitted: "Answer sent to the server",
+    back_to_named_course: "Back to {{course}}",
+    preview_frame_title: "React preview",
+    preview_ts_unavailable: "The TypeScript worker isn't available.",
+    preview_compile_error: "The TSX code couldn't be compiled.",
+    preview_no_component: "No component found. Define `function App() { ... }`.",
+    preview_unsupported_module: "Module not supported in the preview: {{module}}",
+    python_worker_error: "The Python worker couldn't start",
+    topic_not_found: "Topic not found"
   },
   difficulty: {
     easy: "Easy",
@@ -647,5 +702,11 @@ export default {
     submit: "Submit",
     submit_busy: "The server is busy. Please try again in a while.",
     submit_error: "The answer could not be sent."
+  },
+  nav: {
+    menu: "Menu",
+    open_menu: "Open menu",
+    close_menu: "Close menu",
+    breadcrumb: "Breadcrumb"
   }
 };

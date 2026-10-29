@@ -7,8 +7,12 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { I18nProvider } from './contexts/I18nContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+// Idioma de la interfície (abans que es pinti res)
+import './i18n';
 import App from './App';
 import { queryClient } from './services/sessionCache';
+// Canvis d'idioma: tornar a demanar al servidor el contingut en l'idioma nou
+import './services/language';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(

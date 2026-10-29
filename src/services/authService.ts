@@ -2,6 +2,7 @@ import { registerUser, type RegisterPayload } from './register';
 import { publicClient } from './httpClient';
 import { clearPrivateLocalData } from './testAnswerStorage';
 import { resetSessionCaches } from './sessionCache';
+import { applyAccountLanguage, clearAccountLanguage } from './language';
 
 const LOGOUT_TIMEOUT = 5000;
 
@@ -18,6 +19,8 @@ export const authService = {
       resetSessionCaches();
     }
     if (data?.user) {data.user.password = '***';}
+    // L'idioma desat al compte (o, si se n'havia triat un en aquest navegador, aquest al compte)
+    if (data?.token) applyAccountLanguage(data?.user?.language);
 
     return data;
   },
@@ -40,6 +43,7 @@ export const authService = {
     localStorage.removeItem('currentStudent');
     clearPrivateLocalData();
     resetSessionCaches();
+    clearAccountLanguage();
 
     if (token) {
       void publicClient

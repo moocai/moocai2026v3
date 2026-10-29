@@ -32,6 +32,7 @@ import { AiHelpPanel } from '../courses/AiHelpPanel';
 import { ProblemBreadcrumb, type Crumb } from '../../features/lesson/ProblemBreadcrumb';
 import { MaterialsPanel } from '../../features/lesson/MaterialsPanel';
 import { refreshCoursePoints, getCurrentStudent, getTotalPoints } from '../../utils/pointsSync';
+import { getLocalizedText } from '../../utils/formatters';
 
 interface Student { id: string; name: string; }
 
@@ -378,12 +379,8 @@ export default function LessonPage() {
 
   const handleValidate = (markers: any[]) => setDiagnostics(markers);
   
-  const lang = (i18n.language?.split('-')[0]) as 'ca' | 'es' | 'en';
-  const getText = (field: any): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return field[lang] || field['ca'] || field['es'] || field['en'] || '';
-  };
+  const lang = i18n.language;
+  const getText = (field: any): string => getLocalizedText(field, lang);
 
   const outlineProblem = course?.content?.flatMap((t: any) => t.subTopics || []).find((s: any) => s.problemSlug === lessonId || s.slug === lessonId);
   // Slug real del tema que conté el problema (abans la revisió IA demanava "general").
@@ -749,7 +746,7 @@ export default function LessonPage() {
     const wasSolvedBefore = solved;
     setConsoleOutput([`[${t('lesson.system', 'SISTEMA')}]: ${t('lesson.executing', 'Executant...')}`]);
     setStatus('idle');
-    try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error('Topic not found'); setConsoleOutput(p => [...p, `📤 ${t('lesson.sending', 'Enviant al servidor...')}`]);
+    try {const topic = course?.content?.find((t: any) => t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)); if (!topic) throw new Error(t('lesson.topic_not_found')); setConsoleOutput(p => [...p, `📤 ${t('lesson.sending', 'Enviant al servidor...')}`]);
       const result = await courseService.submitChallenge(courseId!,topic.id,lessonId!,{code: userInputRef.current, language: selectedLanguage });
       setConsoleOutput(p => [...p, `✅ ${t('lesson.submitted', 'Resposta enviada al servidor')}`]);
       // El servidor corregeix: `accepted` vol dir que passa totes les proves
@@ -911,7 +908,7 @@ export default function LessonPage() {
       const topic = course?.content?.find((t: any) =>
         t.subTopics?.some((s: any) => s.problemSlug === lessonId || s.slug === lessonId)
       );
-      if (!topic) throw new Error('Topic not found');
+      if (!topic) throw new Error(t('lesson.topic_not_found'));
       const data = await courseService.getPeerSubmissions(courseId, topic.id, lessonId);
       setPeerSolutions(data);} 
       catch {setPeerSolutions([]);

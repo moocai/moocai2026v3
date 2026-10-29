@@ -15,6 +15,7 @@ import {
   type Organization, type ProfileUser,
 } from '../services/profileService';
 import { invalidateImage, preloadImage, myAvatarUrl } from '../utils/avatarCache';
+import i18n from '../i18n';
 
 const languages = [
   { code: 'en', labelKey: 'profile.lang_english' },
@@ -80,9 +81,11 @@ function FlagIcon({ code, size = 20 }: { code: string; size?: number }) {
   );
 }
 
-const DEFAULT_ORG: Organization = { id: -1, name: 'CIFO BCN La Violeta', type: 'Centre de formació' };
+// El tipus de l'organització de demostració és una clau de traducció (`orgSubtitle` la tradueix)
+const DEFAULT_ORG: Organization = { id: -1, name: 'CIFO BCN La Violeta', type: 'profile.org_type_training_centre' };
 /** Subtítol de l'organització: el tipus si l'endpoint el retorna, sinó el de la demo. */
 function orgSubtitle(org: Organization) {
+  if (org.id === DEFAULT_ORG.id && org.type) return i18n.t(org.type);
   return org.type ?? org.subtitle ?? null;
 }
 
@@ -187,7 +190,7 @@ export default function ProfilePage() {
   });
   const { addNotification } = useNotifications();
   const { language, setLanguage } = useI18n();
-  const currentLang = (language?.split('-')[0] || 'ca') as string;
+  const currentLang = language;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const stored = readStoredProfile();

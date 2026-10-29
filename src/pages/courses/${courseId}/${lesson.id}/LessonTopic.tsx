@@ -6,6 +6,7 @@ import { Box, Typography, Button, IconButton, CircularProgress, useTheme, useMed
 import { useTranslation } from 'react-i18next';
 
 import { courseService } from '../../../../services/courseService';
+import { getLocalizedText } from '../../../../utils/formatters';
 
 // Tipus per a suportar multiidioma (ca, es, en)
 type I18nField = { ca: string; es: string; en: string };
@@ -44,12 +45,8 @@ export default function LessonTopic() {
       .catch(() => setApiData(null))
       .finally(() => setLoading(false));
   }, [courseId]);
-  const lang = (i18n.language?.split('-')[0] as keyof I18nField) || 'ca';
-  const getText = (field: I18nField | string | Record<string, string> | undefined): string => {
-    if (!field) return '';
-    if (typeof field === 'string') return field;
-    return (field as any)[lang] || (field as any)['ca'] || '';
-  };
+  const lang = i18n.language;
+  const getText = (field: I18nField | string | Record<string, string> | undefined): string => getLocalizedText(field as any, lang);
 
   const course = useMemo(() => apiData?.courses?.find((c) => c.id === courseId), [apiData, courseId]);
   const lesson = useMemo(() => course?.content?.find((l) => l.id === lessonId), [course, lessonId]);

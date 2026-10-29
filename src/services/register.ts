@@ -1,5 +1,7 @@
 import { apiErrorMessages, publicClient } from './httpClient';
 import { clearPrivateLocalData } from './testAnswerStorage';
+import { applyAccountLanguage } from './language';
+import i18n from '../i18n';
 
 export const REGISTER_URL = '/auth/register/';
 /** Dades del formulari (organitzacions, avatar per defecte). Només `GET`. */
@@ -55,12 +57,14 @@ export async function registerUser(payload: RegisterPayload) {
 
   const response = await publicClient.post(REGISTER_URL, formData);
 
-  const data = response.data as { token?: string } | undefined;
+  const data = response.data as { token?: string; user?: { language?: string } } | undefined;
   if (data?.token) {
     // Sessió nova: res de l'alumne anterior (ni el seu id, ni les respostes dels tests, ni el codi)
     localStorage.removeItem('currentStudent');
     clearPrivateLocalData();
     localStorage.setItem('token', data.token);
+    // El compte nou pren l'idioma de la petició (el de la interfície)
+    applyAccountLanguage(data.user?.language);
   }
 
   return data;
@@ -69,5 +73,5 @@ export async function registerUser(payload: RegisterPayload) {
 export function extractRegisterErrors(error: unknown): string {
   const messages = apiErrorMessages(error);
   if (messages.length > 0) return messages.join('. ');
-  return "No s'ha pogut crear el compte. Revisa les dades.";
+  return i18n.t('auth.register_error');
 }

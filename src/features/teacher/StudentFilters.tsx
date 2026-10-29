@@ -21,11 +21,11 @@ export function StudentFilters({ filters, onChange }: StudentFiltersProps) {
       <FormControl size="small" sx={{ minWidth: 160 }}>
         <InputLabel id="estado-label">{t('teacher.filtroEstado')}</InputLabel>
         <Select labelId="estado-label" label={t('teacher.filtroEstado')} value={filters.estado} onChange={(e) => onChange({ ...filters, estado: e.target.value as Estado | 'todos' })}>
-          <MenuItem value="todos">Todos</MenuItem>
-          <MenuItem value="activo">Activo</MenuItem>
-          <MenuItem value="inactivo">Inactivo</MenuItem>
-          <MenuItem value="completado">Completado</MenuItem>
-          <MenuItem value="bloqueado">Bloqueado</MenuItem>
+          <MenuItem value="todos">{t('teacher.filtroTodos')}</MenuItem>
+          <MenuItem value="activo">{t('teacher.estadoActivo')}</MenuItem>
+          <MenuItem value="inactivo">{t('teacher.estadoInactivo')}</MenuItem>
+          <MenuItem value="completado">{t('teacher.estadoCompletado')}</MenuItem>
+          <MenuItem value="bloqueado">{t('teacher.estadoBloqueado')}</MenuItem>
         </Select>
       </FormControl>
       <FormControl size="small" sx={{ minWidth: 160 }}>

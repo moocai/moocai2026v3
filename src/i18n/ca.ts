@@ -4,9 +4,33 @@ export default {
     logout: "Sortir",
     start: "Inici",
     login_students: "Accés Alumnes",
-    incorrect_pin: "Contrassenya incorrecte",
+    incorrect_pin: "Usuari o contrasenya incorrectes",
     access: "Inicia sessió",
     enroll_login_required: "Has d'iniciar sessió per inscriure't al curs",
+    register_success_title: "Compte creat correctament",
+    register_success_text: "Benvingut/da, {{name}}! Ja pots iniciar sessió amb el teu usuari.",
+    back_to_login: "Tornar a iniciar sessió",
+    username_or_email: "Usuari o correu electrònic",
+    password: "Contrasenya",
+    forgot_password: "Has oblidat la contrasenya?",
+    create_account: "Crear un compte",
+    forgot_sent: "Si existeix un compte amb aquesta adreça, rebràs un correu amb instruccions per establir-ne una de nova.",
+    forgot_intro: "Introdueix la teva adreça de correu electrònic i t'enviarem instruccions per establir-ne una de nova.",
+    email_address: "Adreça de correu electrònic",
+    send_reset_link: "Envia l'enllaç de restabliment",
+    login_link: "Iniciar sessió",
+    choose_file: "Tria fitxer",
+    avatar_hint: "Penja la foto del teu avatar",
+    first_name: "Nom",
+    last_name: "Cognoms",
+    email: "Correu electrònic",
+    username: "Nom d'usuari",
+    organization: "Organització",
+    no_organization: "Sense organització",
+    confirm_password: "Confirma la contrasenya",
+    passwords_mismatch: "Les contrasenyes no coincideixen",
+    register_error: "No s'ha pogut crear el compte. Revisa les dades.",
+    register_submit: "Crear",
     forgot_error: "No s'ha pogut enviar el correu. Revisa l'adreça i torna-ho a provar."
   },
     dashboard: {
@@ -96,6 +120,9 @@ export default {
     next_up_answer: "Contesta",
     next_up_not_accepted: "encara no acceptat",
     next_up_all_done: "Has fet tots els problemes disponibles. Molt bé!",
+    stats_show_less: "Mostra'n menys",
+    stats_show_more_one: "Mostra'n {{count}} més",
+    stats_show_more_other: "Mostra'n {{count}} més"
   },
   home: {
     enrolled_title: "Els meus cursos",
@@ -109,7 +136,7 @@ export default {
       code_desc: "Domina patrons de disseny escalables i arquitectures professionals.",
       portfolio_title: "Portfolio d'Alt Impacte",
       portfolio_desc: "Construeix 20+ aplicacions fullstack per impressionar en entrevistes.",
-      stack_title: "Stack de Vanguardia 2026",
+      stack_title: "Stack d'avantguarda 2026",
       stack_desc: "Domina Next.js 15, React 19 i Tailwind v4.",
       networking_title: "Networking Global",
       networking_desc: "Comunitat exclusiva a Discord amb 50k+ desenvolupadors.",
@@ -121,7 +148,7 @@ export default {
   },
   hero: {
     subtitle: "Uneix-te als alumnes que ja estan dominant les tecnologies de 2026 amb projectes reals.",
-    build_apps: "Build Real-World Apps",
+    build_apps: "Crea aplicacions reals",
     stats: {students: "Estudiants", courses: "Cursos Actius",support: "Support"},
     scroll_down: "FES SCROLL"
   },
@@ -173,9 +200,10 @@ export default {
     new_password1: "Nova contrasenya",
     new_password2: "Confirma la nova contrasenya",
     current_password_required: "Cal la contrasenya actual per canviar-la",
-    passwords_mismatch: "Les contrasenys no coincideixen",
+    passwords_mismatch: "Les contrasenyes no coincideixen",
     saved: "Perfil actualitzat correctament ✅",
-    save: "Desa els canvis"
+    save: "Desa els canvis",
+    org_type_training_centre: "Centre de formació"
   },
 
   notification_center: {
@@ -344,7 +372,7 @@ export default {
     progress_error: "Error en desar el progrés ⚠️",
     account_created: "Compte creat correctament, {{name}} ({{role}}) 🎉",
     user_deleted: "Usuari eliminat: {{name}} ({{role}}) 🗑️",
-    incorrect_pin: "Contrassenya incorrecte ❌",
+    incorrect_pin: "Usuari o contrasenya incorrectes ❌",
     welcome: "Benvingut/da, {{name}} 👋",
     session_closed: "Sessió tancada 👋",
     course_reset: "Curs reiniciat correctament 🗑️",
@@ -450,7 +478,26 @@ export default {
     eliminarCurso: "Eliminar curs",
     eliminarCursoConfirmar: "Esteu segur que voleu eliminar \"{{nombre}}\"? Aquesta acció no es pot desfer.",
     eliminar: "Eliminar",
-    solucionProfesor: "Solució del professor"
+    solucionProfesor: "Solució del professor",
+    filtroTodos: "Tots",
+    estadoActivo: "Actiu",
+    estadoInactivo: "Inactiu",
+    estadoCompletado: "Completat",
+    estadoBloqueado: "Bloquejat",
+    estadoBorrador: "Esborrany",
+    cursoNombre: "Nom",
+    cursoDescripcion: "Descripció",
+    cursoDuracion: "Durada",
+    cursoDuracionEjemplo: "8 setmanes",
+    ejecutar: "Executa",
+    previewTitulo: "VISTA PRÈVIA",
+    previewSinCodigo: "// No hi ha codi React per mostrar",
+    previewPulsaEjecutar: "// Prem Executa per veure la vista prèvia",
+    invitacionEmail: "Correu electrònic",
+    invitacionEnviando: "Enviant...",
+    invitacionEnviada: "Invitació enviada a {{email}}",
+    invitacionError: "No s'ha pogut enviar la invitació",
+    codigoEjecutado: "✅ Codi executat correctament"
   },
   lesson: {
     syllabus: "Temari",
@@ -617,7 +664,15 @@ export default {
     points_earned_other: "+{{count}} estrelles!",
     total_points: "Estrelles totals: {{count}}",
     sending: "Enviant al servidor...",
-    submitted: "Resposta enviada al servidor"
+    submitted: "Resposta enviada al servidor",
+    back_to_named_course: "Tornar a {{course}}",
+    preview_frame_title: "Vista prèvia de React",
+    preview_ts_unavailable: "El worker de TypeScript no està disponible.",
+    preview_compile_error: "No s'ha pogut compilar el codi TSX.",
+    preview_no_component: "No s'ha trobat cap component. Defineix `function App() { ... }`.",
+    preview_unsupported_module: "Mòdul no suportat al preview: {{module}}",
+    python_worker_error: "No s'ha pogut iniciar el worker de Python",
+    topic_not_found: "No s'ha trobat el tema"
   },
   difficulty: {
     easy: "Fàcil",
@@ -645,5 +700,11 @@ export default {
     submit: "Envia",
     submit_busy: "El servidor està ocupat. Torna-ho a provar d'aquí a una estona.",
     submit_error: "No s'ha pogut enviar la resposta."
+  },
+  nav: {
+    menu: "Menú",
+    open_menu: "Obre el menú",
+    close_menu: "Tanca el menú",
+    breadcrumb: "Ruta de navegació"
   }
 };

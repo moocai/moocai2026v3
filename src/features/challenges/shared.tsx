@@ -1,7 +1,7 @@
 import { Box, Chip, alpha } from '@mui/material';
 import { Archive, ArrowDownWideNarrow, ArrowUpWideNarrow, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getBaseLanguage } from '../../utils/formatters';
+import { getBaseLanguage, getLocalizedText } from '../../utils/formatters';
 import { LOWER_IS_BETTER, type Challenge, type ChallengeMetric } from '../../services/challengeService';
 
 /** Color d'accent de les pàgines de curs (Drive, Enquestes…) */
@@ -33,11 +33,9 @@ export function currentUserId(): string | null {
 
 /** Descripció del repte en l'idioma de l'usuari (Markdown), amb les altres com a reserva. */
 export function challengeDescription(challenge: Challenge, language: string | undefined): string {
-  const lang = getBaseLanguage(language, 'ca');
-  return (
-    challenge[`description_${lang}` as const]
-    || challenge.description_ca || challenge.description_es || challenge.description_en || ''
-  ).trim();
+  return getLocalizedText({
+    ca: challenge.description_ca, es: challenge.description_es, en: challenge.description_en,
+  }, getBaseLanguage(language)).trim();
 }
 
 /** Text pla d'un Markdown, per als resums de les targetes. */

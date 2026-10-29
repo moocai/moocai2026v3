@@ -1,18 +1,18 @@
 import { Button, Stack } from '@mui/material';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../hooks/useI18n';
 
 const languages = [{code: 'ca', label: 'CA'},{code: 'es', label: 'ES'},{code: 'en', label: 'EN'}];
 
 export function LanguageSwitcher() {
-  const { i18n } = useTranslation();
-  const currentLang = (i18n.language?.split('-')[0] || 'ca') as string;
+  // El mateix idioma (i la mateixa manera de triar-lo) que el selector del perfil
+  const { language: currentLang, setLanguage } = useI18n();
 
   return (
     <Stack direction="row" sx={{ bgcolor: 'action.hover', borderRadius: '12px', p: 0.3, border: '2px solid #8400ff' }}>
       {languages.map((lang) => (
         <Button
           key={lang.code}
-          onClick={() => i18n.changeLanguage(lang.code)}
+          onClick={() => setLanguage(lang.code)}
           sx={{
             minWidth: '36px',
             px: 1,
