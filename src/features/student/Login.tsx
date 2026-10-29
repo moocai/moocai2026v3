@@ -32,7 +32,6 @@ export function Login({
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState(false);
-
   const [nom, setNom] = useState('');
   const [cognoms, setCognoms] = useState('');
   const [email, setEmail] = useState('');
