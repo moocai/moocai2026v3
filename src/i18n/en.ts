@@ -6,7 +6,8 @@ export default {
     login_students: "Student Access",
     incorrect_pin: "Incorrect PIN",
     access: "Log in / Sign in",
-    enroll_login_required: "You must log in to enroll in the course"
+    enroll_login_required: "You must log in to enroll in the course",
+    forgot_error: "We couldn't send the email. Check the address and try again."
   },
     dashboard: {
     last_session: "Last session",

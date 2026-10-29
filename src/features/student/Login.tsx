@@ -4,6 +4,7 @@ import {Lock, User, Mail, UserRound, Camera, ArrowLeft, Upload, Check} from 'luc
 import {useTranslation} from 'react-i18next';
 import {type ChangeEvent, type FormEvent, useEffect, useState} from 'react';
 import {type Organization, extractRegisterErrors, loadRegistrationData, registerUser} from '../../services/register';
+import {authService} from '../../services/authService';
 
 interface LoginProps {
   username: string;
@@ -29,6 +30,8 @@ export function Login({
   const [view, setView] = useState<'login' | 'register' | 'forgot'>('login');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState(false);
 
   const [nom, setNom] = useState('');
   const [cognoms, setCognoms] = useState('');
@@ -113,11 +116,23 @@ export function Login({
     setRegisterError(null);
     setForgotSent(false);
     setForgotEmail('');
+    setForgotError(false);
   };
 
-  const handleForgot = (e: FormEvent) => {
+  // Demana al servidor que enviï el correu de restabliment. La resposta és la mateixa tant si
+  // l'adreça té compte com si no; només un error (xarxa, adreça no vàlida) no es dona per enviat.
+  const handleForgot = async (e: FormEvent) => {
     e.preventDefault();
-    setForgotSent(true);
+    setForgotLoading(true);
+    setForgotError(false);
+    try {
+      await authService.requestPasswordReset(forgotEmail.trim());
+      setForgotSent(true);
+    } catch {
+      setForgotError(true);
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   const cardSx = {
@@ -279,7 +294,14 @@ export function Login({
                   sx={fieldSx}
                 />
 
-                <Button type="submit" variant="contained" fullWidth sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
+                {forgotError && (
+                  <Typography variant="body2" color="error" sx={{ textAlign: 'center', fontWeight: 600 }}>
+                    {t('auth.forgot_error')}
+                  </Typography>
+                )}
+
+                <Button type="submit" variant="contained" fullWidth disabled={forgotLoading} sx={{ borderRadius: '12px', py: 1.5, fontWeight: 800, boxShadow: 'none', '&:hover': { boxShadow: 'none' } }}>
+                  {forgotLoading && <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />}
                   Envia l'enllaç de restabliment
                 </Button>
               </>
