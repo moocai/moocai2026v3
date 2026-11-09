@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import { Menu as MenuIcon, Close as CloseIcon, Logout as LogoutIcon, KeyboardArrowDown as KeyboardArrowDownIcon } from '@mui/icons-material';
 import SchoolIcon from '@mui/icons-material/School';
-import { motion, AnimatePresence } from 'framer-motion';
 import { AppBar, Toolbar, Box, Typography, Button, IconButton, Stack, Divider, alpha, Menu, MenuItem } from '@mui/material';
 import { authService } from '../services/authService';
 import { useTranslation } from 'react-i18next';
@@ -18,15 +17,17 @@ import { usePoints } from '../utils/pointsSync';
 import { useAllCourses } from '../hooks/useCourses';
 import { isCourseProfessor, teacherViewPath } from '../utils/courseRole';
 const logo = '/img/logo.webp';
+const logoSet = '/img/logo.webp';
 
 /** Pastilla d'estrelles (la puntuació), pensada per anar al costat de l'àvia. */
 function PointsBadge({ points }: { points: number }) {
+  const { mode } = useThemeMode();
   return (
     <Box
       sx={{
         display: 'flex', alignItems: 'center', gap: 0.5,
         px: 1, height: 32, borderRadius: 999, flexShrink: 0,
-        bgcolor: alpha('#8400ff', 0.15), border: '1px solid', borderColor: alpha('#8400ff', 0.4),
+        bgcolor: alpha('#8400ff', 0.15), border: '1px solid', borderColor: mode === 'light' ? '#000' : '#fff',
       }}
     >
       <StarScore value={points} sx={{ fontSize: '0.85rem', fontWeight: 900, color: 'text.primary', lineHeight: 1 }} />
@@ -186,12 +187,12 @@ export function Header() {
 
   return (
     <>
-      <AppBar position="sticky" sx={{width: '100%', bgcolor: mode === 'fancy' ? '#000000' : mode === 'dark' ? '#1f2937' : 'white', zIndex: 1400, boxShadow: mode === 'fancy' ? 'none' : compact ? '0 1px 16px #8400ff' : '0 1px 40px #8400ff'}}>
+      <AppBar position="sticky" sx={{width: '100%', bgcolor: mode === 'fancy' ? '#000000' : mode === 'dark' ? '#1f2937' : 'white', zIndex: 1400, borderBottom: mode === 'fancy' ? '1px solid white' : 'none', boxShadow: mode === 'fancy' ? 'none' : compact ? '0 1px 16px #8400ff' : '0 1px 40px #8400ff'}}>
         <Toolbar sx={{ px: { xs: 2, md: compact ? 3 : 8 }, height: headerHeight, minHeight: { xs: headerHeight, sm: headerHeight }, display: 'flex', justifyContent: 'space-between' }}>
           
           {/* LOGO */}
         <Box component={RouterLink} to="/" state={{ fromNav: true }} sx={{ display: 'flex', flexDirection: { xs: 'row', md: 'row' }, alignItems: 'center', gap: { xs: 0.5, md: 1.5 }, textDecoration: 'none' }}>
-          <Box component="img" src={logo} alt="Rocket" width={438} height={190} sx={{ height: { xs: compact ? 17 : 22, md: compact ? 28 : 50 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s' }} />
+            <Box component="img" src={logo} srcSet={logoSet} alt="Rocket" width={115} height={50} fetchPriority="high" decoding="async" sx={{ height: { xs: compact ? 17 : 22, md: compact ? 28 : 44 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s' }} />
             <Stack direction="row" sx={{ alignItems: 'baseline' }}>
               <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'text.primary', ...(compact && { fontSize: '1.15rem' })}}>MOOC</Typography>
               <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'primary.main', ml:0.5, ...(compact && { fontSize: '1.15rem' })}}>2026</Typography>
@@ -269,9 +270,8 @@ export function Header() {
       </AppBar>
 
       {/* MOBILE MENU OVERLAY */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <Box component={motion.div} initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}  sx={{position: 'fixed', top: headerHeight,left: 0,right: 0,bottom: 0,width: '100vw',height: `calc(100vh - ${headerHeight}px)`,bgcolor: 'background.default', zIndex: 1300, display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', pt: 4, pb: 6}}>
+      {mobileOpen && (
+          <Box className="mobile-menu-enter" sx={{position: 'fixed', top: headerHeight,left: 0,right: 0,bottom: 0,width: '100vw',height: `calc(100vh - ${headerHeight}px)`,bgcolor: 'background.default', zIndex: 1300, display: 'flex', flexDirection: 'column', alignItems: 'center', overflowY: 'auto', pt: 4, pb: 6}}>
             <Stack spacing={4} sx={{ width: '85%', alignItems: 'center' }}>
 
               {/* 1. Cursos + Dashboard + nom usuari */}
@@ -335,7 +335,6 @@ export function Header() {
             </Stack>
           </Box>
         )}
-      </AnimatePresence>
     </>
   );
 }

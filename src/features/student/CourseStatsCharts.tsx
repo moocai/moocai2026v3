@@ -4,7 +4,9 @@ import { Box, Typography, Stack, CircularProgress, Tooltip, Button, useMediaQuer
 import { ArrowDownward, ArrowUpward, InfoOutlined, ExpandMore, ExpandLess } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { courseService } from '../../services/courseService';
+import { retryQuery } from '../../services/httpClient';
 import { useSeriesColors } from './chartColors';
+import { useThemeMode } from '../../hooks/useTheme';
 
 interface TopicRow {
   topic: string;
@@ -22,6 +24,9 @@ const BELOW_COLOR = 'error.main';
 /* ─── BarRow ─── */
 function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boolean; accent: string; delayMs: number }) {
   const { t } = useTranslation();
+  const { mode } = useThemeMode();
+  // El border de cada barra: negre en tema clar i blanc en dark/fancy perquè es vegi bé
+  const borderColor = mode === 'light' ? '#000' : '#fff';
   const [shown, setShown] = useState(false);
 
   useEffect(() => {
@@ -44,24 +49,27 @@ function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boole
     <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ py: 1, alignItems: 'center' }}>
       <Typography
         variant="body2"
-        sx={{ width: { xs: 80, sm: 110, md: 180 }, textAlign: 'left', color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}
+        sx={{ width: { xs: 80, sm: 110, md: 180 }, textAlign: 'center', color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}
         title={row.topic}
       >
         {row.topic}
       </Typography>
 
       <Tooltip title={rowTip} arrow placement="top">
-        <Box sx={{ flex: 1, position: 'relative', height: 18, borderRadius: 1, bgcolor: 'action.hover' }}>
-          {[0, 20, 40, 60, 80, 100].map((g) => (
-            <Box key={g} sx={{ position: 'absolute', top: 0, bottom: 0, left: `${g}%`, width: '1px', bgcolor: 'action.disabledBackground' }} />
-          ))}
-          <Box
-            sx={{
-              position: 'absolute', top: 0, left: 0, height: '100%', borderRadius: 1, bgcolor: accent,
-              width: shown ? `${row.personal}%` : '0%',
-              transition: 'width 900ms cubic-bezier(0.16,1,0.3,1)',
-            }}
-          />
+        <Box role="img" sx={{ flex: 1, position: 'relative', height: 18, borderRadius: 1, bgcolor: 'action.hover', border: `1px solid ${borderColor}` }}>
+          <Box sx={{ position: 'absolute', inset: 0, borderRadius: 1, overflow: 'hidden' }}>
+            {[0, 20, 40, 60, 80, 100].map((g) => (
+              <Box key={g} sx={{ position: 'absolute', top: 0, bottom: 0, left: `${g}%`, width: '1px', bgcolor: 'black' }} />
+            ))}
+            <Box
+              sx={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', bgcolor: accent,
+                transformOrigin: 'left center',
+                transform: shown ? `scaleX(${Math.min(Math.max(row.personal, 0), 100) / 100})` : 'scaleX(0)',
+                transition: 'transform 900ms cubic-bezier(0.16,1,0.3,1)',
+              }}
+            />
+          </Box>
           {/* Mitjana de la classe: una marca sòlida del color del text, per sobre i per sota de la barra */}
           <Box
             sx={{
@@ -73,13 +81,13 @@ function BarRow({ row, active, accent, delayMs }: { row: TopicRow; active: boole
         </Box>
       </Tooltip>
 
-      <Tooltip title={t('dashboard.stats_value_tooltip', { you: row.personal })} arrow placement="top">
+      <Tooltip title={t('dashboard.stats_value_tooltip', { you: row.personal })} arrow placement="top" describeChild>
         <Typography variant="body2" sx={{ width: { xs: 38, sm: 46 }, textAlign: 'right', fontWeight: 700, color: 'text.primary', flexShrink: 0 }}>
           {row.personal}%
         </Typography>
       </Tooltip>
 
-      <Tooltip title={diffTip} arrow placement="top">
+      <Tooltip title={diffTip} arrow placement="top" describeChild>
         <Stack direction="row" spacing={0.25} sx={{ width: { xs: 48, sm: 56 }, color: diffColor, alignItems: 'center', flexShrink: 0 }}>
           {hasActivity && diff > 0 && <ArrowUpward sx={{ fontSize: 14 }} />}
           {hasActivity && diff < 0 && <ArrowDownward sx={{ fontSize: 14 }} />}
@@ -115,13 +123,17 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
     return () => io.disconnect();
   }, [delayStart]);
 
+  // dins de ChartCard:
+const { mode } = useThemeMode(); // 'light' | 'dark' | 'fancy'
+const btnColor = mode === 'light' ? '#8400ff' : 'white';
+
   return (
     <Box ref={ref} sx={{ border: '2px solid', borderColor: '#00685d', borderRadius: 3, bgcolor: 'background.paper', overflow: 'hidden' }}>
-      <Box sx={{ px: 2.5, py: 2, borderBottom: 1, borderColor: 'divider' }}>
+      <Box sx={{ px: 2.5, py: 2, borderBottom: 2, borderColor: '#00685d' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center', minWidth: 0 }}>
-            <Box sx={{ width: 10, height: 10, borderRadius: '3px', bgcolor: accent, flexShrink: 0 }} />
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>{title}</Typography>
+            <Box sx={{ width: 10, height: 10, borderRadius: '1px', bgcolor: accent, flexShrink: 0 }} />
+            <Typography component="h3" variant="subtitle1" sx={{ fontWeight: 800 }}>{title}</Typography>
             <Typography variant="caption" color="text.secondary">({t('dashboard.stats_topics_count', { count: data.length })})</Typography>
             <Tooltip title={help} arrow placement="top">
               <InfoOutlined sx={{ fontSize: 18, color: 'text.secondary', cursor: 'help' }} />
@@ -149,8 +161,8 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
             {/* Capçalera de la columna de la diferència, amb l'explicació */}
             <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ alignItems: 'center' }}>
               <Box sx={{ flex: 1 }} />
-              <Tooltip title={t('dashboard.stats_vs_average_help')} arrow placement="top">
-                <Typography variant="caption" color="text.secondary" sx={{ width: { xs: 48, sm: 56 }, flexShrink: 0, cursor: 'help', textDecoration: 'underline dotted' }}>
+              <Tooltip title={t('dashboard.stats_vs_average_help')} arrow placement="top" describeChild>
+                <Typography variant="caption" color="text.secondary" tabIndex={0} sx={{ width: { xs: 48, sm: 56 }, flexShrink: 0, cursor: 'help', textDecoration: 'underline dotted' }}>
                   {t('dashboard.stats_vs_average')}
                 </Typography>
               </Tooltip>
@@ -158,13 +170,13 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
             {(expanded ? data : data.slice(0, limit)).map((row, i) => (
               <BarRow key={row.topic} row={row} active={active} accent={accent} delayMs={i * 55} />
             ))}
-            <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ mt: 1, pt: 1, borderTop: 1, borderColor: 'divider', alignItems: 'center' }}>
+            <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ mt: 1, pt: 1, borderTop: 1, alignItems: 'center' }}>
               <Box sx={{ width: { xs: 80, sm: 110, md: 180 }, flexShrink: 0 }} />
-              <Box sx={{ flex: 1, position: 'relative', height: 14 }}>
+              <Box sx={{ flex: 1, position: 'relative', height: 14}}>
                 {/* Al mòbil la barra és estreta: només 0, 50 i 100 % (si no, les etiquetes se sobreposen) */}
                 {[0, 20, 40, 50, 60, 80, 100].map((g) => (
                   <Typography key={g} sx={{
-                    position: 'absolute', left: `${g}%`, transform: 'translateX(-50%)', fontSize: 10, color: 'text.secondary', lineHeight: 1,
+                    position: 'absolute', left: `${g}%`, transform: 'translateX(-50%)', fontSize: 12, fontWeight:'900', color: mode === 'light' ? '#000' : '#fff', lineHeight: 1,
                     display: g === 50 ? { xs: 'block', sm: 'none' } : g === 0 || g === 100 ? 'block' : { xs: 'none', sm: 'block' },
                   }}>
                     {g}%
@@ -180,7 +192,7 @@ function ChartCard({ title, help, data, accent, delayStart = 0 }: { title: strin
                   size="small"
                   onClick={() => setExpanded((v) => !v)}
                   endIcon={expanded ? <ExpandLess fontSize="small" /> : <ExpandMore fontSize="small" />}
-                  sx={{ textTransform: 'none', fontWeight: 700 }}
+                  sx={{ textTransform: 'none', fontWeight: 700, color: btnColor }}
                 >
                   {expanded
                     ? t('dashboard.stats_show_less')
@@ -238,6 +250,7 @@ export function CourseStatsCharts({ courseSlug }: { courseSlug: string }) {
     queryFn: () => fetchCourseStats(courseSlug),
     enabled: !!courseSlug,
     staleTime: 60 * 1000,
+    retry: retryQuery,
   });
 
   // En resoldre un problema o un test, les xifres canvien
@@ -253,9 +266,9 @@ export function CourseStatsCharts({ courseSlug }: { courseSlug: string }) {
 
   return (
     <Box component="section">
-      <Typography component="h2" variant="h6" sx={{ fontWeight: 900, mb: 2 }}>{t('dashboard.performance_title')}</Typography>
+      <Typography component="h2" variant="h6" sx={{ fontWeight: 900, mb: 2}}>{t('dashboard.performance_title')}</Typography>
       {stats.isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+        <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress aria-label={t('common.loading')} /></Box>
       ) : (
         <Box sx={{ display: 'grid', gap: { xs: 3, md: 4 }, gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, alignItems: 'start' }}>
           <ChartCard title={t('dashboard.stats_coding_title')} help={t('dashboard.stats_coding_help')} data={stats.data?.coding ?? []} accent={colors.coding} delayStart={0} />

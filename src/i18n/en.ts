@@ -173,7 +173,8 @@ export default {
     access: "Log in"
   },
   course: {by: "by", enroll: "View course syllabus", go_to_course: "Go to course", percent_completed: "{{percent}}% completed"},
-  common: {error_loading: "Error loading data", stars_count_one: "{{count}} star", stars_count_other: "{{count}} stars"},
+  common: {loading: "Loading...", back: "Back", error_loading: "Error loading data", stars_count_one: "{{count}} star", stars_count_other: "{{count}} stars"},
+  theme: {light: "Light theme", dark: "Dark theme", fancy: "Fancy theme", change: "Change theme"},
   
   profile: {
     preferences: "Preferences",
@@ -558,6 +559,7 @@ export default {
     no_other_solutions: "There are no student solutions.",
     reset_tooltip: "Start over: restore the starter code",
     theory_reset_code: "Restore the original code",
+    theory_edit_code: "Edit the code",
     submit_tooltip: "Submit your solution to the server",
     show_live_render: "Show the preview",
     run_button: "Run",

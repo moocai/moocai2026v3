@@ -7,6 +7,7 @@ import {
 import { ArrowLeft, Lock, KeyRound, ShieldCheck, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useI18n } from '../hooks/useI18n';
+import { useNoindex } from '../hooks/useNoindex';
 import { useThemeMode } from '../hooks/useTheme';
 import { useNotifications } from '../contexts/NotificationContext';
 import ParticlesBackground from '../components/ParticlesBackground';
@@ -26,6 +27,7 @@ const languages = [
 const fieldBase = { bgcolor: 'action.hover', borderRadius: '10px' };
 
 const BORDER = '#000';
+const BORDER_DARK = '#fff';
 
 const sectionSx = {
   fontSize: '0.72rem', fontWeight: 900, textTransform: 'uppercase' as const,
@@ -134,16 +136,18 @@ function mirrorProfileToStorage(data: ProfileUser) {
 }
 
 export default function ProfilePage() {
+  useNoindex();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const theme = useTheme();
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
   const isLight = mode === 'light';
+  const isDark = mode === 'dark';
   const cardSx = {
     ...cardBase,
     bgcolor: isFancy ? 'rgba(20,20,20,0.72)' : 'background.paper',
-    borderColor: isFancy ? alpha(theme.palette.primary.main, 0.28) : isLight ? BORDER : 'divider',
+    borderColor: isFancy ? alpha(theme.palette.primary.main, 0.28) : isLight ? BORDER : isDark ? BORDER_DARK : 'divider',
     ...(isFancy && { backdropFilter: 'blur(10px)' }),
   };
   const labelColor = isLight ? '#000' : '#fff';
@@ -157,6 +161,8 @@ export default function ProfilePage() {
       ...fieldBase,
       // En light tornem el contorn negre (laterals i superior) però sense traç inferior.
       ...(isLight && { border: `1px solid ${BORDER}`, borderBottom: 'none' }),
+      // En dark el contorn és blanc (mateix criteri: sense traç inferior).
+      ...(isDark && { border: `1px solid ${BORDER_DARK}`, borderBottom: 'none' }),
       '&:hover': { bgcolor: 'action.selected' },
       // Elimina la línia del notched outline en TOTS els estats (normal, hover i focus).
       // Els efectes propis del TextField (fons, color del label, animació) es mantenen.
@@ -165,7 +171,7 @@ export default function ProfilePage() {
       '&.MuiInputBase-root.Mui-focused::before, &.MuiInputBase-root.Mui-focused::after': { borderBottom: 'none' },
     },
   };
-  const dividerSx = isLight ? { borderColor: BORDER } : undefined;
+  const dividerSx = isLight ? { borderColor: BORDER } : isDark ? { borderColor: BORDER_DARK } : undefined;
   /** Variant per a camps de només lectura: sense gris ni opacitat de `disabled`. */
   const readonlyFieldSx = {
     ...fieldSx,
@@ -373,7 +379,7 @@ export default function ProfilePage() {
                     startIcon={<FlagIcon code={lang.code} />}
                     sx={{
                       border: '1px solid',
-                      borderColor: isLight ? BORDER : active ? 'primary.main' : 'divider',
+                      borderColor: isLight ? BORDER : isDark ? BORDER_DARK : active ? 'primary.main' : 'divider',
                       bgcolor: active ? 'primary.main' : 'transparent',
                       color: active ? '#fff' : 'text.primary',
                       fontWeight: 900,
@@ -408,8 +414,8 @@ export default function ProfilePage() {
                       const sub = orgSubtitle(selectedOrg);
                       return (
                         <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 800, fontSize: '1rem', lineHeight:1.5, marginTop: -2}} noWrap>{selectedOrg.name}</Typography>
-                          {sub && <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary', lineHeight: 1.5 }} noWrap>{sub}</Typography>}
+                          <Typography sx={{ fontWeight: 800, fontSize: '1rem',marginTop: -1}} noWrap>{selectedOrg.name}</Typography>
+                          {sub && <Typography sx={{ fontSize: '0.78rem', color: 'text.secondary'}} noWrap>{sub}</Typography>}
                         </Box>
                       );
                     },
@@ -572,7 +578,7 @@ export default function ProfilePage() {
                 >
                   {t('profile.choose_file', 'Tria un fitxer')}
                 </Button>
-                <Typography sx={{ mt: 1, fontSize: '0.8rem', color: 'text.secondary' }} noWrap>
+                <Typography sx={{ mt: 1, fontSize: '0.8rem', color: mode === 'light' ? 'black' : 'white', borderRadius: 2}} noWrap>
                   {avatarName || t('profile.no_file_selected', 'Cap fitxer triat')}
                 </Typography>
               </Box>

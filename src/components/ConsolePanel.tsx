@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Box, Typography } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { useCodeSurface } from '../theme/codeSurface';
+import { useThemeMode } from '../hooks/useTheme';
 
 /**
  * Línia de la consola: un text de l'aplicació (string, amb el prefix "> ") o
@@ -25,6 +26,8 @@ interface ConsolePanelProps {
 
 export function ConsolePanel({ output, emptyMessage, inputActive = false, onInputSubmit, inputLabel, inputPlaceholder }: ConsolePanelProps) {
   const c = useCodeSurface();
+  const { mode } = useThemeMode();
+  const dividerColor = mode === 'light' ? '#000' : 'divider';
   const kindColors = { stdout: c.stdout, stderr: c.error, info: c.info };
   const { t } = useTranslation();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -68,9 +71,9 @@ export function ConsolePanel({ output, emptyMessage, inputActive = false, onInpu
       flexDirection: 'column',
       width: '100%',
       borderTop: '1px solid',
-      borderTopColor: 'divider',
+      borderTopColor: dividerColor,
       borderBottom: '1px solid',
-      borderColor: 'divider'
+      borderColor: dividerColor
     }}>
       <Box sx={{
         height: 30,

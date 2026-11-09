@@ -12,8 +12,12 @@ import { useRecordCourseActivity } from '../../utils/lastCourse';
 import { answerKey, isLoggedIn, readAllSavedAnswers, readSavedAnswer, saveAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 import { MarkdownContent } from '../../components/MarkdownContent';
 import { getLocalizedText } from '../../utils/formatters';
+import {useThemeMode} from '../../hooks/useTheme';
 
 export default function TopicTestPage() {
+  const { mode } = useThemeMode();
+  // light -> negre; dark i fancy -> blanc
+  const textColor = mode === 'light' ? '#000' : '#fff';
   const { courseId, challengeSlug } = useParams<{ courseId: string; challengeSlug: string }>();
   useRecordCourseActivity(courseId);
   const [searchParams] = useSearchParams();
@@ -252,7 +256,7 @@ export default function TopicTestPage() {
       p: 0.5,
       borderRadius: 1,
       borderWidth: state ? 2 : 1,
-      borderColor: color ?? 'divider',
+      borderColor: color ?? textColor,
       bgcolor: color ? alpha(color, 0.08) : 'transparent',
     };
   };
@@ -268,59 +272,56 @@ export default function TopicTestPage() {
       </Box>
     );
   };
-
   // Explicació del professor (si n'hi ha), un cop respost
   const choiceExplanation = (value: string) => {
     if (!revealed) return null;
     const review = reviewChoices.find((c: any) => String(c.id) === value);
     const explanation = review?.explanation_html || review?.explanationHtml || '';
     if (!explanation) return null;
-    return <Box sx={{ ml: 5.5, mr: 2, mb: 1, fontSize: '0.85rem', color: 'text.secondary', '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: explanation }} />;
+    return <Box sx={{ ml: 5.5, mr: 2, mb: 1, fontSize: '0.85rem', color: textColor, '& p': { m: 0 } }} dangerouslySetInnerHTML={{ __html: explanation }} />;
   };
 
   return (
     // El MainLayout dona una alçada fixa amb overflow ocult: el scroll ha de ser aquí dins
-    <Box ref={scrollRef} sx={{ width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-      <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 4 } }}>
+    <Box ref={scrollRef} sx={{ width: '100%', height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', color: textColor }}>
+      <Box sx={{ maxWidth: 1400, mx: 'auto', px: { xs: 1.5, sm: 2, md: 4 }, py: { xs: 2, md: 3 } }}>
         {/* Botó de tornar enrere */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1}}>
           {examParam ? (
-            <Button component={RouterLink} to={`/courses/${courseId}/exams/${encodeURIComponent(examParam)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+            <Button component={RouterLink} to={`/courses/${courseId}/exams/${encodeURIComponent(examParam)}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: textColor }}>
               {t('exams.back_to_exam')}
             </Button>
           ) : (
-            <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary' }}>
+            <Button component={RouterLink} to={`/courses/${courseId}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 900, color: textColor, mb: 1, borderRadius: 2, border: '2px solid #00685d', '&:hover': { bgcolor: 'transparent', border: '2px solid red' } }}>
               {getText(courseTitle) || t('lesson.back', 'Tornar')}
             </Button>
           )}
         </Box>
 
         {/* Títol principal */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-          <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '2.125rem' }, flex: 1 }}>{title}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, flexWrap: 'wrap' }}>
+          <Typography variant="h4" sx={{ fontWeight: 900, fontSize: { xs: '1.5rem', md: '1.8rem' }, flex: 1 }}>{title}</Typography>
         </Box>
 
         {/* Contingut amb scroll vertical natural */}
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 2fr' }, gap: 3, mb: 3 }}>
-          <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Paper sx={{p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: mode === 'light' ? 'black' : 'white', borderRadius: 2}}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>{t('topic_test.statement', 'Enunciat')}</Typography>
-            <MarkdownContent fontSize="1rem" sx={{ '& p': { color: 'text.secondary', lineHeight: 1.8, mb: 2 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>
-              {statement}
-            </MarkdownContent>
+            <MarkdownContent fontSize="1rem" sx={{ color: textColor, '& p, & li, & span, & h1, & h2, & h3, & h4, & strong, & em': { color: textColor }, '& p': { lineHeight: 1.8, mb: 2 },'& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem', wordBreak: 'break-all' } }}>{statement}</MarkdownContent>
           </Paper>
 
-          <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+          <Paper sx={{ p: { xs: 2, md: 3 }, bgcolor: 'background.paper', border: '1px solid', borderColor: mode === 'light' ? 'black' : 'white', borderRadius: 2 }}>
             {/* Navegador de preguntes: a dalt de la targeta, posició fixa (no depèn del nombre d'opcions) */}
             {topicTests.length > 1 && (
-              <Box sx={{ mb: 2, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Box sx={{ mb: 2, pb: 2, borderBottom: '1px solid', borderColor: mode === 'light' ? 'black' : 'white'}}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <Typography sx={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: 'text.secondary' }}>
+                  <Typography sx={{ flex: 1, fontSize: '0.85rem', fontWeight: 800, color: textColor }}>
                     {t('topic_test.question_n_of', 'Pregunta {{n}} de {{total}}', { n: currentIdx + 1, total: topicTests.length })}
                   </Typography>
-                  <Button size="small" variant="outlined" startIcon={<ChevronLeft size={16} />} onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} title="←" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: 'text.primary', borderColor: 'divider' }}>
+                  <Button size="small" variant="outlined" startIcon={<ChevronLeft size={16} />} onClick={() => goTo(currentIdx - 1)} disabled={currentIdx === 0} title="←" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: textColor, borderColor: mode === 'light' ? 'black' : 'white'}}>
                     {t('topic_test.prev', 'Anterior')}
                   </Button>
-                  <Button size="small" variant="outlined" endIcon={<ChevronRight size={16} />} onClick={() => goTo(currentIdx + 1)} disabled={currentIdx >= topicTests.length - 1} title="→" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: 'text.primary', borderColor: 'divider' }}>
+                  <Button size="small" variant="outlined" endIcon={<ChevronRight size={16} />} onClick={() => goTo(currentIdx + 1)} disabled={currentIdx >= topicTests.length - 1} title="→" sx={{ fontWeight: 700, textTransform: 'none', borderRadius: 1.5, color: textColor, borderColor: mode === 'light' ? 'black' : 'white'}}>
                     {t('topic_test.next_short', 'Següent')}
                   </Button>
                 </Box>
@@ -343,14 +344,7 @@ export default function TopicTestPage() {
                         aria-current={isCurrent ? 'step' : undefined}
                         aria-label={`${t('topic_test.question', 'Pregunta')} ${idx + 1}: ${statusLabel}`}
                         title={`${idx + 1}. ${st.title || st.name || getText(st.subtitle) || st.problemSlug} (${statusLabel})`}
-                        sx={{
-                          minWidth: 30, height: 30, px: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800,
-                          border: isCurrent ? '2px solid #8400ff' : '1px solid',
-                          borderColor: isCurrent ? '#8400ff' : (color ?? 'divider'),
-                          bgcolor: color ? alpha(color, 0.15) : 'transparent',
-                          color: color ?? 'text.primary',
-                        }}
-                      >
+                        sx={{ minWidth: 30, height: 30, px: 0.5, borderRadius: 1, fontSize: '0.8rem', fontWeight: 800,border: isCurrent ? '2px solid #8400ff' : '1px solid',borderColor: isCurrent ? '#8400ff' : (color ?? (mode === 'light' ? 'common.black' : 'common.white')),bgcolor: color ? alpha(color, 0.15) : 'transparent',color: color ?? textColor,}}>
                         {idx + 1}
                       </ButtonBase>
                     );
@@ -381,7 +375,7 @@ export default function TopicTestPage() {
               </Box>
             </Box>
 
-            <FormControl disabled={answered || loading} fullWidth>
+            <FormControl disabled={answered || loading} fullWidth sx={{ color: textColor, '& .MuiFormControlLabel-label, & .MuiFormControlLabel-label.Mui-disabled': { color: textColor } }}>
               {isMultiChoice ? (
                 <FormGroup>
                   <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: choices.length > 6 ? '1fr 1fr' : '1fr' }, gap: 1 }}>
@@ -394,7 +388,7 @@ export default function TopicTestPage() {
                           <Box sx={{ display: 'flex', alignItems: 'center' }}>
                           <FormControlLabel
                             control={<Checkbox checked={checked} onChange={(event) => handleCheckboxChange(value, event.target.checked)} sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
-                            label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
+                            label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' }, color: textColor }} dangerouslySetInnerHTML={{ __html: html }} />}
                             sx={{ mx: 1, mr: 0, flex: 1 }}
                           />
                           {choiceIcon(value)}
@@ -418,7 +412,7 @@ export default function TopicTestPage() {
                           <FormControlLabel
                             value={value}
                             control={<Radio sx={{ '&.Mui-checked': { color: '#8400ff' } }} />}
-                            label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' } }} dangerouslySetInnerHTML={{ __html: html }} />}
+                            label={<Box component="span" sx={{ fontSize: { xs: '0.9rem', md: '1rem' }, color: textColor }} dangerouslySetInnerHTML={{ __html: html }} />}
                             sx={{ mx: 1, mr: 0, flex: 1 }}
                           />
                           {choiceIcon(value)}

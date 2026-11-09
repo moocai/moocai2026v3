@@ -10,15 +10,17 @@ export function getTheme(mode: ThemeMode): Theme {
       mode: isFancy ? 'dark' : mode,
       ...(mode === 'dark'
         ? {
-            primary: { main: '#9f5fff' },
-            secondary: { main: '#ec4899' },
+            primary: { main: '#8400ff' },
+            secondary: { main: '#f472b6' },
+            error: { main: '#ff8a80' },
             background: { default: '#111827', paper: '#1f2937' },
             text: { primary: '#f1f5f9', secondary: '#cbd5e1' },
           }
         : mode === 'fancy'
           ? {
               primary: { main: '#8400ff' },
-              secondary: { main: '#ec4899' },
+              secondary: { main: '#f472b6' },
+              error: { main: '#ff8a80' },
               background: { default: '#141414', paper: '#141414' },
               text: { primary: '#e4e4e4', secondary: '#e4e4e4' },
             }
@@ -35,18 +37,18 @@ export function getTheme(mode: ThemeMode): Theme {
       MuiButton: {
         styleOverrides: {
           root: { textTransform: 'none', fontWeight: 600 },
-          ...(mode === 'dark'
+          ...(mode === 'dark' || mode === 'fancy'
             ? {
                 contained: {
-                  backgroundColor: '#9f5fff',
+                  backgroundColor: mode === 'dark' ? '#7c3aed' : '#8400ff',
                   color: '#fff',
-                  '&:hover': { backgroundColor: '#b380ff' },
-                  '&:active': { backgroundColor: '#8400ff' },
+                  '&:hover': { backgroundColor: mode === 'dark' ? '#6d28d9' : '#7200db' },
+                  '&:active': { backgroundColor: mode === 'dark' ? '#5b21b6' : '#5c00b3' },
                 },
                 outlined: {
-                  borderColor: '#9f5fff',
+                  borderColor: '#b18cff',
                   color: '#c9a8ff',
-                  '&:hover': { borderColor: '#b380ff', backgroundColor: 'rgba(159,95,255,0.08)' },
+                  '&:hover': { borderColor: '#c9a8ff', backgroundColor: 'rgba(177,140,255,0.08)' },
                 },
               }
             : {}),
@@ -58,7 +60,7 @@ export function getTheme(mode: ThemeMode): Theme {
           ...(mode === 'dark'
             ? {
                 outlined: {
-                  borderColor: '#9f5fff',
+                  borderColor: '#b18cff',
                   color: '#c9a8ff',
                 },
               }
@@ -70,8 +72,8 @@ export function getTheme(mode: ThemeMode): Theme {
           ...(mode === 'dark'
             ? {
                 root: {
-                  '&.MuiAlert-standardInfo': { backgroundColor: 'rgba(159,95,255,0.12)', color: '#c9a8ff' },
-                  '&.MuiAlert-standardInfo .MuiAlert-icon': { color: '#9f5fff' },
+                  '&.MuiAlert-standardInfo': { backgroundColor: 'rgba(177,140,255,0.12)', color: '#c9a8ff' },
+                  '&.MuiAlert-standardInfo .MuiAlert-icon': { color: '#b18cff' },
                 },
               }
             : {}),

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avatar, Box, useTheme } from '@mui/material';
+import { Avatar, Box, IconButton, useTheme } from '@mui/material';
+import { useTranslation } from 'react-i18next';
 import { preloadImage, myAvatarUrl } from '../utils/avatarCache';
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export function UserAvatarMenu({ studentName }: Props) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const theme = useTheme();
   const [avatarSrc, setAvatarSrc] = useState<string | null>(null);
@@ -39,24 +41,30 @@ export function UserAvatarMenu({ studentName }: Props) {
 
   return (
     <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-      <Avatar
-        src={avatarSrc || undefined}
-        alt={studentName}
+      <IconButton
         onClick={() => navigate('/profile')}
-        sx={{
-          bgcolor: 'primary.main',
-          fontWeight: 900,
-          fontSize: '1rem',
-          width: 40,
-          height: 40,
-          cursor: 'pointer',
-          border: '1px solid',
-          borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'divider',
-          '&:hover': { borderColor: 'primary.main' },
-        }}
+        aria-label={`${t('profile.title')}: ${studentName}`}
+        title={t('profile.title')}
+        sx={{ p: 0, '&:hover': { bgcolor: 'transparent' } }}
       >
-        {!avatarSrc && studentName.charAt(0)}
-      </Avatar>
+        <Avatar
+          src={avatarSrc || undefined}
+          alt={studentName}
+          sx={{
+            bgcolor: 'primary.main',
+            color: 'primary.contrastText',
+            fontWeight: 900,
+            fontSize: '1rem',
+            width: 40,
+            height: 40,
+            border: '1px solid',
+            borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.2)' : 'divider',
+            '&:hover': { borderColor: 'primary.main' },
+          }}
+        >
+          {!avatarSrc && studentName.charAt(0)}
+        </Avatar>
+      </IconButton>
     </Box>
   );
 }

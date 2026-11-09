@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Course } from '../types';
 import { courseService } from '../services/courseService';
+import { retryQuery } from '../services/httpClient';
 
 // Les mateixes queryKey que `useCourse` (['course', slug]): la cache de React
 // Query es comparteix entre la portada, el dashboard i les pàgines del curs.
@@ -20,7 +21,7 @@ export function useAllCourses(enabled = true) {
     enabled,
     staleTime: LIST_STALE_TIME,
     gcTime: LIST_GC_TIME,
-    retry: 1,
+    retry: retryQuery,
   });
 }
 
@@ -31,7 +32,7 @@ export function usePublicCourses(enabled = true) {
     enabled,
     staleTime: LIST_STALE_TIME,
     gcTime: LIST_GC_TIME,
-    retry: 1,
+    retry: retryQuery,
   });
 }
 
@@ -43,6 +44,6 @@ export function useCourseDetail(slug: string | undefined) {
     enabled: !!slug,
     staleTime: DETAIL_STALE_TIME,
     gcTime: DETAIL_GC_TIME,
-    retry: 1,
+    retry: retryQuery,
   });
 }

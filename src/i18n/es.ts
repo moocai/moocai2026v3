@@ -179,10 +179,13 @@ export default {
     percent_completed: "{{percent}}% completado"
   },
   common: {
+    loading: "Cargando...",
+    back: "Volver",
     error_loading: "Error al cargar los datos",
     stars_count_one: "{{count}} estrella",
     stars_count_other: "{{count}} estrellas"
   },
+  theme: {light: "Tema claro", dark: "Tema oscuro", fancy: "Tema fantasía", change: "Cambiar el tema"},
   profile: {
     preferences: "Preferencias",
     back: "Volver al curso",
@@ -566,6 +569,7 @@ export default {
     no_other_solutions: "No hay soluciones de estudiantes.",
     reset_tooltip: "Volver a empezar: recupera el código inicial",
     theory_reset_code: "Recupera el código original",
+    theory_edit_code: "Edita el código",
     submit_tooltip: "Envía tu solución al servidor",
     show_live_render: "Mostrar la visualización",
     run_button: "Ejecutar",

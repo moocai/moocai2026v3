@@ -42,7 +42,9 @@ export const authService = {
     localStorage.removeItem('token');
     localStorage.removeItem('currentStudent');
     clearPrivateLocalData();
-    resetSessionCaches();
+    window.dispatchEvent(new Event('auth-state-change'));
+    // Sense token no s'han de refetxar les consultes: tornarien a respondre 401.
+    resetSessionCaches(false);
     clearAccountLanguage();
 
     if (token) {

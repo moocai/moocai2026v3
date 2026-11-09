@@ -1,12 +1,10 @@
-import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, lazy, Suspense, type ReactNode } from 'react';
 import { useParams, useSearchParams, Link as RouterLink } from 'react-router-dom';
 import {Box, Typography, Button, CircularProgress, useTheme, alpha, Tabs, Tab, useMediaQuery, Tooltip, IconButton, Stack} from '@mui/material';
 // Selector de curs (desactivat): Menu, MenuItem, ListItemText, Divider
-import { MarkdownContent } from '../../components/MarkdownContent';
 import {CheckCircle2, XCircle, FileText, Download, Star, AlertTriangle, ChevronRight, ChevronLeft, Check, BookOpen, Code, ClipboardCheck, Folder, List as ListIcon} from 'lucide-react';
 // Selector de curs (desactivat): Globe, Lock, UserCheck de lucide-react
 // import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { useCourse } from '../../hooks/useCourse';
 import { useThemeMode } from '../../hooks/useTheme';
@@ -19,6 +17,10 @@ import { useRecordCourseActivity } from '../../utils/lastCourse';
 // import { useAllCourses, usePublicCourses } from '../../hooks/useCourses';
 import { answerKey, isLoggedIn, readAllSavedAnswers, syncTopicAnswers } from '../../services/topicTestAnswers';
 import { getLocalizedText } from '../../utils/formatters';
+
+// El Markdown (react-markdown + remark/rehype) només cal a la pestanya de teoria: es
+// carrega a part perquè les altres pestanyes (programació, tests, fitxers) no el baixin.
+const MarkdownContent = lazy(() => import('../../components/MarkdownContent').then((m) => ({ default: m.MarkdownContent })));
 
 type I18nField = { ca: string; es: string; en: string };
 // Selector de curs desactivat: dins d'un curs no cal canviar-ne; per canviar de curs, el menú Cursos de la capçalera.
@@ -53,6 +55,8 @@ export default function CourseLessons() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
+  // Amb el tema clar (blanc) els borders van en negre perquè es vegin bé
+  const dividerColor = mode === 'light' ? '#000' : 'divider';
   // const isTallScreen = useMediaQuery('(min-height: 900px)'); // selector de curs (desactivat)
   const isXs = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -101,8 +105,7 @@ export default function CourseLessons() {
     const saved = localStorage.getItem(`mooc_tab_${courseId}`);
     return saved !== null ? JSON.parse(saved) : 0;
   });
-  // Programació i Tests només si el curs els té activats (`allows_coding` / `allows_tests`);
-  // si l'API no ho diu (backend antic), es mostren. La pestanya desada d'una que no hi és → Teoria.
+
   const visibleTabs = TAB_ITEMS.map((_, i) => i).filter((i) =>
     (i !== CODING_TAB || course?.allows_coding !== false) && (i !== TESTS_TAB || course?.allows_tests !== false));
   const mainTab = visibleTabs.includes(storedTab) ? storedTab : 0;
@@ -156,10 +159,10 @@ export default function CourseLessons() {
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(() => {
     const fromUrl = searchParams.get('lessonId');
     if (fromUrl) {
-      try { localStorage.setItem(`mooc_selected_topic_${courseId}`, JSON.stringify(fromUrl)); } catch { /* sense emmagatzematge */ }
+      try { localStorage.setItem(`mooc_selected_topic_${courseId}`, JSON.stringify(fromUrl)); } catch {}
       return fromUrl;
     }
-    try {const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null;} catch {return null;}
+    try { const saved = localStorage.getItem(`mooc_selected_topic_${courseId}`); return saved ? JSON.parse(saved) : null; } catch { return null; }
   });
   const contentRef = useRef<HTMLDivElement>(null);
   const [downloadingFileId, setDownloadingFileId] = useState<number | null>(null);
@@ -239,7 +242,7 @@ export default function CourseLessons() {
       case 'very_hard': return { color: '#dc2626', bg: 'rgba(220,38,38,0.12)', border: '#dc2626' };
       case 'medium': return { color: '#f59e0b', bg: 'rgba(245,158,11,0.08)', border: '#f59e0b' };
       case 'easy': return { color: '#22c55e', bg: 'rgba(34,197,94,0.08)', border: '#22c55e' };
-      default: return { color: 'text.secondary', bg: 'transparent', border: 'divider' };
+      default: return { color: 'text.secondary', bg: 'transparent', border: dividerColor };
     }
   };
 
@@ -275,7 +278,7 @@ export default function CourseLessons() {
         {t('lesson.pending_send', 'Pendent per enviar')}
       </Box>
     ) : (
-      <Box sx={{fontSize: '0.75rem', fontWeight: 900, color: 'text.secondary',border: '1px solid', borderColor: 'divider', borderRadius: 5,px: 1, py: 0.5, textTransform: 'uppercase', letterSpacing: '0.20em',
+      <Box sx={{fontSize: '0.75rem', fontWeight: 900, color: 'text.secondary',border: '1px solid', borderColor: dividerColor, borderRadius: 5,px: 1, py: 0.5, textTransform: 'uppercase', letterSpacing: '0.20em',
       }}>
         {t('lesson.pending', 'Pendent')}
       </Box>
@@ -293,7 +296,7 @@ export default function CourseLessons() {
 
   const renderOverviewRow = (opts: {key: string; icon: ReactNode; label: string; to?: string; onClick?: () => void; right?: ReactNode; onIntent?: () => void;}) => {
     const content = (
-      <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5,px: 1, py: 1.25, borderBottom: '1px solid', borderColor: 'divider','&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }}}>
+      <Box sx={{display: 'flex', alignItems: 'center', gap: 1.5,px: 1, py: 1.25, borderBottom: '1px solid', borderColor: dividerColor,'&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.06) }}}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: 'primary.main' }}>{opts.icon}</Box>
         <Typography sx={{ flex: 1, fontSize: '1.3rem', color: 'text.primary', letterSpacing: '0.05rem'}}>{opts.label}</Typography>{opts.right}</Box>
     );
@@ -306,9 +309,6 @@ export default function CourseLessons() {
   // veu bé en qualsevol navegador). Llista del tema fresca (1 petició) + GET submissions només
   // dels tests ja resposts que no tenim desats.
   const queryClient = useQueryClient();
-  // Pestanya Programació: es descarrega l'editor de codi (Monaco) en segon pla,
-  // així en obrir un problema l'editor apareix sense esperes.
-  useEffect(() => { if (mainTab === 1) preloadMonaco(); }, [mainTab]);
   const syncTopicId = mainTab === 2 && course?.content?.length
     ? ((course.content as any[]).find((l: any) => l.id === selectedTopicId) ?? course.content[0])?.id
     : undefined;
@@ -406,7 +406,7 @@ export default function CourseLessons() {
           value={mainTab}
           onChange={(_, v) => setMainTab(v)}
           variant={isXs ? 'scrollable' : 'standard'}
-          sx={{ mb: { xs: 4, lg: 8 }, minHeight: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-list': {justifyContent: { xs: 'flex-start' }},
+          sx={{ mb: { xs: 4, lg: 8 }, minHeight: 0, borderBottom: '1px solid', borderColor: dividerColor, '& .MuiTabs-list': {justifyContent: { xs: 'flex-start' }},
             '& .MuiTab-root': {textTransform: 'none', fontWeight: 900,fontSize: { xs: '1.2rem', md: '0.95rem', lg: '1.3rem'}, minHeight: { xs: 60, md: 0 }, minWidth: { xs: 50, md: 90 },py: { xs: 2, md: 1.5}, px: { xs: 1.75, md: 7, lg:8},color: mode === 'light' ? '#000' : '#fff',},
             '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : '#fff !important' },
             '& .MuiTabs-indicator': { bgcolor: '#8400ff', height: { xs: 4, md: 3}},
@@ -421,14 +421,14 @@ export default function CourseLessons() {
     </Stack>
   );
 
-  const markdownSx = { '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 2, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', maxWidth: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: 'divider', px: { xs: 1, md: 2 }, py: 1, textAlign: 'left', color: 'text.secondary', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: { xs: '0.8rem', md: '0.875rem' } }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } };
+  const markdownSx = { '& p': { color: 'text.secondary', fontSize: '1rem', lineHeight: 2, mb: 2.5 }, '& code': { bgcolor: alpha(theme.palette.primary.main, 0.08), px: 0.8, py: 0.2, borderRadius: 1, fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: '0.85rem' }, '& pre': { bgcolor: '#1a1d23', p: 2.5, borderRadius: 2, overflow: 'auto', '& code': { bgcolor: 'transparent', px: 0, py: 0, fontSize: '0.85rem', color: '#7ee787' } }, '& ul, & ol': { color: 'text.secondary', lineHeight: 1.8, mb: 2.5 }, '& li': { mb: 0.5 }, '& h1, & h2, & h3, & h4, & h5, & h6': { color: 'text.primary', fontWeight: 700, mb: 1.5 }, '& table': { width: '100%', maxWidth: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', mb: 2.5 }, '& th, & td': { border: '1px solid', borderColor: dividerColor, px: { xs: 1, md: 2 }, py: 1, textAlign: 'left', color: 'text.secondary', overflowWrap: 'anywhere', wordBreak: 'break-word', fontSize: { xs: '0.8rem', md: '0.875rem' } }, '& th': { bgcolor: alpha(theme.palette.primary.main, 0.05), fontWeight: 700, color: 'text.primary' }, '& a': { color: 'primary.main' }, '& blockquote': { borderLeft: '4px solid', borderColor: 'primary.main', pl: 2, py: 0.5, mb: 2.5, color: 'text.secondary', fontStyle: 'italic' }, '& img': { maxWidth: '100%', borderRadius: 2 } };
 
   const renderTopicButtons = (items: TopicNavItem[], activeId?: string) =>
     items.map((item) => {
       const active = item.id === activeId;
       return (
-        <Box key={item.id} component={motion.button} layout transition={{ type: 'spring', stiffness: 400, damping: 34 }} type="button" onClick={() => selectTopic(item.id)} aria-current={active ? 'true' : undefined}
-          sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : 'divider', bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary', fontSize: '1.3rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
+        <Box key={item.id} component="button" type="button" onClick={() => selectTopic(item.id)} aria-current={active ? 'true' : undefined}
+          sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, flexShrink: 0,textAlign: 'left', cursor: 'pointer', font: 'inherit',px: 3, py: 1, borderRadius: 2, border: '1px solid', borderColor: active ? '#8400ff' : dividerColor, bgcolor: active ? '#8400ff' : 'background.paper',color: active ? '#fff' : 'text.primary', fontSize: '1.3rem', whiteSpace: 'normal',overflowWrap: 'anywhere', transition: 'background-color 0.2s, border-color 0.2s','&:hover': { bgcolor: active ? '#8400ff' : alpha(theme.palette.primary.main, 0.06) }}}>
           <Box component="span" sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             {/* Estrella com a algorien: plena si el tema dona punts (tema en curs), buida si no */}
             {item.current !== undefined && (
@@ -458,8 +458,8 @@ export default function CourseLessons() {
   const renderMobileTopicPanel = (items: TopicNavItem[], activeId?: string) => (
     <>
       <Box onClick={() => setMobileNavOpen(false)} sx={{display: { xs: 'block', md: 'none' },position: 'absolute', inset: 0, zIndex: 29,bgcolor: alpha('#000', 0.45),opacity: mobileNavOpen ? 1 : 0,pointerEvents: mobileNavOpen ? 'auto' : 'none',transition: 'opacity 0.25s ease',}}/>
-      <Box component="aside" id="lesson-topics" aria-label={t('lesson.topics', 'Topics')} sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', position: 'absolute', top: 15, left: 0, bottom: 0, zIndex: 30, width: 300, maxWidth: '86vw', bgcolor: 'background.paper', borderRight: '1px solid', borderColor: 'divider', boxShadow: mobileNavOpen ? 6 : 'none', transform: mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease, box-shadow 0.25s ease' }} >
-        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0,}}>
+      <Box component="aside" id="lesson-topics" aria-label={t('lesson.topics', 'Topics')} sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', position: 'absolute', top: 15, left: 0, bottom: 0, zIndex: 30, width: 300, maxWidth: '86vw', bgcolor: 'background.paper', borderRight: '1px solid', borderColor: dividerColor, boxShadow: mobileNavOpen ? 6 : 'none', transform: mobileNavOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease, box-shadow 0.25s ease' }} >
+        <Box sx={{display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1,px: 2, py: 1.25, borderBottom: '1px solid', borderColor: dividerColor, flexShrink: 0,}}>
           <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', color: 'text.primary' }}>
             {t('lesson.topics', 'Topics')}
           </Typography>
@@ -497,7 +497,7 @@ export default function CourseLessons() {
     const markdown = topicDetailQuery.isError ? '' : topicDetailQuery.data?.theory;
 
     return renderMasterDetail(topicItems, activeTopicId, (
-      <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>
+      <Box id={`theory-${activeLesson.id}`} sx={{ border: '1px solid', borderColor: dividerColor, borderRadius: 2, bgcolor: 'background.paper', p: { xs: 2, md: 3 } }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1.5, mb: 2.5 }}>
           <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>{getText(activeLesson.title)}</Typography>
           {isDone && <CheckCircle2 size={20} color={theme.palette.success.main} />}
@@ -515,11 +515,14 @@ export default function CourseLessons() {
         )}
 
         {markdown === undefined ? (<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>
-        ) : markdown ? (<MarkdownContent fontSize="1rem" sx={markdownSx} runnablePython>{markdown}</MarkdownContent>
+        ) : markdown ? (
+          <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress size={24} /></Box>}>
+            <MarkdownContent fontSize="1rem" sx={markdownSx} runnablePython>{markdown}</MarkdownContent>
+          </Suspense>
         ) : (<Typography sx={{ color: 'text.secondary', fontStyle: 'italic', mb: 2 }}>{t('lesson.no_theory_content', "No hi ha contingut teòric detallat per a aquesta lliçó.")}</Typography>
         )}
 
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3, pt: 2, borderTop: '1px solid', borderColor: dividerColor }}>
           <Button
             variant={isDone ? 'outlined' : 'contained'} color={isDone ? 'success' : 'primary'} onClick={() => markLessonAsDone(activeLesson.id)}startIcon={<Check size={16} />}sx={{ textTransform: 'none', fontWeight: 700 }}>
             {isDone ? t('lesson.completed', 'Completat') : t('lesson.mark_as_done', 'Marca com a completat')}
@@ -551,8 +554,8 @@ export default function CourseLessons() {
     const emoji = type === 'coding' ? '💻' : '📝';
 
     return renderMasterDetail(topicItems, activeTopicId, (
-      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
-        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ border: '1px solid', borderColor: dividerColor, borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: dividerColor }}>
           <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>
             {getText(active.title)}
           </Typography>
@@ -573,9 +576,13 @@ export default function CourseLessons() {
                 label: getText(sub.subtitle || sub.title),
                 to: type === 'coding' ? `/courses/${courseId}/${targetSlug}` : `/courses/${courseId}/test/${targetSlug}?topic=${encodeURIComponent(active.id)}`,
                 right: renderStatusWithDifficulty(status || false, sub.difficulty),
-                // Problema de codi: n'avança l'enunciat en passar-hi per sobre, perquè s'obri a l'instant
-                onIntent: type === 'coding' && sub.text === undefined
-                  ? () => { void queryClient.prefetchQuery(problemDetailQuery(courseId!, active.id, targetSlug)); }
+                // Problema de codi: en passar-hi per sobre s'avança l'enunciat i l'editor (Monaco),
+                // perquè s'obri a l'instant. Així no es baixa el pes de l'editor només veure la llista.
+                onIntent: type === 'coding'
+                  ? () => {
+                    preloadMonaco();
+                    if (sub.text === undefined) void queryClient.prefetchQuery(problemDetailQuery(courseId!, active.id, targetSlug));
+                  }
                   : undefined,
               });
             })}
@@ -598,8 +605,8 @@ export default function CourseLessons() {
     );
 
     return renderMasterDetail(topicItems, activeTopicId, (
-      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
-        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+      <Box sx={{ border: '1px solid', borderColor: dividerColor, borderRadius: 2, overflow: 'hidden', bgcolor: 'background.paper' }}>
+        <Box sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: dividerColor }}>
           <Typography component="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.2rem', md: '1.5rem' } }}>{getText(active.title)}</Typography>
         </Box>
         {topicDetailQuery.isPending ? (
@@ -632,7 +639,7 @@ export default function CourseLessons() {
 
       <Box sx={{ display: 'flex', height: '100%' }}>
         <Box ref={scrollRef} sx={{flex: '1 1 auto', minWidth: 0,maxWidth: { md: 'none' },pl: { xs: 3, md: 8 },pr: { xs: 7.5, md: 10 },py: 6,overflowY: 'auto',height: 'calc(100vh - 64px)'}}>
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+          <Box sx={{ animation: 'courseFadeIn 0.5s ease both', '@keyframes courseFadeIn': { from: { opacity: 0, transform: 'translateY(20px)' }, to: { opacity: 1, transform: 'translateY(0)' } } }}>
 
             <Box sx={{ display: 'flex', flexDirection: { xs: 'column', lg: 'row' }, alignItems: { lg: 'center' }, gap: { xs: 1, lg: 5 }, mt: { lg: 4 }, flexWrap: 'wrap' }}>
             {/* Selector de curs desactivat: per canviar de curs, el menú Cursos de la capçalera.
@@ -707,12 +714,12 @@ export default function CourseLessons() {
             {mainTab === 1 && (<Box>{renderTabs()}{renderExerciseTab('coding')}</Box>)}
             {mainTab === 2 && (<Box>{renderTabs()}{renderExerciseTab('test')}</Box>)}
             {mainTab === 3 && (<Box>{renderTabs()}{renderFilesTab()}</Box>)}
-          </motion.div>
+          </Box>
         </Box>
       </Box>
 
       {/* Menú vertical flotant: apareix quan les pestanyes de dalt surten de la pantalla */}
-      <Box sx={{ position: 'absolute', right: { xs: 7.5, md: 27, lg: 35 }, top: '50%', zIndex: 20, display: 'flex', flexDirection: 'column', gap: 3, p: 1, borderRadius: 999, bgcolor: alpha(theme.palette.background.paper, 0.85), backdropFilter: 'blur(8px)', border: '1px solid', borderColor: 'divider', boxShadow: 3, transition: 'opacity 0.25s, transform 0.25s', opacity: showRail ? 1 : 0, transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)', pointerEvents: showRail ? 'auto' : 'none' }}>
+      <Box sx={{ position: 'absolute', right: { xs: 7.5, md: 27, lg: 35 }, top: '50%', zIndex: 20, display: 'flex', flexDirection: 'column', gap: 3, p: 1, borderRadius: 999, bgcolor: alpha(theme.palette.background.paper, 0.85), backdropFilter: 'blur(8px)', border: '1px solid', borderColor: dividerColor, boxShadow: 3, transition: 'opacity 0.25s, transform 0.25s', opacity: showRail ? 1 : 0, transform: showRail ? 'translateY(-50%)' : 'translate(24px, -50%)', pointerEvents: showRail ? 'auto' : 'none' }}>
         {visibleTabs.map((index) => {
           const { icon: Icon, labelKey, fallback } = TAB_ITEMS[index];
           const active = mainTab === index;

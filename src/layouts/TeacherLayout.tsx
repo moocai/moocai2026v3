@@ -1,19 +1,23 @@
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet, useNavigate, Navigate } from 'react-router-dom';
 import { Box, IconButton, Typography, Stack, Avatar } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import SchoolIcon from '@mui/icons-material/School';
-const logo = '/img/logo.webp';
+const logo = '/img/logo-230.webp';
+const logoSet = '/img/logo-115.webp 1x, /img/logo-230.webp 2x';
 import { Sidebar } from '../features/teacher/Sidebar';
+import { RouteFallback } from '../components/ui/RouteFallback';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
 import { ChatWidget } from '../features/teacher/ChatWidget';
 import { useThemeMode } from '../hooks/useTheme';
 import { useAllCourses } from '../hooks/useCourses';
+import { useNoindex } from '../hooks/useNoindex';
 import { isCourseProfessor, studentViewPath } from '../utils/courseRole';
 
 export function TeacherLayout() {
+  useNoindex();
   const navigate = useNavigate();
   const { t } = useTranslation();
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -64,7 +68,7 @@ export function TeacherLayout() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 'auto' }}>
             <IconButton onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' } }}><MenuIcon /></IconButton>
-            <Box component="img" src={logo} alt="" width={438} height={190} sx={{ height: { xs: 22, md: 32 }, width: 'auto' }} />
+            <Box component="img" src={logo} srcSet={logoSet} alt="" width={438} height={190} sx={{ height: { xs: 22, md: 32 }, width: 'auto' }} />
             <Stack direction="row" sx={{ alignItems: 'baseline' }}>
               <Typography variant="h6" component="span" sx={{ fontWeight: 900, color: 'text.primary' }}>MOOC</Typography>
               <Typography variant="h6" component="span" sx={{ fontWeight: 900, color: 'primary.main', ml: 0.3 }}>2026</Typography>
@@ -92,6 +96,8 @@ export function TeacherLayout() {
             </IconButton>
             <IconButton
               onClick={() => navigate('/teacher/profile')}
+              aria-label={t('profile.title')}
+              title={t('profile.title')}
               sx={{
                 width: 40, height: 40,
                 bgcolor: 'action.hover',
@@ -107,8 +113,10 @@ export function TeacherLayout() {
           </Box>
         </Box>
 
-        <Box sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
-          <Outlet />
+        <Box component="main" sx={{ flex: 1, p: { xs: 2, md: 3 }, overflow: 'auto' }}>
+          <Suspense fallback={<RouteFallback />}>
+            <Outlet />
+          </Suspense>
         </Box>
       </Box>
       <ChatWidget />

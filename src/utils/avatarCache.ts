@@ -106,9 +106,19 @@ export function myAvatarUrl(): string | null {
   }
 }
 
+function hasAuthToken(): boolean {
+  try {
+    return Boolean(localStorage.getItem('token'));
+  } catch {
+    return false;
+  }
+}
+
 async function fetchAsBlob(src: string): Promise<Blob | null> {
   // Les imatges estàtiques es deixen passar tal qual, sense passar per axios.
   if (src.startsWith('/img/') || src.startsWith('blob:') || src.startsWith('http')) return null;
+  // Sense sessió no es demana res: l'endpoint respondria 401/403.
+  if (!hasAuthToken()) return null;
   try {
     const cleanUrl = src.startsWith('/api/v1') ? src.replace('/api/v1', '') : src;
     const res = await api.get(cleanUrl, { responseType: 'blob' });

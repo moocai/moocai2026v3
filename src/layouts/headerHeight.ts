@@ -1,9 +1,9 @@
 import { matchPath } from 'react-router-dom';
 
 /** Alçada de la capçalera a totes les pàgines. */
-export const HEADER_HEIGHT = 80;
+export const HEADER_HEIGHT = 60;
 /** Capçalera compacta a la pàgina d'un problema de codi: més espai per al codi. */
-export const CODING_HEADER_HEIGHT = 48;
+export const CODING_HEADER_HEIGHT = 60;
 
 // Rutes de dos segments sota un curs que NO són un problema de codi (les pàgines del curs:
 // estadístiques, enquestes, Drive, reptes…). Qualsevol altra és el slug d'un problema.

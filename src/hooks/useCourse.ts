@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { courseService, mapProblem } from '../services/courseService';
 import { localCourseService } from '../services/localCourseService';
+import { retryQuery } from '../services/httpClient';
 
 interface SubTopic {
   subtitle: any;
@@ -51,7 +52,7 @@ export function useCourse(courseId: string | undefined) {
     enabled: !!courseId && courseId !== 'undefined',
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
-    retry: 1,
+    retry: retryQuery,
   });
 }
 

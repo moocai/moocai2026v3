@@ -27,8 +27,9 @@ function clearSession(): void {
   localStorage.removeItem('token');
   localStorage.removeItem('currentStudent');
   clearPrivateLocalData();
-  resetSessionCaches();
   window.dispatchEvent(new Event('auth-state-change'));
+  // Sense token no s'han de refetxar les consultes: tornarien a respondre 401.
+  resetSessionCaches(false);
 }
 
 export const apiClient = axios.create({ baseURL: API_BASE_URL, timeout: 100000 });
@@ -61,6 +62,18 @@ apiClient.interceptors.response.use(
 );
 
 /**
+ * Política de reintents per a React Query: repetir un 4xx no serveix (la resposta serà
+ * la mateixa), només val la pena reintentar errors de xarxa o 5xx.
+ */
+export function retryQuery(failureCount: number, error: unknown): boolean {
+  if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
+    if (status != null && status >= 400 && status < 500) return false;
+  }
+  return failureCount < 1;
+}
+
+/**
  * Missatges d'un error de l'API. Tots els errors tenen la forma
  * `{ detail, code, errors: { camp: [missatges] } }`: es retornen els missatges
  * de `errors` i, si no n'hi ha, el `detail`.
@@ -80,6 +93,14 @@ export function apiErrorMessages(error: unknown): string[] {
     }
   };
   collect(data.errors);
+  // Alguns 400 (validació de DRF) porten els camps a l'arrel (`{ email: [...] }`)
+  // en lloc de dins de `errors`: també s'han de mostrar, no el missatge genèric.
+  if (messages.length === 0) {
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'detail' || key === 'code' || key === 'errors' || key === 'meta') continue;
+      collect(value);
+    }
+  }
   if (messages.length === 0 && typeof data.detail === 'string' && data.detail.trim() !== '') {
     messages.push(data.detail);
   }

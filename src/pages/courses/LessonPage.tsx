@@ -36,6 +36,17 @@ import { getLocalizedText } from '../../utils/formatters';
 
 interface Student { id: string; name: string; }
 
+/** Sessió desada, només si encara hi ha token: un 401 l'esborra i no s'ha de continuar com si res. */
+function readStoredStudent(): Student | null {
+  try {
+    if (!localStorage.getItem('token')) return null;
+    const saved = localStorage.getItem('currentStudent');
+    return saved ? (JSON.parse(saved) as Student) : null;
+  } catch {
+    return null;
+  }
+}
+
 function LockedTabMessage({ text }: { text: string }) {
   const theme = useTheme();
   return (
@@ -229,6 +240,8 @@ export default function LessonPage() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const { mode } = useThemeMode();
+  // Amb el tema clar (blanc) els borders van en negre perquè es vegin bé
+  const dividerColor = mode === 'light' ? '#000' : 'divider';
   const c = useCodeSurface();
   const navigate = useNavigate();
   const contentRef = useRef<HTMLDivElement>(null);
@@ -241,7 +254,18 @@ export default function LessonPage() {
   const { data: course, isLoading: loading } = examSlug ? examCourseQuery : courseQuery;
   // On tornen "enrere" i el final de l'examen: la pàgina de l'examen
   const examPath = examSlug ? `/courses/${courseId}/exams/${encodeURIComponent(examSlug)}` : null;
-  const [currentUser] = useState<Student | null>(() => {const saved = localStorage.getItem('currentStudent'); return saved ? JSON.parse(saved) : null;  });
+  const [currentUser, setCurrentUser] = useState<Student | null>(readStoredStudent);
+  // Si la sessió caduca mentre s'és dins del problema (401), s'ha de deixar de desar
+  // al servidor: amb l'estat antic es continuava cridant `submissions/backup/` sense token.
+  useEffect(() => {
+    const onAuthChange = () => {
+      const user = readStoredStudent();
+      setCurrentUser(user);
+      if (!user) navigate('/dashboards/student', { replace: true });
+    };
+    window.addEventListener('auth-state-change', onAuthChange);
+    return () => window.removeEventListener('auth-state-change', onAuthChange);
+  }, [navigate]);
   const [consoleOutput, setConsoleOutput] = useState<ConsoleLine[]>([]);
   // Resultat de l'últim enviament d'aquesta visita (fins que el detail del servidor es refresca)
   const [submittedStatus, setSubmittedStatus] = useState<{ status: string; submission_count?: number } | null>(null);
@@ -405,7 +429,7 @@ export default function LessonPage() {
   // Al professorat (i a qui pot veure el contingut ocult) el detall no li porta `my_solution`:
   // llavors l'estat propi es demana a la seva submissió (una petició, només en aquest cas).
   const needsOwnSubmission = !!currentProblem && currentProblem.type !== 'test' && currentProblem.mySolution === undefined
-    && !!currentUser && !!currentTopicSlug;
+    && !!currentUser && !!currentTopicSlug && !!localStorage.getItem('token');
   const { data: ownSubmission } = useQuery({
     queryKey: ['own-submission', courseId, currentTopicSlug, lessonId],
     queryFn: () => courseService.getOwnSubmission(resolveSlug(courseId!), currentTopicSlug, lessonId!),
@@ -576,11 +600,77 @@ export default function LessonPage() {
     };
   }, []);
 
-  // Les pestanyes s'encongeixen si la columna és més estreta que l'amplada inicial, però no
-  // creixen si és més ampla (amb la columna molt ampla la lletra quedava massa gran)
-  const tabScale = Math.min(1, Math.max(0.6, col1Pct / STATEMENT_DEFAULT_PCT));
-  const tabFontSize = Math.round(13 * tabScale * 12) / 10;
-  const tabIconSize = Math.max(8, Math.round(10 * tabScale));
+  // Les pestanyes s'adapten a l'amplada de la columna: la lletra s'encongeix quan la columna és
+  // estreta (no creix quan és ampla) i l'espaiat entre pestanyes creix amb l'amplada, de manera
+  // que sempre queden centrades i aprofiten l'espai disponible.
+  // Amplada REAL (en px) de la columna de l'enunciat: el % de la columna no basta, perquè el mateix
+  // % és molt diferent en una finestra petita que en una de gran.
+  const col1Ref = useRef<HTMLDivElement>(null);
+  const [col1Width, setCol1Width] = useState(0);
+  useEffect(() => {
+    const el = col1Ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(([entry]) => setCol1Width(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [isMobile, loading, !!currentProblem]);
+  // Quan la font personalitzada s'acaba de carregar, les mides del text canvien: es torna a calcular
+  const [fontsTick, setFontsTick] = useState(0);
+  useEffect(() => { void document.fonts?.ready.then(() => setFontsTick((n) => n + 1)); }, []);
+  const measureCtxRef = useRef<CanvasRenderingContext2D | null>(null);
+
+  // Escull la lletra més gran (màx. 15,6 px, mín. 10 px) amb què les pestanyes caben senceres a
+  // l'amplada actual; l'espai que sobra es reparteix en padding i separació (fins a un màxim).
+  // Si ni a 10 px hi caben, les Tabs ja fan scroll horitzontal (variant="scrollable").
+  const tabLabels = [
+    t('lesson.tab_statement', 'Enunciat'),
+    t('lesson.tab_teacher_solution', 'Solució'),
+    t('lesson.tab_other_solutions', 'Alumnes'),
+    t('lesson.tab_ai_help', 'IA'),
+  ];
+  const tabLocks = [false, !solutionUnlocked, !peersUnlocked, false];
+  const tabLayout = useMemo(() => {
+    const MAX_FONT = 15.6, MIN_FONT = 10, PAD_MIN = 4, GAP_MIN = 10, PAD_MAX = 12, GAP_MAX = 40;
+    const fallback = { fontSize: MAX_FONT, iconSize: 10, gap: GAP_MIN / 8, pad: 0.75 };
+    if (!col1Width || typeof document === 'undefined') return fallback;
+    if (!measureCtxRef.current) measureCtxRef.current = document.createElement('canvas').getContext('2d');
+    const ctx = measureCtxRef.current;
+    if (!ctx) return fallback;
+    const family = theme.typography.fontFamily;
+    const n = tabLabels.length + (materialsAllowed ? 1 : 0);
+    const available = col1Width - 16; // marge de seguretat
+    const iconFor = (f: number) => Math.max(8, Math.round(f * 0.64));
+    // Suma de l'amplada del contingut de totes les pestanyes (sense padding ni separació)
+    const contentAt = (f: number) => {
+      ctx.font = `900 ${f}px ${family}`;
+      const icon = iconFor(f);
+      let total = 0;
+      tabLabels.forEach((label, i) => {
+        // El Tab de MUI va en majúscules i amb letter-spacing (0,4/14 em)
+        const text = ctx.measureText(label.toUpperCase()).width + label.length * f * 0.0286;
+        total += text * 1.06 + (tabLocks[i] ? icon + 6 : 0);
+      });
+      if (materialsAllowed) total += icon + 4;
+      return total;
+    };
+    const baseAt = (f: number) => contentAt(f) + n * 2 * PAD_MIN + (n - 1) * GAP_MIN;
+    let f = MAX_FONT;
+    while (f > MIN_FONT && baseAt(f) > available) f = Math.round((f - 0.4) * 10) / 10;
+    f = Math.max(MIN_FONT, f);
+    const slots = 2 * n + (n - 1);
+    const extra = Math.max(0, available - baseAt(f)) / slots;
+    return {
+      fontSize: f,
+      iconSize: iconFor(f),
+      pad: Math.min(PAD_MAX, PAD_MIN + extra) / 8, // en unitats de spacing (8 px)
+      gap: Math.min(GAP_MAX, GAP_MIN + extra * 1.5) / 8,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [col1Width, fontsTick, tabLabels.join('|'), tabLocks.join(), materialsAllowed, theme.typography.fontFamily]);
+  const tabFontSize = tabLayout.fontSize;
+  const tabIconSize = tabLayout.iconSize;
+  const tabGap = tabLayout.gap;
+  const tabPad = tabLayout.pad;
 
   useEffect(() => {
     if (currentProblem) {
@@ -624,7 +714,7 @@ export default function LessonPage() {
   // Sense esborrany local de Python (un altre dispositiu, o s'ha sortit de la sessió, que l'esborra):
   // es recupera la còpia de seguretat del servidor, si l'alumne encara no ha tocat l'editor.
   useEffect(() => {
-    if (!currentUser || !currentProblem || !currentTopicSlug || !lessonId) return;
+    if (!currentUser || !localStorage.getItem('token') || !currentProblem || !currentTopicSlug || !lessonId) return;
     try {
       const raw = localStorage.getItem(codeStorageKey);
       const parsed = raw ? JSON.parse(raw) : null;
@@ -661,7 +751,7 @@ export default function LessonPage() {
   }, [submissionsRefreshKey]);
 
   useEffect(() => {
-    if (!isDirty || !currentUser) return;
+    if (!isDirty || !currentUser || !localStorage.getItem('token')) return;
     const id = setInterval(() => {
       handleSaveProgress(false);
     }, 10000);
@@ -675,7 +765,7 @@ export default function LessonPage() {
   // i un sol cop fins que torna a funcionar.
   const saveErrorShownRef = useRef(false);
   const handleSaveProgress = async (isAutoSaveOnPass = false) => {
-    if (!currentUser || !courseId || !lessonId) return;
+    if (!currentUser || !localStorage.getItem('token') || !courseId || !lessonId) return;
     persistViewState();
     setIsSaving(true);
     try {
@@ -870,7 +960,7 @@ export default function LessonPage() {
       local = { id: 'local', code: code || null, at: ts ? new Date(ts).toISOString() : null };
     } catch { /* esborrany il·legible */ }
     const slug = resolveSlug(courseId!);
-    const [backup, submitted] = currentUser && currentTopicSlug
+    const [backup, submitted] = currentUser && currentTopicSlug && localStorage.getItem('token')
       ? await Promise.all([
         courseService.getCodeBackupVersion(slug, currentTopicSlug, lessonId!).catch(() => null),
         courseService.getOwnSubmission(slug, currentTopicSlug, lessonId!).catch(() => null),
@@ -947,8 +1037,8 @@ export default function LessonPage() {
     return (
       // pt: sota la capçalera (fixa, per sobre de la pàgina), no amagat al darrere
       <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden' }}>
-        {progressPercent > 0 && <Box sx={{ height: 4, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
-        <Box sx={{height: 48, borderColor: 'divider', display: 'flex', alignItems: 'center', px: 1, gap: 1, justifyContent: 'space-between', flexShrink: 0}}>
+        {progressPercent > 0 && <Box sx={{ height: 8, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
+        <Box sx={{height: 48, borderColor: dividerColor, display: 'flex', alignItems: 'center', px: 1, gap: 1, justifyContent: 'space-between', flexShrink: 0}}>
           <ProblemBreadcrumb items={crumbs} fontSize={12} onNavigate={persistViewState} />
           {materialsAllowed && (
             <Button size="small" variant="outlined" startIcon={<BookOpen size={14} />} onClick={() => setMaterialsOpen(true)} sx={{ flexShrink: 0, textTransform: 'none', fontWeight: 700, fontSize: 12 }}>
@@ -958,15 +1048,15 @@ export default function LessonPage() {
         </Box>
         {/* Materials (mòbil): a pantalla completa, per sobre del problema */}
         <Drawer anchor="right" open={materialsOpen} onClose={() => setMaterialsOpen(false)} sx={{ zIndex: 1500 }} slotProps={{ paper: { sx: { width: '100%', maxWidth: 520 } } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', px: 2, py: 1, borderBottom: '1px solid', borderColor: dividerColor }}>
             <Typography sx={{ fontWeight: 900 }}>{t('materials.title')}</Typography>
             <IconButton onClick={() => setMaterialsOpen(false)} aria-label={t('materials.close')}><X size={20} /></IconButton>
           </Box>
           {materialsOpen && <MaterialsPanel courseId={courseId!} topicSlug={examSlug ? undefined : currentTopicSlug} problemSlug={lessonId} />}
         </Drawer>
         <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', pb: '0px' }}>
-          <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-            <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}` }}>
+          <Box sx={{ width: '100%', bgcolor: 'background.paper', p: 1, borderBottom: '1px solid', borderColor: dividerColor, flexShrink: 0 }}>
+            <Box sx={{ p: 1.5, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1, border: `1px solid ${mode === 'light' ? '#000' : '#fff'}` }}>
               <Typography sx={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', mb: 0.5, color: 'primary.main' }}>{t('lesson.your_challenge')}</Typography>
               {topicClosed && (
                 <Typography sx={{ fontSize: '0.75rem', color: 'warning.main', mb: 0.5 }}>{t('lesson.points_topic_closed')}</Typography>
@@ -1069,8 +1159,8 @@ export default function LessonPage() {
         {/* Espai de la barra de botons fixa de sota */}
         <Box sx={{ height: 70, flexShrink: 0 }} />
 
-        <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
-          <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1 }}>
+        <Box sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, height: 70, flexShrink: 0, borderTop: '1px solid', borderColor: dividerColor, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, bgcolor: 'background.paper', px: 2 }}>
+          <IconButton onClick={handlePrevious} disabled={isFirstCoding} sx={{ border: '1px solid', borderColor: dividerColor, borderRadius: 1, p: 1 }}>
             <ChevronLeft size={20}/>
           </IconButton>
           <Stack direction="row" spacing={0.5} sx={{ flex: 1, alignItems: 'center' }}>
@@ -1089,7 +1179,7 @@ export default function LessonPage() {
               </Box>
             </Tooltip>
           </Stack>
-          <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, p: 1 }}>
+          <IconButton onClick={handleNext} sx={{ border: '1px solid', borderColor: dividerColor, borderRadius: 1.5, p: 1 }}>
             <ChevronRight size={20}/>
           </IconButton>
         </Box>
@@ -1100,12 +1190,15 @@ export default function LessonPage() {
   // DESKTOP LAYOUT - Editor + Visualització en temps real neta al costat + Consola abaix
   return (
     <Box sx={{ position: 'fixed', inset: 0, pt: `${CODING_HEADER_HEIGHT}px`, display: 'flex', flexDirection: 'column', bgcolor: 'background.default', color: 'text.primary', overflow: 'hidden'}}>
-      {progressPercent > 0 && <Box sx={{ height: 4, flexShrink: 0, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
+      {progressPercent > 0 && <Box sx={{ height: 8, flexShrink: 0, bgcolor: 'action.hover' }}><Box sx={{ height: '100%', width: `${progressPercent}%`, bgcolor: 'primary.main' }} /></Box>}
 
       <Box ref={containerRef} sx={{ flex: 1, display: 'flex', minHeight: 0 }}>
         {/* COLUMNA 1: Enunciat / AI / Solucions */}
-        <Box sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: 'divider', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
-          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons={false} sx={{ minHeight: 0, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', '& .MuiTabs-flexContainer': { justifyContent: 'safe center' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: 0.75 * tabScale, ml: 0.75 * tabScale, '&:first-of-type': { ml: 0 }, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
+        <Box ref={col1Ref} sx={{ width: `${col1Pct}%`, flexShrink: 0, borderColor: dividerColor, display: 'flex', flexDirection: 'column', bgcolor: 'background.paper', position: 'relative' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.75, flexShrink: 0, borderBottom: '1px solid', borderColor: dividerColor, minWidth: 0 }}>
+            <ProblemBreadcrumb items={crumbs} fontSize={tabFontSize} onNavigate={persistViewState} />
+          </Box>
+          <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons={false} sx={{ minHeight: 0, flexShrink: 0, borderColor: dividerColor, '& .MuiTabs-list': { justifyContent: 'safe center', gap: tabGap, minWidth: '100%' }, '& .MuiTab-root': { minHeight: 20, fontSize: tabFontSize, fontWeight: 900, minWidth: 0, mt: 1, mb: 0.5, px: tabPad, color: mode === 'light' ? '#000' : 'inherit'}, '& .Mui-selected': { color: mode === 'light' ? '#000 !important' : 'white !important' }, '& .MuiTabs-indicator': { bgcolor: '#8400ff' }}}>
             <Tab label={t('lesson.tab_statement', 'Enunciat')} />
             <Tab label={t('lesson.tab_teacher_solution', 'Solució')} icon={!solutionUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
             <Tab label={t('lesson.tab_other_solutions', 'Alumnes')} icon={!peersUnlocked ? <Lock size={tabIconSize} /> : undefined} iconPosition="end" />
@@ -1114,9 +1207,7 @@ export default function LessonPage() {
             {materialsAllowed && <Tab icon={<BookOpen size={tabIconSize + 4} />} aria-label={t('materials.title')} title={t('materials.title')} />}
           </Tabs>
 
-          <Box sx={{ display: 'flex', alignItems: 'center', px: 0.5, py: 0.75, flexShrink: 0, borderBottom: '1px solid', borderColor: 'divider', minWidth: 0 }}>
-            <ProblemBreadcrumb items={crumbs} fontSize={tabFontSize} onNavigate={persistViewState} />
-          </Box>
+          
 
           <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', minHeight: 0, pb: isMdUp ? 14 : 10 }}>
             {activeTab === 0 && (
@@ -1128,7 +1219,7 @@ export default function LessonPage() {
                     <Typography sx={{ fontSize: '0.8rem' }}>{t('lesson.points_topic_closed')}</Typography>
                   </Box>
                 )}
-                <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2 }}>
+                <Box sx={{ p: 2, bgcolor: alpha(theme.palette.primary.main, 0.05), borderRadius: 1.5, mt: 2, border: `1px solid ${mode === 'light' ? '#000' : '#fff'}` }}>
                   <MarkdownContent>{statementMarkdown}</MarkdownContent>
                 </Box>
               </Box>
@@ -1205,8 +1296,8 @@ export default function LessonPage() {
           </Box>
 
           {/* Botons de navegació inferior esquerra */}
-          <Box sx={{ height: 60, px: 4, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2 }}>
-            <Button onClick={handlePrevious} disabled={isFirstCoding} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: 'divider', color: 'text.primary' }}>
+          <Box sx={{ height: 60, px: 4, bgcolor: 'background.paper', borderTop: '1px solid', borderColor: dividerColor, display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 2 }}>
+            <Button onClick={handlePrevious} disabled={isFirstCoding} variant="outlined" size="small" startIcon={<ChevronLeft size={16} />} sx={{ fontWeight: 700, fontSize: 13, borderColor: dividerColor, color: 'text.primary' }}>
               {t('lesson.previous', 'Anterior')}
             </Button>
             <Button onClick={handleNext} variant="contained" size="small" endIcon={<ChevronRight size={16} />} sx={{ fontWeight: 700, fontSize: 13, bgcolor: 'primary.main', color: '#fff' }}>
@@ -1315,7 +1406,7 @@ export default function LessonPage() {
           </Box>
 
           {/* CONSOLA */}
-          <ResizeHandle color={c.resizeHandle} orientation="horizontal" ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
+          <ResizeHandle color={c.resizeHandle} orientation="horizontal" thickness={2} ariaLabel={t('lesson.resize_console', 'Canvia la mida de la consola')} onDragStart={() => { consoleDragStartRef.current = consoleHeight; }} onDrag={resizeConsole} />
           <Box sx={{ height: consoleHeight, flexShrink: 0, display: 'flex' }}>
             <ConsolePanel 
               output={consoleOutput}

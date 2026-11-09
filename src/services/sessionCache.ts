@@ -21,11 +21,18 @@ export function onSessionChange(reset: () => void): void {
 
 /**
  * Buida tot el que s'ha portat del servidor amb la sessió anterior: el que veu un usuari depèn
- * de qui és (el professorat rep reptes i temes bloquejats, les respostes pròpies…), i si no
+ * de qui és (el professorat rep reptes i temes bloquejats, les respostes pròpies.), i si no
  * es buidés, qui entrés després al mateix navegador ho veuria fins que caduqués. Les consultes
  * actives es tornen a demanar amb la sessió nova.
+ *
+ * Amb `refetch = false` (sortida o 401) no es refan: el token ja no hi és i tornarien a
+ * respondre 401. En entrar, es refan amb el token nou.
  */
-export function resetSessionCaches(): void {
+export function resetSessionCaches(refetch = true): void {
   resetters.forEach((reset) => reset());
-  void queryClient.resetQueries();
+  if (refetch) {
+    void queryClient.resetQueries();
+  } else {
+    queryClient.clear();
+  }
 }

@@ -1,6 +1,7 @@
 import { Box, type SxProps, type Theme } from '@mui/material';
 import { Star } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useThemeMode } from '../hooks/useTheme';
 
 /** Groc de l'estrella de puntuació (el mateix que la dels temes que en donen, com a algorien). */
 export const STAR_COLOR = '#facc15';
@@ -10,8 +11,11 @@ export const STAR_COLOR = '#facc15';
  * "estrelles"). La paraula sencera ("120 estrelles") hi és per als lectors de pantalla i
  * en passar-hi per sobre.
  */
-export function StarScore({ value, size = 16, sx }: { value: number; size?: number; sx?: SxProps<Theme> }) {
+export function StarScore({ value, size = 18, sx }: { value: number; size?: number; sx?: SxProps<Theme> }) {
   const { t } = useTranslation();
+  const { mode } = useThemeMode();
+  // El contorn de l'estrella: negre en tema clar i blanc en dark/fancy perquè es vegi bé
+  const borderColor = mode === 'light' ? '#000' : '#fff';
   const label = t('common.stars_count', { count: value });
   return (
     <Box component="span" role="img" aria-label={label} title={label}
@@ -21,7 +25,7 @@ export function StarScore({ value, size = 16, sx }: { value: number; size?: numb
           (que depèn de les mètriques de cada font i no casava amb les xifres): el seu centre
           queda a mitja alçada de les xifres (~0,35em sobre la línia base) amb qualsevol font
           i navegador. */}
-      <Star size={size} color={STAR_COLOR} fill={STAR_COLOR} aria-hidden="true"
+      <Star size={size} color={borderColor} fill={STAR_COLOR} strokeWidth={2} aria-hidden="true"
         style={{ display: 'inline-block', marginLeft: '0.3em', verticalAlign: `calc(0.35em - ${size / 2}px)` }} />
     </Box>
   );

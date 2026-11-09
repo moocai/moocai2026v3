@@ -87,7 +87,7 @@ function TopicExam({ exam, courseId, slug }: { exam: Exam; courseId: string; slu
           <ExamChips exam={exam} size="medium" />
           {score !== null && (
             <Typography sx={{ fontWeight: 800, ml: 1, fontVariantNumeric: 'tabular-nums' }}>
-              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 600 }}>{t('exams.score')}: </Box>{score}
+              <Box component="span" sx={{ color: 'text.secondary', fontWeight: 900 }}>{t('exams.score')}: </Box>{score}
             </Typography>
           )}
         </Stack>

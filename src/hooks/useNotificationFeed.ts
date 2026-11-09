@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { notificationService, type CourseNotification } from '../services/notificationService';
+import { retryQuery } from '../services/httpClient';
 
 // Una sola cache per a la campana del menú i la pàgina d'avisos: marcar-ne un de llegit en
 // un lloc es veu de seguida a l'altre.
@@ -28,7 +29,7 @@ export function useNotificationFeed(enabled: boolean) {
     staleTime: 30 * 1000,
     refetchInterval: enabled ? FEED_REFRESH_MS : false,
     refetchOnWindowFocus: true,
-    retry: 1,
+    retry: retryQuery,
   });
   const notifications = enabled ? query.data ?? NO_NOTIFICATIONS : NO_NOTIFICATIONS;
   return { ...query, notifications };

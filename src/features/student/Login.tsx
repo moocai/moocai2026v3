@@ -1,4 +1,3 @@
-import {motion} from 'framer-motion';
 import {Typography, Card, TextField, Button, Stack, CircularProgress, useTheme, Avatar, Box, Grid, FormControl, InputLabel, Select, MenuItem} from '@mui/material';
 import {Lock, User, Mail, UserRound, Camera, ArrowLeft, Upload, Check} from 'lucide-react';
 import {useTranslation} from 'react-i18next';
@@ -71,7 +70,8 @@ export function Login({
     };
   }, [view, registrationLoaded]);
 
-  const fieldSx = { '& .MuiInputBase-root': { bgcolor: 'action.hover', borderRadius: '12px' } };
+  const fieldSx = {'& .MuiInputBase-root': {bgcolor: 'action.hover', borderRadius: '12px','&::before, &::after': { display: 'none' }} 
+};
 
   const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -144,11 +144,8 @@ export function Login({
   };
 
   return (
-    <motion.div
-      key="login"
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0 }}
+    <div
+      className="login-enter"
       style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }}
     >
 
@@ -158,7 +155,7 @@ export function Login({
             <Avatar sx={{ bgcolor: 'success.main', width: 64, height: 64 }}>
               <Check size={32} />
             </Avatar>
-            <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            <Typography component="h1" variant="h6" sx={{ fontWeight: 800 }}>
               {t('auth.register_success_title')}
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -176,7 +173,7 @@ export function Login({
           sx={cardSx}
         >
           <Stack spacing={2.5}>
-            <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
+            <Typography component="h1" variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
               {t('auth.login')}
             </Typography>
 
@@ -251,16 +248,18 @@ export function Login({
         </Card>
       ) : view === 'forgot' ? (
         <Card component="form" onSubmit={handleForgot} sx={cardSx}>
-          <Stack spacing={2.5}>
-            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
+          <Stack spacing={3}>
+            <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between'}}>
               <Button
                 size="small"
-                startIcon={<ArrowLeft size={18} />}
+                startIcon={<ArrowLeft size={20} />}
                 onClick={goBackToLogin}
-                sx={{ fontWeight: 700, color: '#ffffff' }}
+                aria-label={t('common.back')}
+                title={t('common.back')}
+                sx={{color: 'text.primary'}}
               >
               </Button>
-              <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
+              <Typography component="h1" variant="h6" sx={{ fontWeight: 900, textAlign: 'center', marginRight:8}}>
                 {t('auth.forgot_password')}
               </Typography>
             </Stack>
@@ -289,7 +288,7 @@ export function Login({
                   onChange={e => setForgotEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  slotProps={{ input: { startAdornment: <Mail size={18} style={{ marginRight: 8 }} /> } }}
+                  slotProps={{ input: { startAdornment: <Mail size={18} style={{ marginRight: 8,marginTop:20 }} /> } }}
                   sx={fieldSx}
                 />
 
@@ -317,13 +316,13 @@ export function Login({
             <Stack direction="row" sx={{ alignItems: 'center', justifyContent: 'space-between' }}>
               <Button
                 size="small"
-                startIcon={<ArrowLeft size={18} />}
+                startIcon={<ArrowLeft size={18}/>}
                 onClick={goBackToLogin}
-                sx={{ fontWeight: 700, color: '#ffffff' }}
+                sx={{ fontWeight: 700, color: 'text.primary' }}
               >
                 {t('auth.login_link')}
               </Button>
-              <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
+              <Typography component="h1" variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
                 {t('auth.create_account')}
               </Typography>
             </Stack>
@@ -339,7 +338,7 @@ export function Login({
                       variant="outlined"
                       component="label"
                       startIcon={<Upload size={18} />}
-                      sx={{ borderRadius: '12px', fontWeight: 700 }}
+                      sx={{ borderRadius: '12px', fontWeight: 700}}
                     >
                       {t('auth.choose_file')}
                       <input type="file" hidden accept="image/*" onChange={handleAvatarChange} />
@@ -359,7 +358,8 @@ export function Login({
                   value={nom}
                   onChange={e => setNom(e.target.value)}
                   required
-                  slotProps={{ input: { startAdornment: <UserRound size={18} style={{ marginRight: 8 }} /> } }}
+                  autoComplete="given-name"
+                  slotProps={{ input: { startAdornment: <UserRound size={18} style={{ marginRight: 8 ,marginTop:20}} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -372,7 +372,8 @@ export function Login({
                   value={cognoms}
                   onChange={e => setCognoms(e.target.value)}
                   required
-                  slotProps={{ input: { startAdornment: <UserRound size={18} style={{ marginRight: 8 }} /> } }}
+                  autoComplete="family-name"
+                  slotProps={{ input: { startAdornment: <UserRound size={18} style={{ marginRight: 8 ,marginTop:20}} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -387,7 +388,7 @@ export function Login({
                   onChange={e => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  slotProps={{ input: { startAdornment: <Mail size={18} style={{ marginRight: 8 }} /> } }}
+                  slotProps={{ input: { startAdornment: <Mail size={18} style={{ marginRight: 8,marginTop:20 }} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -401,7 +402,7 @@ export function Login({
                   onChange={e => setRegUsername(e.target.value)}
                   required
                   autoComplete="username"
-                  slotProps={{ input: { startAdornment: <User size={18} style={{ marginRight: 8 }} /> } }}
+                  slotProps={{ input: { startAdornment: <User size={18} style={{ marginRight: 8 ,marginTop:20}} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -432,7 +433,7 @@ export function Login({
                   onChange={e => setRegPassword(e.target.value)}
                   required
                   autoComplete="new-password"
-                  slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8 }} /> } }}
+                  slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8,marginTop:20}} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -447,7 +448,7 @@ export function Login({
                   onChange={e => setRegConfirm(e.target.value)}
                   required
                   autoComplete="new-password"
-                  slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8 }} /> } }}
+                  slotProps={{ input: { startAdornment: <Lock size={18} style={{ marginRight: 8,marginTop:20}} /> } }}
                   sx={fieldSx}
                 />
               </Grid>
@@ -470,6 +471,6 @@ export function Login({
           </Stack>
         </Card>
       )}
-    </motion.div>
+    </div>
   );
 }

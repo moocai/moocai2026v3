@@ -47,7 +47,7 @@ export function ProblemBreadcrumb({ items, fontSize = 12, onNavigate }: {
           {item.label}
         </Link>
       ) : (
-        <Typography key={i} title={item.label} aria-current="page" sx={{ ...crumbSx, color: 'text.primary' }}>
+        <Typography key={i} title={item.label} aria-current="page" sx={{ ...crumbSx, color: '#8400ff' }}>
           {item.label}
         </Typography>
       );

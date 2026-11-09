@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Bell } from 'lucide-react';
 import { Badge, Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, Popover, Stack, Typography, alpha } from '@mui/material';
 import { useMarkNotificationsRead, useNotificationFeed } from '../hooks/useNotificationFeed';
-import { MarkdownContent } from './MarkdownContent';
 import { formatNotificationDate, markdownToPlainText } from '../utils/notificationText';
+
+// El Markdown (react-markdown + remark/rehype) pesa molt i només es fa servir al diàleg
+// d'un avís important: es carrega a part perquè no entri al bundle inicial de tota la web.
+const MarkdownContent = lazy(() => import('./MarkdownContent').then((m) => ({ default: m.MarkdownContent })));
 
 /** Avisos que es veuen al desplegable (els recents, llegits o no, com GitHub o Slack). */
 const DROPDOWN_LIMIT = 8;
@@ -128,7 +131,9 @@ export function NotificationBell() {
               <Typography variant="caption" color="text.secondary">{formatNotificationDate(blocking.created_at, i18n.language)}</Typography>
             </DialogTitle>
             <DialogContent dividers>
-              <MarkdownContent>{blocking.text}</MarkdownContent>
+              <Suspense fallback={<Typography sx={{ whiteSpace: 'pre-line' }}>{markdownToPlainText(blocking.text)}</Typography>}>
+                <MarkdownContent>{blocking.text}</MarkdownContent>
+              </Suspense>
             </DialogContent>
             <DialogActions sx={{ px: 3, py: 1.5 }}>
               <Button variant="contained" disabled={markRead.isPending} onClick={() => markRead.mutate([blocking.id])} sx={{ textTransform: 'none', fontWeight: 700 }}>

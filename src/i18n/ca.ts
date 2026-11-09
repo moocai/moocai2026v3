@@ -11,7 +11,7 @@ export default {
     register_success_text: "Benvingut/da, {{name}}! Ja pots iniciar sessió amb el teu usuari.",
     back_to_login: "Tornar a iniciar sessió",
     username_or_email: "Usuari o correu electrònic",
-    password: "Contrasenya",
+    password: "Contrasenya (8-digits)",
     forgot_password: "Has oblidat la contrasenya?",
     create_account: "Crear un compte",
     forgot_sent: "Si existeix un compte amb aquesta adreça, rebràs un correu amb instruccions per establir-ne una de nova.",
@@ -171,7 +171,8 @@ export default {
   },
 
   course: {by: "by", enroll: "Veure temari del curs", go_to_course: "Anar al curs", percent_completed: "{{percent}}% completat"},
-  common: {error_loading: "Error en carregar les dades", stars_count_one: "{{count}} estrella", stars_count_other: "{{count}} estrelles"},
+  common: {loading: "Carregant...", back: "Tornar", error_loading: "Error en carregar les dades", stars_count_one: "{{count}} estrella", stars_count_other: "{{count}} estrelles"},
+  theme: {light: "Tema clar", dark: "Tema fosc", fancy: "Tema fantasia", change: "Canvia el tema"},
 
   profile: {
     preferences: "Preferències",
@@ -556,6 +557,7 @@ export default {
     no_other_solutions: "No hi ha solucions d'estudiants.",
     reset_tooltip: "Torna a començar: recupera el codi inicial",
     theory_reset_code: "Recupera el codi original",
+    theory_edit_code: "Edita el codi",
     submit_tooltip: "Envia la teva solució al servidor",
     show_live_render: "Mostra la visualització",
     run_button: "Executar",

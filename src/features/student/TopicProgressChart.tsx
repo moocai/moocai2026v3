@@ -1,6 +1,8 @@
 import { Box, Stack, Tooltip, Typography } from '@mui/material';
+import { visuallyHidden } from '@mui/utils';
 import { useSeriesColors } from './chartColors';
 import { useTranslation } from 'react-i18next';
+import { useThemeMode } from '../../hooks/useTheme';
 
 /** Un tema del gràfic: problemes visibles i resolts de cada tipus (del servidor). */
 export type TopicProgressItem = {
@@ -10,7 +12,6 @@ export type TopicProgressItem = {
   coding: { total: number; done: number };
   tests: { total: number; done: number };
 };
-
 
 /** Temes que hi caben sense fer créixer la targeta (la mateixa alçada que el rànquing). */
 const TOPIC_CHART_MAX = 5;
@@ -22,6 +23,9 @@ const TOPIC_CHART_MAX = 5;
  */
 export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressItem[]; onOpen: (topicId: string, kind: 'coding' | 'tests') => void }) {
   const { t } = useTranslation();
+  const { mode } = useThemeMode();
+  // El border de cada barra: negre en tema clar i blanc en dark/fancy perquè es vegi bé
+  const borderColor = mode === 'light' ? '#000' : '#fff';
   const colors = useSeriesColors();
   const series = [
     { key: 'coding' as const, label: t('dashboard.chart_code'), color: colors.coding, empty: t('dashboard.no_code_problems') },
@@ -65,18 +69,16 @@ export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressIt
                   : t('dashboard.chart_bar_tooltip', { topic: topic.title, kind: s.label, done, total, pct });
                 return (
                   <Tooltip key={s.key} title={tip} arrow placement="top">
-                    <Box
-                      role="button" tabIndex={0} aria-label={tip}
-                      onClick={() => onOpen(topic.id, s.key)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') onOpen(topic.id, s.key); }}
-                      sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', '&:hover .bar-fill': { opacity: 0.8 } }}
-                    >
-                      <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: pct == null ? 'transparent' : 'action.disabledBackground', border: pct == null ? '1px dashed' : 'none', borderColor: 'divider', overflow: 'hidden' }}>
-                        {pct != null && <Box className="bar-fill" sx={{ width: `${pct}%`, height: '100%', bgcolor: s.color, borderRadius: 3 }} />}
+                    <Box component="span" sx={{ display: 'flex', flex: 1, minWidth: 0 }}>
+                      <Box component="button" type="button" onClick={() => onOpen(topic.id, s.key)} sx={{ width: '100%', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer', background: 'none', border: 'none', p: 0, font: 'inherit', textAlign: 'left', '&:hover .bar-fill': { opacity: 0.8 }, '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', borderRadius: 1 } }}>
+                        <span style={visuallyHidden}>{tip}</span>
+                        <Box sx={{ flex: 1, height: 6, borderRadius: 3, bgcolor: pct == null ? 'transparent' : 'action.disabledBackground', border: pct == null ? '1px dashed' : '1px solid', borderColor, overflow: 'hidden' }}>
+                          {pct != null && <Box className="bar-fill" sx={{ width: `${pct}%`, height: '100%', bgcolor: s.color, borderRadius: 3 }} />}
+                        </Box>
+                        <Typography variant="caption" sx={{ width: 28, textAlign: 'right', fontWeight: 700, fontSize: '0.65rem', lineHeight: 1.2, color: borderColor }}>
+                          {pct == null ? '—' : `${pct}%`}
+                        </Typography>
                       </Box>
-                      <Typography variant="caption" sx={{ width: 28, textAlign: 'right', fontWeight: 700, fontSize: '0.65rem', lineHeight: 1.2, color: pct == null ? 'text.secondary' : 'text.primary' }}>
-                        {pct == null ? '—' : `${pct}%`}
-                      </Typography>
                     </Box>
                   </Tooltip>
                 );
@@ -86,7 +88,7 @@ export function TopicProgressChart({ topics, onOpen }: { topics: TopicProgressIt
         ))}
       </Stack>
       {older > 0 && (
-        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, textAlign: 'left' }}>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, textAlign: 'center' }}>
           {t('dashboard.chart_older_topics', { count: older })}
         </Typography>
       )}

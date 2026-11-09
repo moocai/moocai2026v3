@@ -5,6 +5,7 @@ import { Box, Container, Typography, Link as MuiLink, useTheme } from '@mui/mate
 import Grid from '@mui/material/Grid';
 import { useTranslation } from 'react-i18next'; 
 const logo = '/img/logo.webp';
+const logoSet = '/img/logo.webp';
 
 interface FooterLinkProps {children: ReactNode;to?: string;href?: string;}
 
@@ -29,7 +30,7 @@ export function Footer() {
             <Grid size={{ xs: 12, md: 5 }} sx={{ textAlign: { xs: 'center', md: 'left' }}}>
              <RouterLink to="/" style={{ textDecoration: 'none' }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: { xs: 'center', md: 'flex-start' }, gap: 2, mb: 3 }}>
-                  <Box component="img" src={logo} alt="RocketFooter" width={438} height={190} sx={{ height: { xs: 22, md: 50 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s', filter: 'drop-shadow(0 0 12px ' + theme.palette.primary.main + '80)' }} />
+                  <Box component="img" src={logo} srcSet={logoSet} alt="RocketFooter" width={438} height={190} sx={{ height: { xs: 22, md: 50 }, width: 'auto', transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s', filter: 'drop-shadow(0 0 12px ' + theme.palette.primary.main + '80)' }} />
                   <Box sx={{ display: 'flex', alignItems: 'baseline' }}>
                     <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'text.primary', letterSpacing: '-1px', fontSize: { xs: '1.4rem', md: '1.75rem' } }}>MOOC</Typography>
                     <Typography variant="h5" component="span" sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '-1px', fontSize: { xs: '1.4rem', md: '1.75rem' }, ml: 0.5 }}>2026</Typography>

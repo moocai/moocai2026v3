@@ -66,16 +66,16 @@ const DARK: CodeSurface = {
 const LIGHT: CodeSurface = {
   bg: '#ffffff',
   bar: '#f5f3ff',
-  border: '#e5e7eb',
-  separator: '#d1d5db',
+  border: '#000',
+  separator: '#000',
   text: '#1f2937',
   muted: '#4b5563',
   icon: '#4b5563',
   hover: '#ede9fe',
   accentText: '#7c3aed',
   chipBg: '#ffffff',
-  chipBorder: '#d1d5db',
-  outline: '#c4b5fd',
+  chipBorder: '#000',
+  outline: '#000',
   outlineHover: '#8400ff',
   primaryBg: '#8400ff',
   primaryText: '#fff',
@@ -89,7 +89,7 @@ const LIGHT: CodeSurface = {
   info: '#6b7280',
   echo: '#0e7490',
   placeholder: '#9ca3af',
-  resizeHandle: '#e5e7eb',
+  resizeHandle: '#000',
 };
 
 export const getCodeSurface = (mode: 'light' | 'dark' | 'fancy'): CodeSurface => (mode === 'light' ? LIGHT : DARK);

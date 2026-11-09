@@ -1,31 +1,36 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Box } from '@mui/material';
-import Home from './pages/Home';
-import CourseLessons from './pages/courses/CourseLessons';
-import LessonPage from './pages/courses/LessonPage';
-import LessonTopic from './pages/courses/${courseId}/${lesson.id}/LessonTopic';
-import TopicTestPage from './pages/courses/TopicTestPage';
-import StudentDashboard from './pages/dashboards/StudentDashboard';
-import ProfilePage from './pages/ProfilePage';
-import NotificationsPage from './pages/NotificationsPage';
-import SurveysPage from './pages/courses/SurveysPage';
-import SurveyPage from './pages/courses/SurveyPage';
-import DrivePage from './pages/courses/DrivePage';
-import ChallengesPage from './pages/courses/ChallengesPage';
-import ChallengePage from './pages/courses/ChallengePage';
-import ExamsPage from './pages/courses/ExamsPage';
-import ExamPage from './pages/courses/ExamPage';
 import { MainLayout } from './layouts/MainLayout';
 import { TeacherLayout } from './layouts/TeacherLayout';
-import TeacherIndex from './pages/teacher/TeacherIndex';
-import Students from './pages/teacher/Students';
-import Courses from './pages/teacher/Courses';
-import Exercises from './pages/teacher/Exercises';
-import ExerciseList from './pages/teacher/ExerciseList';
-import Test from './pages/teacher/Test';
-import Hackathon from './pages/teacher/Hackathon';
-import InviteStudents from './pages/teacher/InviteStudents';
+import { RouteFallback } from './components/ui/RouteFallback';
 import { useThemeMode } from './hooks/useTheme';
+
+// Totes les pàgines es carreguen sota demanda: així una visita a un curs no baixa el codi
+// del tauler (ni les seves gràfiques) i el bundle inicial és molt més petit.
+const Home = lazy(() => import('./pages/Home'));
+const StudentDashboard = lazy(() => import('./pages/dashboards/StudentDashboard'));
+const CourseLessons = lazy(() => import('./pages/courses/CourseLessons'));
+const LessonPage = lazy(() => import('./pages/courses/LessonPage'));
+const LessonTopic = lazy(() => import('./pages/courses/${courseId}/${lesson.id}/LessonTopic'));
+const TopicTestPage = lazy(() => import('./pages/courses/TopicTestPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
+const SurveysPage = lazy(() => import('./pages/courses/SurveysPage'));
+const SurveyPage = lazy(() => import('./pages/courses/SurveyPage'));
+const DrivePage = lazy(() => import('./pages/courses/DrivePage'));
+const ChallengesPage = lazy(() => import('./pages/courses/ChallengesPage'));
+const ChallengePage = lazy(() => import('./pages/courses/ChallengePage'));
+const ExamsPage = lazy(() => import('./pages/courses/ExamsPage'));
+const ExamPage = lazy(() => import('./pages/courses/ExamPage'));
+const TeacherIndex = lazy(() => import('./pages/teacher/TeacherIndex'));
+const Students = lazy(() => import('./pages/teacher/Students'));
+const Courses = lazy(() => import('./pages/teacher/Courses'));
+const Exercises = lazy(() => import('./pages/teacher/Exercises'));
+const ExerciseList = lazy(() => import('./pages/teacher/ExerciseList'));
+const Test = lazy(() => import('./pages/teacher/Test'));
+const Hackathon = lazy(() => import('./pages/teacher/Hackathon'));
+const InviteStudents = lazy(() => import('./pages/teacher/InviteStudents'));
 
 // L'antiga pàgina "Més estadístiques" ara és una secció del tauler del curs
 function LegacyStatsRedirect() {
@@ -44,7 +49,7 @@ function App() {
   return (
     <Box sx={{bgcolor: mode === 'fancy' ? 'transparent' : 'background.default' }}>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Suspense fallback={<RouteFallback />}><Home /></Suspense>} />
         <Route element={<MainLayout />}>
           <Route path="/courses/:courseId" element={<CourseLessons />} />
           <Route path="/courses/:courseId/:lessonId" element={<LessonPage />} />

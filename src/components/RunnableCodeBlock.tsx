@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Box, Button, IconButton, Tooltip } from '@mui/material';
-import { Play, RotateCcw, Square } from 'lucide-react';
+import { Pencil, Play, RotateCcw, Square } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { ConsolePanel, type ConsoleLine } from './ConsolePanel';
 import { usePythonRun } from '../hooks/usePythonRun';
@@ -23,8 +23,12 @@ export function RunnableCodeBlock({ code }: { code: string }) {
   // Com el codi dels companys: segueix el mode de la web (el tema de Monaco és global a la pàgina)
   const { mode } = useThemeMode();
   const c = useCodeSurface();
+  const dividerColor = mode === 'light' ? '#000' : 'divider';
   const [value, setValue] = useState(code);
   const [output, setOutput] = useState<ConsoleLine[] | null>(null);
+  // Monaco són ~1,3 MB de JavaScript: no es baixa fins que l'alumne vol editar el codi.
+  // Mentrestant es mostra el codi en un <pre> (el botó Executar ja funciona sense editor).
+  const [editRequested, setEditRequested] = useState(false);
   const [monacoReady, setMonacoReady] = useState(false);
   const [height, setHeight] = useState(code.split('\n').length * LINE_HEIGHT + EDITOR_PADDING * 2);
   const { isRunning, inputActive, run, stop, submitInput } = usePythonRun(setOutput);
@@ -32,24 +36,32 @@ export function RunnableCodeBlock({ code }: { code: string }) {
   useEffect(() => { setValue(code); setOutput(null); }, [code]);
   // L'editor només es crea amb el Monaco local configurat (si no, el carregaria d'un CDN)
   useEffect(() => {
+    if (!editRequested) return;
     let cancelled = false;
     loadMonaco().then(() => { if (!cancelled) setMonacoReady(true); }).catch(() => {});
     return () => { cancelled = true; };
-  }, []);
+  }, [editRequested]);
 
   const runLabel = t('lesson.run_button');
   const stopLabel = t('lesson.stop_button');
   const resetLabel = t('lesson.theory_reset_code');
+  const editLabel = t('lesson.theory_edit_code');
   const edited = value !== code;
 
+  // El codi estàtic també és la vista mentre Monaco es baixa: en clicar-hi s'activa l'edició
   const staticCode = (
-    <Box component="pre" sx={{ m: 0, px: 1.5, py: `${EDITOR_PADDING}px`, overflowX: 'auto', fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, color: c.stdout, whiteSpace: 'pre' }}>
+    <Box
+      component="pre"
+      onClick={() => setEditRequested(true)}
+      title={monacoReady ? undefined : editLabel}
+      sx={{ m: 0, px: 1.5, py: `${EDITOR_PADDING}px`, overflowX: 'auto', cursor: editRequested ? 'auto' : 'text', fontFamily: "'Fira Code', 'Consolas', monospace", fontSize: FONT_SIZE, lineHeight: `${LINE_HEIGHT}px`, color: c.stdout, whiteSpace: 'pre' }}
+    >
       {value}
     </Box>
   );
 
   return (
-    <Box sx={{ my: 2.5, border: '1px solid', borderColor: 'divider', borderRadius: 1.5, overflow: 'hidden', bgcolor: c.bg }}>
+    <Box sx={{ my: 2.5, border: '1px solid', borderColor: dividerColor, borderRadius: 1.5, overflow: 'hidden', bgcolor: c.bg }}>
       {/* Executar a l'esquerra, al costat del codi (com les cel·les de Jupyter): a la dreta quedava
           massa lluny en pantalles grans */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, px: 1, py: 0.5, bgcolor: c.bar, borderBottom: `1px solid ${c.border}`, minHeight: 36 }}>
@@ -66,6 +78,13 @@ export function RunnableCodeBlock({ code }: { code: string }) {
         >
           {isRunning ? stopLabel : runLabel}
         </Button>
+        {!monacoReady && (
+          <Tooltip title={editLabel} arrow>
+            <IconButton size="small" onClick={() => setEditRequested(true)} aria-label={editLabel} sx={{ color: c.icon, '&:hover': { bgcolor: c.hover } }}>
+              <Pencil size={14} />
+            </IconButton>
+          </Tooltip>
+        )}
         {edited && (
           <Tooltip title={resetLabel} arrow>
             <IconButton size="small" onClick={() => setValue(code)} aria-label={resetLabel} sx={{ color: c.icon, '&:hover': { bgcolor: c.hover } }}>

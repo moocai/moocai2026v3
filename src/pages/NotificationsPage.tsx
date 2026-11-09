@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { Box, Button, Chip, CircularProgress, Container, Stack, Typography } from '@mui/material';
 import { useThemeMode } from '../hooks/useTheme';
+import { useNoindex } from '../hooks/useNoindex';
 import { useAllCourses } from '../hooks/useCourses';
 import { resolveSlug } from '../hooks/useCourse';
 import { useMarkNotificationsRead, useNotificationFeed } from '../hooks/useNotificationFeed';
@@ -18,6 +19,7 @@ const ACCENT = '#00685d';
  * torna a entrar a la pàgina.
  */
 export default function NotificationsPage() {
+  useNoindex();
   const { t, i18n } = useTranslation();
   const { mode } = useThemeMode();
   const { hash } = useLocation();

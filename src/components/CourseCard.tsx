@@ -13,7 +13,6 @@ import { courseEntryPath } from '../utils/courseRole';
 
 interface Course {id: string;slug?: string;title: string | { ca: string; es: string; en: string }; description: string | { ca: string; es: string; en: string }; image: string; level: string; duration: string; instructor: string; logoSize?: number; logoWidth?: number; logoHeight?: number; disabled?: boolean; myRole?: string | null;}
 
-// `progress`: % completat del curs (cursos on l'usuari és alumne). Sense, el peu diu "Anar al curs".
 interface CourseCardProps {course: Course;index: number;progress?: number | null;}
 
 export function CourseCard({ course, index, progress }: CourseCardProps) {
@@ -25,12 +24,9 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
   const handleCardClick = (e: MouseEvent) => {
     if (course.disabled) return;
     e.preventDefault();
-    // Professor del curs → vista de professor; alumne → vista d'alumne
     navigate(courseEntryPath(course));
   };
 
-  // Imatge del curs: la local (si n'hi ha) o l'avatar del servidor, que necessita el token
-  // (per això passa per la memòria cau d'imatges i no per un <img src> directe).
   const slug = course.slug || course.id;
   const localImage = course.image || courseImages[slug];
   const avatar = useImageUrl(localImage ? undefined : `/api/v1/courses/${encodeURIComponent(slug)}/avatar/`);
@@ -43,7 +39,16 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
   return (
     <motion.div initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.1, duration: 0.5, ease: "easeOut" }} viewport={{ once: true }} style={{ height: '100%' }}>
       <Card 
+        component="div"
+        role="button"
+        tabIndex={course.disabled ? -1 : 0}
         onClick={handleCardClick}
+        onKeyDown={(e: { key: string; preventDefault: () => void; }) => {
+          if (!course.disabled && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            navigate(courseEntryPath(course));
+          }
+        }}
         sx={{
           height: '100%', 
           width: {xs: '85%', md: '100%'}, 
@@ -70,10 +75,10 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
               <motion.div whileHover={{ scale: 1.05, rotate: 2 }} transition={{ type: "spring", stiffness: 300 }}>
                 {imageSrc ? (
                   <Box
-                    component="img" src={imageSrc} alt={title}
+                    component="img" src={imageSrc} alt={title} width={logoW} height={logoH}
+                    loading="lazy" decoding="async"
                     sx={{width: { xs: logoW * 0.65, md: logoW },height: { xs: logoH * 0.65, md: logoH }, objectFit: 'contain'}}/>
                 ) : (
-                  // Sense imatge (el curs no té avatar): la inicial del curs, no una imatge trencada
                   <Typography aria-hidden sx={{ fontSize: { xs: '3rem', md: '4.5rem' }, fontWeight: 900, color: 'primary.main', lineHeight: 1 }}>{title.charAt(0).toUpperCase()}</Typography>
                 )}
               </motion.div>
@@ -88,12 +93,12 @@ export function CourseCard({ course, index, progress }: CourseCardProps) {
 
             <Box>
               {progress != null ? (
-                <Box sx={{ pt: { xs: 1.5, md: 2.5 }, borderTop: '1px solid', borderColor: 'divider' }}>
+                <Box sx={{ pt: { xs: 1.5, md: 2.5 }, borderTop: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#fff' : '#000' }}>
                   <Typography sx={{ fontSize: { xs: '0.7rem', md: '0.85rem' }, fontWeight: 900, color: 'text.primary', mb: 1 }}>{t('course.percent_completed', { percent: progress })}</Typography>
                   <ProgressBar value={progress} />
                 </Box>
               ) : (
-              <Box sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: 'divider'}}>
+              <Box sx={{display: 'flex', alignItems: 'center',justifyContent: 'space-between', pt: { xs: 1.5, md: 2.5 },borderTop: '1px solid', borderColor: theme.palette.mode === 'dark' ? '#fff' : '#000'}}>
                 <Typography sx={{fontSize: { xs: '0.6rem', md: '0.8rem' }, fontWeight: 900, letterSpacing: '0.15em', color: 'primary.main' }}>{t('course.go_to_course')}</Typography>
                 <Box component={motion.div} animate={{ x: [0, 6, 0] }} transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}>
                   <ArrowRight size={18} color={theme.palette.primary.main} strokeWidth={2.5} />

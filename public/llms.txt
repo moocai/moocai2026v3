@@ -1,0 +1,12 @@
+# MOOC2026
+
+> Plataforma de cursos online i aprenentatge interactiu de programació i intel·ligència artificial.
+
+## Seccions principals
+
+- [Cursos disponibles](https://moocai2026v3.vercel.app/#courses): Llistat de tots els cursos actius de la plataforma.
+- [Accés d'estudiants](https://moocai2026v3.vercel.app/dashboards/student): Panell de control personalitzat per a l'alumnat.
+
+## Documentació i recursos
+
+- [Informació general](https://moocai2026v3.vercel.app/): Pàgina principal del lloc web.

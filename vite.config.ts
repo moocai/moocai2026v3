@@ -190,7 +190,7 @@ export default defineConfig({
         preview: path.resolve(__dirname, 'preview.html'),
       },
     },
-    sourcemap: true,
+    sourcemap: false,
     reportCompressedSize: true,
     cssCodeSplit: true,
   },

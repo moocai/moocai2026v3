@@ -1,8 +1,8 @@
-import {useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
+import {Suspense, useState, useEffect, useMemo, useCallback, type FormEvent} from 'react';
 import {useNavigate, useSearchParams, Link as RouterLink} from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 import {useQueryClient} from '@tanstack/react-query';
-import {Box, Container, Typography, Stack, CircularProgress, Tabs, Tab, IconButton, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
+import {Box, Container, Typography, Stack, CircularProgress, Skeleton, Tabs, Tab, IconButton, Button, useMediaQuery, Tooltip, Divider, Menu, MenuItem, ListItemIcon, ListItemText, Grid} from '@mui/material';
 import {Public as PublicIcon, LockOutlined as LockIcon, School as SchoolIcon, ExpandMore as ExpandMoreIcon, ArrowForward as ArrowForwardIcon, RestartAlt as RestartAltIcon, Code as CodeIcon, FactCheckOutlined as FactCheckOutlinedIcon, QuizOutlined as QuizOutlinedIcon, AutoAwesome as AutoAwesomeIcon} from '@mui/icons-material';
 import {api} from '../../services/api';
 import {authService} from '../../services/authService';
@@ -26,6 +26,7 @@ import { CourseStatsCharts } from '../../features/student/CourseStatsCharts';
 import { useSeriesColors } from '../../features/student/chartColors';
 import { resolveSlug } from '../../hooks/useCourse';
 import { getLocalizedText } from '../../utils/formatters';
+import { useNoindex } from '../../hooks/useNoindex';
 
 /** Nombre d'usuaris que es mostren al rànquing (només cal descarregar aquests). */
 const LEADERBOARD_VISIBLE = 6;
@@ -161,15 +162,14 @@ export default function StudentDashboard() {
   const [scope, setScope] = useState<CourseScope>(() => (SHOW_COURSE_SWITCHER ? savedScope(readLastCourse()) : 'assigned'));
   const [scopeAnchor, setScopeAnchor] = useState<null | HTMLElement>(null);
   const [ranking, setRanking] = useState<RankedStudent[]>([]);
+  // L'endpoint d'avatar d'un membre exigeix que qui el demana sigui alumne del curs.
+  // Amb un compte de professorat respon 403: en aquest cas es mostren les inicials.
+  const [canLoadMemberAvatars, setCanLoadMemberAvatars] = useState(false);
   const [restored, setRestored] = useState(false);
   const queryClient = useQueryClient();
 
-  // Cursos llegits de la cache de React Query (mateixes queryKey que CourseLessons).
-  // Res no es demana sense sessió: la pantalla de login no en mostra cap.
-  //  - «Els meus cursos»: sempre amb sessió (també decideix si es pot veure el rànquing).
-  //  - Públics: només si és l'àmbit actiu o si s'obre el menú d'àmbits (hi surten els recomptes).
-  //  - Detall (temes + problemes): NOMÉS del curs seleccionat, no de tots els cursos.
   const isLoggedIn = selectedStudent != null;
+  useNoindex(isLoggedIn);
   const assignedQuery = useAllCourses(isLoggedIn);
   const publicQuery = usePublicCourses(isLoggedIn && (scope === 'public' || scopeAnchor != null));
 
@@ -187,7 +187,12 @@ export default function StudentDashboard() {
   const currentSlug = visibleCourses[courseTabIndex]?.slug;
   // Fins que no s'ha restaurat el curs recordat no es demana cap detall
   // (evita baixar el del primer tab i tot seguit el del curs bo).
-  const detailQuery = useCourseDetail(restored ? currentSlug : undefined);
+  // Sense sessió no es demana res: els endpoints del curs requereixen token i farien 401.
+  // Primer es valida el token amb la llista de cursos: si és caducat, no s'arriba a
+  // demanar el detall ni les estadístiques (que farien més 401 inútils).
+  const detailQuery = useCourseDetail(
+    restored && isLoggedIn && assignedQuery.isSuccess ? currentSlug : undefined,
+  );
 
   const [firstDetailShown, setFirstDetailShown] = useState(false);
   useEffect(() => { if (detailQuery.data) setFirstDetailShown(true); }, [detailQuery.data]);
@@ -299,9 +304,22 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   useEffect(() => {
     const onAuthChange = () => {
       courseService.clearCache();
+      // Un 401 esborra token i currentStudent, però l'estat de React encara tindria
+      // l'alumne: cal buidar-lo o el dashboard continua demanant curs i estadístiques
+      // sense credencials (i torna a rebre 401 en bucle).
+      try {
+        const saved = localStorage.getItem('currentStudent');
+        setSelectedStudent(saved ? JSON.parse(saved) : null);
+      } catch {
+        setSelectedStudent(null);
+      }
+      if (!localStorage.getItem('token')) {
+        setRanking([]);
+        setCanLoadMemberAvatars(false);
+      }
       queryClient.invalidateQueries({ queryKey: ALL_COURSES_KEY });
       queryClient.invalidateQueries({ queryKey: PUBLIC_COURSES_KEY });
-      queryClient.invalidateQueries({ queryKey: ['course'] });
+      queryClient.removeQueries({ queryKey: ['course'] });
     };
     window.addEventListener('auth-state-change', onAuthChange);
     return () => window.removeEventListener('auth-state-change', onAuthChange);
@@ -436,30 +454,49 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     if (!currentSlug || !selectedStudentId || !isOwnCourse) {
       // Sense curs propi seleccionat no es queda a pantalla el rànquing anterior.
       setRanking((prev) => (prev.length ? [] : prev));
+      setCanLoadMemberAvatars(false);
       return;
     }
     try {
       const res: any = await courseService.getCourseLeaderboard(currentSlug);
       const list = Array.isArray(res) ? res : (res?.results || []);
       syncOwnPointsFromList(currentSlug, list, Array.isArray(res) ? undefined : res?.me); // header i leaderboard comparteixen els mateixos punts
+
+      // `/members/{id}/avatar/` només respon si qui el demana és alumne del curs.
+      // L'API diu si ho és amb `me` (null/absent = no alumne) i, si no hi és, amb `my_role`.
+      const isProfessor = current?.myRole === 'professor';
+      const isMember = Array.isArray(res)
+        ? !isProfessor
+        : (res && Object.prototype.hasOwnProperty.call(res, 'me') ? res.me != null : !isProfessor);
+      setCanLoadMemberAvatars(isMember);
+
       const rankedList = toRanking(list);
       setRanking(rankedList);
 
-      // Només demanem els avatars que es veuen: així els de dalt surten
-      // de immediat i no saturen la connexió amb centenars de peticions.
-      const rankingAvatars = rankedList
-        .slice(0, LEADERBOARD_VISIBLE)
-        .filter((s): s is RankedStudent & { userId: string } => Boolean(s.userId))
-        .map(s => userAvatarUrl(s.userId, currentSlug!));
-      void Promise.all(rankingAvatars.map(url => preloadImage(url)));
+      // Només demanem els avatars que es veuen i que podem demanar: així els de
+      // dalt surten de seguida i no saturen la connexió amb centenars de peticions.
+      if (isMember) {
+        const rankingAvatars = rankedList
+          .slice(0, LEADERBOARD_VISIBLE)
+          .filter((s): s is RankedStudent & { userId: string } => Boolean(s.userId))
+          .map(s => userAvatarUrl(s.userId, currentSlug!));
+        void Promise.all(rankingAvatars.map(url => preloadImage(url)));
+      }
     } catch {
       // Si falla la petició es conserva el rànquing anterior (no el buidem)
+      setCanLoadMemberAvatars(false);
     }
   }, [currentSlug, selectedStudentId, assignedQuery.data, visibleCourses]);
 
   useEffect(() => {
     void loadRanking();
   }, [loadRanking]);
+
+  // En canviar de curs no es reutilitza el permís de l'anterior: fins que no arribi
+  // el rànquing nou, els avatars es mostren com a inicials i no es demanen.
+  useEffect(() => {
+    setCanLoadMemberAvatars(false);
+  }, [currentSlug]);
 
   // Els punts del rànquing els calcula el backend, així que es torna a preguntar
   // quan hi ha novetats: activitat desada (mateixa pestanya o altra), canvi de
@@ -544,11 +581,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
     // panell s'omple quan arriba (sense tornar a tapar tota la pàgina).
     (detailQuery.isLoading && !firstDetailShown);
 
-  if (loading) return (
-    <Box sx={{ position: 'fixed', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: mode === 'fancy' ? 'transparent' : 'background.default', zIndex: 9999 }}>
-      <CircularProgress color="primary" />
-    </Box>
-  );
+  if (loading) return <DashboardSkeleton />;
 
   const currentCourse = currentCourseWithDetail;
   const currentProgress = serverStats
@@ -591,16 +624,16 @@ const isMdUp = useMediaQuery('(max-height:900px)');
   const openTopic = (tab: number, topicId: string) => {
     if (!currentCourse?.slug) return;
     try {
+      // 1. Guardar la pestanya (1 per Programació, 2 per Tests)
       localStorage.setItem(`mooc_tab_${currentCourse.slug}`, JSON.stringify(tab));
+      // 2. Guardar el tema seleccionat perquè CourseLessons el llegeixi
       if (topicId) {
-        const key = `mooc_expanded_${currentCourse.slug}`;
-        const expanded: string[] = JSON.parse(localStorage.getItem(key) || '[]');
-        if (!expanded.includes(topicId)) {
-          localStorage.setItem(key, JSON.stringify([...expanded, topicId]));
-        }
+        localStorage.setItem(`mooc_selected_topic_${currentCourse.slug}`, JSON.stringify(topicId));
       }
     } catch { /* mode privat */ }
-    navigate(`/courses/${currentCourse.slug}`);
+    
+    // Navegar directament a la vista de lliçons passant el lessonId per URL per assegurar resposta immediata
+    navigate(`/courses/${currentCourse.slug}?lessonId=${encodeURIComponent(topicId)}`);
   };
 
   return (
@@ -620,6 +653,9 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                 />
             ) : (
               <>
+                <Typography component="h1" className="sr-only">
+                  {currentCourse ? getText(currentCourse.title) : t('dashboard.title')}
+                </Typography>
                 {SHOW_COURSE_SWITCHER && (
                 <Box sx={{
                   display: 'inline-flex', alignItems: 'center', mb: 5, mt: tabsTopSpace,
@@ -718,7 +754,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                   // Sense el selector: tornar al curs com a les pàgines de test i de problema (el nom
                   // del curs, que també diu de quin curs és el tauler) i el títol de la pàgina
                   <Box sx={{ mb: { xs: 2, md: 3 }, mt:{md:-3}}}>
-                    <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 600, color: 'text.secondary', mb: 1, borderRadius: 1, border: '1px solid transparent', '&:hover': { bgcolor: 'transparent', border: '1px solid red' } }}>
+                    <Button component={RouterLink} to={`/courses/${currentCourse.slug}`} startIcon={<ChevronLeft size={18} />} sx={{ textTransform: 'none', fontWeight: 900, color: mode === 'light' ? '#000' : '#fff', mb: 1, borderRadius: 2, border: '2px solid #00685d', '&:hover': { bgcolor: 'transparent', border: '2px solid red' } }}>
                      {t('lesson.back_to_named_course', { course: getText(currentCourse.title) || currentCourse.slug })}
                     </Button>
                   </Box>
@@ -731,10 +767,10 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                         <DashboardCard title={t('dashboard.overall_progress')} compact minHeightXs={110}>
                           <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
                             <Box sx={{ position: 'relative', display: 'inline-flex', width: { xs: 64, md: isMdUp ? 160 : 180 }, height: { xs: 64, md: isMdUp ? 160 : 200 } }}>
-                              <CircularProgress variant="determinate" value={100} thickness={5} size="100%" sx={{ color: 'action.disabledBackground', position: 'absolute', ml: { xs: 0, md: isMdUp ? 0 : 1 } }} />
-                              <CircularProgress variant="determinate" value={currentProgress} thickness={5} size="100%" sx={{ color: 'primary.main' }} />
+                              <CircularProgress variant="determinate" value={100} thickness={5} size="100%" aria-hidden sx={{ color: 'action.disabledBackground', position: 'absolute', ml: { xs: 0, md: isMdUp ? 0 : 1 } }} />
+                              <CircularProgress variant="determinate" value={currentProgress} thickness={5} size="100%" aria-label={t('dashboard.overall_progress')} sx={{ color: 'primary.main' }}/>
                               <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: { xs: 0, md: isMdUp ? 0 : 1 } }}>
-                                <Typography variant={isMdUp ? 'h4' : 'h6'} sx={{ fontWeight: 900, fontSize: { xs: '0.85rem', md: isMdUp ? '1.5rem' : '2.5rem' } }}>{currentProgress}%</Typography>
+                                <Typography variant={isMdUp ? 'h4' : 'h5'} component="div" sx={{ fontWeight: 900, fontSize: { xs: '0.85rem', md: isMdUp ? '1.5rem' : '2.5rem' } }}>{currentProgress}%</Typography>
                               </Box>
                             </Box>
                           </Box>
@@ -759,7 +795,7 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                                 <Stack key={s.id || index} direction="row" spacing={1.5} sx={{ alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                                   <Stack direction="row" spacing={1} sx={{ alignItems: 'center', overflow: 'hidden' }}>
                                     <ProtectedAvatar 
-                                      src={s.userId && currentCourse?.slug ? userAvatarUrl(s.userId, currentCourse.slug) : undefined}
+                                      src={canLoadMemberAvatars && s.userId && currentCourse?.slug ? userAvatarUrl(s.userId, currentCourse.slug) : undefined}
                                       alt={s.name}
                                       sx={{
                                         width: { xs: 28, md: 32 }, height: { xs: 28, md: 32 },
@@ -820,9 +856,11 @@ const isMdUp = useMediaQuery('(max-height:900px)');
                     </Grid>
 
                     {/* Rendiment per tema, el propi i el de la classe (abans, "Més estadístiques") */}
-                    {currentCourse.slug && (
+                    {isLoggedIn && currentCourse.slug && (
                       <Box sx={{ order: { xs: 2, md: 0 } }}>
-                        <CourseStatsCharts courseSlug={currentCourse.slug} />
+                        <Suspense fallback={<Skeleton variant="rounded" height={420} sx={{ borderRadius: 3 }} />}>
+                          <CourseStatsCharts courseSlug={currentCourse.slug} />
+                        </Suspense>
                       </Box>
                     )}
 
@@ -902,6 +940,33 @@ function StatRow({ icon, label, value, hint }: { icon: React.ReactNode; label: s
   );
 }
 
+const MOCK_CARD_HEIGHT = 230;
+
+function DashboardSkeleton() {
+  const { t } = useTranslation();
+
+  return (
+    <Box
+      role="status"
+      aria-busy="true"
+      aria-label={t('common.loading')}
+      sx={{ width: '100%', height: '100%', overflow: 'auto' }}
+    >
+      <Container maxWidth={false} sx={{ pt: { xs: 2, md: 4 }, px: { xs: 2, sm: 1.5, md: 8, lg: 8, xl: 10 } }}>
+        <Skeleton variant="text" width="35%" height={36} sx={{ mb: 3, borderRadius: 2 }} />
+        <Grid container spacing={{ xs: 1.5, md: 2, xl: 4 }} sx={{ mb: { xs: 1.5, md: 5 } }}>
+          {[0, 1, 2, 3].map((i) => (
+            <Grid key={i} size={{ xs: 12, sm: 6, md: 3 }}>
+              <Skeleton variant="rounded" height={MOCK_CARD_HEIGHT} sx={{ borderRadius: 3 }} />
+            </Grid>
+          ))}
+        </Grid>
+        <Skeleton variant="rounded" height={420} sx={{ borderRadius: 3 }} />
+      </Container>
+    </Box>
+  );
+}
+
 function DashboardCard({ title, children, muted, compact, minHeightXs }: { title: string; children: React.ReactNode; muted?: boolean; compact?: boolean; minHeightXs?: number }) {
   return (
     <Box sx={{
@@ -912,7 +977,7 @@ function DashboardCard({ title, children, muted, compact, minHeightXs }: { title
       display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center',
       bgcolor: 'background.paper', opacity: muted ? 0.7 : 1,
     }}>
-      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 700, textAlign: 'center', width: '100%', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+      <Typography component="h2" variant="subtitle2" color="text.secondary" sx={{ mb: 1, fontWeight: 700, textAlign: 'center', width: '100%', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
         {title}
       </Typography>
       {children}
