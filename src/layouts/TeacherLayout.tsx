@@ -5,8 +5,8 @@ import { Box, IconButton, Typography, Stack, Avatar } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import PersonIcon from '@mui/icons-material/Person';
 import SchoolIcon from '@mui/icons-material/School';
-const logo = '/img/logo-230.webp';
-const logoSet = '/img/logo-115.webp 1x, /img/logo-230.webp 2x';
+const logo = '/img/logo.webp';
+const logoSet = '/img/logo.webp';
 import { Sidebar } from '../features/teacher/Sidebar';
 import { RouteFallback } from '../components/ui/RouteFallback';
 import { ThemeToggleButton } from '../components/ThemeToggleButton';
@@ -24,8 +24,6 @@ export function TeacherLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { mode } = useThemeMode();
   const isFancy = mode === 'fancy';
-  // L'àrea de professorat és per a qui és professor d'algun curs (el rol és per curs).
-  // Qui no ho és de cap (p. ex. un alumne que hi arriba per URL) torna a la portada.
   const isLoggedIn = !!localStorage.getItem('token');
   const courses = useAllCourses(isLoggedIn);
   const hasTeacherAccess = !!courses.data?.some(isCourseProfessor);
