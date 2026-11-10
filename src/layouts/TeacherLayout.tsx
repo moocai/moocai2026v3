@@ -66,7 +66,7 @@ export function TeacherLayout() {
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mr: 'auto' }}>
             <IconButton onClick={() => setMobileOpen(true)} sx={{ display: { md: 'none' } }}><MenuIcon /></IconButton>
-            <Box component="img" src={logo} srcSet={logoSet} alt="" width={438} height={190} sx={{ height: { xs: 22, md: 32 }, width: 'auto' }} />
+            <Box component="img" src={logo} srcSet={logoSet} alt="" width={100} height={45} sx={{transform: { xs: 'rotate(-90deg)', md: 'none' }, transition: 'transform 0.5s' }} />
             <Stack direction="row" sx={{ alignItems: 'baseline' }}>
               <Typography variant="h6" component="span" sx={{ fontWeight: 900, color: 'text.primary' }}>MOOC</Typography>
               <Typography variant="h6" component="span" sx={{ fontWeight: 900, color: 'primary.main', ml: 0.3 }}>2026</Typography>
